@@ -1,0 +1,66 @@
+[gd_scene format=3 uid="uid://5dash74ywlbq"]
+
+[ext_resource type="Script" uid="uid://lmj07yqpxv08" path="res://scripts/rendering/heightmap_terrain.gd" id="1_terrain"]
+[ext_resource type="Script" uid="uid://ch74ul3xqsi7r" path="res://scripts/ui/terrain_camera.gd" id="2_camera"]
+[ext_resource type="Script" uid="uid://b5suwdilyitpa" path="res://scripts/ui/terrain_editor.gd" id="3_editor"]
+
+[sub_resource type="Environment" id="Environment_world"]
+background_mode = 1
+background_color = Color(0.055, 0.085, 0.11, 1)
+ambient_light_source = 3
+ambient_light_color = Color(0.72, 0.81, 0.9, 1)
+ambient_light_energy = 0.3
+
+[sub_resource type="FastNoiseLite" id="Noise_land"]
+seed = 42
+frequency = 0.014
+
+[sub_resource type="FastNoiseLite" id="Noise_mountains"]
+seed = 137
+frequency = 0.035
+fractal_type = 2
+fractal_octaves = 4
+
+[node name="CivilizationLegacy" type="Node3D" unique_id=1335480349]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=2073379631]
+environment = SubResource("Environment_world")
+
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=707824059]
+transform = Transform3D(0.8660254, 0.40957603, -0.28678823, 0, 0.57357645, 0.81915206, 0.5, -0.7094065, 0.49673176, 0, 0, 0)
+light_color = Color(1, 0.9, 0.74, 1)
+light_energy = 0.85
+shadow_enabled = true
+shadow_blur = 1.5
+directional_shadow_mode = 0
+
+[node name="Terrain" type="Node3D" parent="." unique_id=492534778]
+script = ExtResource("1_terrain")
+map_size = Vector2(1024, 1024)
+elevation = 31.0
+land_noise = SubResource("Noise_land")
+mountain_noise = SubResource("Noise_mountains")
+mountain_strength = 0.24
+
+[node name="CameraRig" type="Node3D" parent="." unique_id=787485630]
+transform = Transform3D(1, 0, 0, 0, 0.57357645, 0.81915206, 0, -0.81915206, 0.57357645, 0, 0, 0)
+script = ExtResource("2_camera")
+
+[node name="Camera3D" type="Camera3D" parent="CameraRig" unique_id=2064744091]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 240)
+projection = 1
+current = true
+size = 180.0
+far = 2000.0
+
+[node name="Interface" type="CanvasLayer" parent="." unique_id=1751660738]
+
+[node name="Editor" type="Control" parent="Interface" unique_id=790371725]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("3_editor")

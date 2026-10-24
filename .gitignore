@@ -1,0 +1,15 @@
+# Godot-generated editor state and imported assets.
+.godot/
+.local-backups/
+/builds/
+/exports/
+export_credentials.cfg
+*.tmp
+*.log
+.DS_Store
+Thumbs.db
+
+# Keep source assets, .gd.uid files and portable export_presets.cfg in version control.
+
+# Intermediate input to regenerate the checked-in upstream comparison fixture.
+/tests/reference/graph-inputs.json
