@@ -1,9 +1,20 @@
+uniform sampler2D drainage_field : source_color, filter_nearest, repeat_disable;
+uniform bool hydrology_enabled = false;
 uniform sampler2D biome_palette : source_color, filter_linear, repeat_disable;
 uniform bool biomes_enabled = false;
 uniform sampler2D climate_field : filter_linear, repeat_disable;
+uniform sampler2D habitat_field : filter_linear, repeat_disable;
+uniform sampler2D biome_field : source_color, filter_nearest, repeat_disable;
+uniform bool habitats_enabled = false;
 uniform int climate_mode = 0;
 
 vec3 climate_color(vec2 uv) {
+	if (climate_mode == 5) {
+		return texture(biome_field, clamp(uv, vec2(0.0), vec2(1.0))).rgb;
+	}
+	if (climate_mode == 4) {
+		return texture(drainage_field, clamp(uv, vec2(0.0), vec2(1.0))).rgb;
+	}
 	vec4 data = texture(climate_field, clamp(uv, vec2(0.0), vec2(1.0)));
 	if (climate_mode == 1) {
 		float t = data.r * 140.0 - 80.0;

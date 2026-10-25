@@ -43,11 +43,11 @@ func _ready() -> void:
 	var apply := Button.new()
 	apply.name = "ApplyClimate"
 	apply.text = "Apply climate"
-	apply.tooltip_text = "Generate temperature, winds and rainfall using this gizmo without changing the terrain."
+	apply.tooltip_text = "Generate temperature, winds and rainfall using this gizmo and recalculate lake and river flows without changing the terrain."
 	apply.pressed.connect(apply_settings)
 	_form.add_child(apply)
 	overlay = OptionButton.new()
-	for title in ["Terrain", "Temperature", "Rainfall", "Winds"]:
+	for title in ["Terrain", "Temperature", "Rainfall", "Winds", "Drainage basins", "Biomes"]:
 		overlay.add_item(title)
 	overlay.tooltip_text = "Terrain shows the resulting biomes, while the other views show the climate data that created them."
 	overlay.item_selected.connect(func(index: int): terrain.set_climate_view(index); _update_legend())
@@ -99,6 +99,12 @@ func sync() -> void:
 	_update_latitudes()
 	if terrain.climate != null:
 		status.text = "Temperatures %.0f to %.0f°C · %.0f ms" % [terrain.climate.temperature_range.x, terrain.climate.temperature_range.y, terrain.climate.generation_ms]
+		if terrain.hydrology != null and terrain.hydrology.error.is_empty():
+			var wet_lakes: int = 0
+			for lake in terrain.hydrology.lakes:
+				if lake.active:
+					wet_lakes += 1
+			status.text += "\n%d lakes · %d river reaches" % [wet_lakes, terrain.hydrology.rivers.size()]
 	else:
 		status.text = "Generate terrain to add climate."
 	_update_legend()
@@ -126,7 +132,7 @@ func _update_latitudes() -> void:
 
 
 func _update_legend() -> void:
-	legend.text = ["Terrain shows climate-driven biomes · click a cell for its biome.", "Blue −80°C · white 0°C · red +60°C", "Sand 0 · teal 1500 · blue 6000 mm/yr (est.)", "Arrows point where air travels · not wind speed"][overlay.selected]
+	legend.text = ["Terrain shows climate-driven biomes · click a cell for its biome.", "Blue −80°C · white 0°C · red +60°C", "Sand 0 · teal 1500 · blue 6000 mm/yr (est.)", "Arrows point where air travels · not wind speed", "Matching colours drain to the same outlet or closed lake.", "Green: forests · olive: grasslands · sand: deserts · grey: tundra · muted teal: wetlands. Click for details."][overlay.selected]
 
 
 func apply_settings() -> void:

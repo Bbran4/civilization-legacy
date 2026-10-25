@@ -1,10 +1,12 @@
 extends RefCounted
 ## Versioned terrain-only documents. Parse and validate completely before applying.
 
+const Biomes = preload("res://scripts/domain/terrain_biomes.gd")
+const Hydrology = preload("res://scripts/domain/terrain_hydrology.gd")
 const Climate = preload("res://scripts/domain/terrain_climate.gd")
 const Geography = preload("res://scripts/domain/terrain_geography.gd")
 const Recipe = preload("res://scripts/domain/heightmap_recipe.gd")
-const VERSION: int = 6
+const VERSION: int = 8
 const MAX_BYTES: int = 64 * 1024 * 1024
 const NUMBERS: Dictionary = {
 	"close_detail_resolution": [32, 256, true], "micro_detail_strength": [0, 2],
@@ -59,7 +61,7 @@ static func capture(terrain: Node) -> Dictionary:
 	if source.has("error"):
 		return {}
 	return {"format": "civilization-legacy-terrain", "version": VERSION,
-		"generator_version": terrain.generator_version, "climate": {"version": Climate.VERSION, "settings": terrain.climate_settings.duplicate()}, "settings": settings, "source_image": source,
+		"biomes": {"version": Biomes.VERSION}, "hydrology": {"version": Hydrology.VERSION}, "generator_version": terrain.generator_version, "climate": {"version": Climate.VERSION, "settings": terrain.climate_settings.duplicate()}, "settings": settings, "source_image": source,
 		"sample_size": [terrain.sample_size().x, terrain.sample_size().y], "graph": terrain.graph_snapshot(),
 		"heights": Array(terrain.height_samples), "geography": terrain.geography_snapshot()}
 
@@ -68,7 +70,7 @@ static func validate(document: Variant) -> String:
 	if not document is Dictionary:
 		return "The file must contain a terrain document object."
 	if document.get("format") != "civilization-legacy-terrain" or not _within(document.get("version"), [1, VERSION, true]):
-		return "This is not a supported Civilization Legacy terrain file (versions 1–6)."
+		return "This is not a supported Civilization Legacy terrain file (versions 1–8)."
 	if not _within(document.get("generator_version"), [1, 4, true]):
 		return "The terrain generator version is unsupported."
 	var settings: Variant = document.get("settings")
@@ -138,6 +140,14 @@ static func validate(document: Variant) -> String:
 		var climate_error: String = Climate.validate(climate.get("settings"))
 		if not climate_error.is_empty():
 			return climate_error
+	if document.version >= 8:
+		var biomes: Variant = document.get("biomes")
+		if not biomes is Dictionary or not _within(biomes.get("version"), [Biomes.VERSION, Biomes.VERSION, true]):
+			return "Unsupported biome data."
+	if document.version >= 7:
+		var hydrology: Variant = document.get("hydrology")
+		if not hydrology is Dictionary or not _within(hydrology.get("version"), [Hydrology.VERSION, Hydrology.VERSION, true]):
+			return "Unsupported hydrology data."
 	return ""
 
 

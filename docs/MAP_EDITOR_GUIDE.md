@@ -101,8 +101,8 @@ changing their saved heights. Shoreline outlines fade away as you zoom into 3D.
 
 ## What comes next
 
-Basic climate and biome ground cover are implemented. Drainage, rivers, lake
-levels and detailed ice remain later stages. See the
+Basic climate, biome ground cover and the first lakes/rivers pass are implemented.
+Partial/seasonal lake levels, erosion, wetlands and detailed ice remain later work. See the
 [terrain generation roadmap](TERRAIN_GENERATION_ROADMAP.md).
 
 ## Climate gizmo
@@ -123,3 +123,39 @@ Applied choices save with the map; pending edits do not.
 
 This is a basic annual climate estimate. Rivers, seasonal weather, lake outlets
 and detailed vegetation are later stages. [Detailed climate guide](CLIMATE_REFERENCE.md).
+
+## Lakes and rivers
+
+Generate a map to create water drainage automatically. Rivers collect rainfall,
+join into larger channels, feed lakes and reach the sea or the edge of a cropped
+map. Lakes have their own spill elevations and may have an outlet or be closed.
+The current lake surfaces use spill-capacity levels; seasonal filling and smaller
+water surfaces for underfed lakes are not simulated yet.
+
+Choose **Drainage basins** in the climate panel to colour areas by their shared
+outlet. Return to **Terrain** to see water surfaces and river ribbons. Click water
+or land to see its basin, river-flow strength, lake level and outlet information.
+**Apply climate** recalculates flows; zero rainfall dries generated inland water
+while preserving the ocean and original terrain. **Show heights** hides water
+presentation for inspecting the source heightmap.
+
+Maps save in version 8; earlier files still load. See the
+[hydrology model and verification](HYDROLOGY_REFERENCE.md) for details and limits.
+
+## Biomes and tree suitability
+
+Choose **Biomes** in the bottom-right view menu to see habitat categories.
+Click terrain to read the exact biome, potential tree cover and nearby-water
+influence. Wetlands prefer flat wet ground; suitable river and lake banks can
+support woodland even when the surrounding country is dry. Rainfall remains
+the amount falling from the sky. Potential tree cover is a habitat estimate;
+actual tree models come in the later presentation stage. Use **Terrain** to
+return to blended natural ground colours.
+
+## Ground surface detail
+
+In **Terrain**, zoom close to see repeating grass, soil, sand, wet ground, rock and
+snow textures, with small bumps affecting their lighting. Their size stays the
+same when you generate a wider map. Zooming out fades fine texture into the broad
+biome colours. No extra settings are required. The diagnostic views still show
+their original data. See [terrain material notes](TERRAIN_MATERIALS.md).

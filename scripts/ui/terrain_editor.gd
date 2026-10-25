@@ -20,6 +20,7 @@ var _image_path: String = ""
 var _dialog: FileDialog
 var _dialog_action: String = ""
 var _selected_cell: int = -1
+var _cell_panel: PanelContainer
 var _cell_label: Label
 var _custom_index: int = -1
 var _image_size := Vector2i.ZERO
@@ -385,6 +386,7 @@ func load_terrain(path: String) -> String:
 func _build_cell_inspector() -> void:
 	var panel := PanelContainer.new()
 	panel.name = "CellInspector"
+	_cell_panel = panel
 	panel.anchor_left = 1.0
 	panel.anchor_right = 1.0
 	panel.offset_left = -274
@@ -409,9 +411,16 @@ func _build_cell_inspector() -> void:
 	scroll.add_child(_cell_label)
 	add_child(panel)
 	_terrain.climate_changed.connect(_refresh_selected_cell)
-	_terrain.terrain_regenerated.connect(func():
-		_selected_cell = -1
-		_cell_label.text = "CELL DATA\nClick the map to inspect its terrain." if _terrain.graph != null else "LEGACY TERRAIN\nSaved surface loaded.\nGenerate to create cell data.")
+	_terrain.terrain_regenerated.connect(_reset_cell_inspector)
+	_reset_cell_inspector()
+
+
+func _reset_cell_inspector() -> void:
+	_selected_cell = -1
+	_cell_label.text = "CELL DATA\nClick the map to inspect its terrain." if _terrain.graph != null else "LEGACY TERRAIN\nGenerate to create cell data."
+	_cell_panel.anchor_bottom = 0.0
+	_cell_panel.offset_bottom = 84
+
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -431,15 +440,32 @@ func _refresh_selected_cell() -> void:
 
 
 func _show_cell_info(info: Dictionary) -> void:
-	_cell_label.text = "CELL %d · %s\nX %.2f   Y %.2f\nHeight %d / 100 · sea datum 20\n%d neighbors\nArea %.2f map units²" % [info.id, "Land" if info.land else "Water", info.position.x, info.position.y, info.height, info.neighbor_count, info.area]
+	_cell_panel.anchor_bottom = 1.0
+	_cell_panel.offset_bottom = -470
+	_cell_label.text = "CELL %d · %s\nX %.2f   Y %.2f\nHeight %d / 100 · sea datum 20\n%d neighbors\nArea %.2f map units²" % [info.id, info.get("surface_kind", "Land" if info.land else "Water"), info.position.x, info.position.y, info.height, info.neighbor_count, info.area]
+	if info.has("basin_id"):
+		if info.basin_id >= 0:
+			var basin: Dictionary = _terrain.hydrology.basins[info.basin_id]
+			var destinations := {"ocean": "ocean", "map_edge": "map edge", "closed_lake": "closed lake", "dry_depression": "dry depression"}
+			_cell_label.text += "\nBasin #%d · drains to %s" % [info.basin_id, destinations[basin.kind]]
+		if info.river_id >= 0:
+			_cell_label.text += "\nRiver reach #%d · flow %.1f×" % [info.river_id, info.flow_strength]
+		if info.lake_id >= 0:
+			_cell_label.text += "\nLake basin #%d · spill level %.1f / 100\n%s" % [info.lake_id, info.lake_level, ("Outlet: cell %d" % info.lake_outlet) if info.lake_outlet >= 0 else ("Closed lake: inflow lost to evaporation" if info.lake_active else "Dry basin: no rainfall runoff")]
+
+			if info.lake_active:
+				_cell_label.text += "\nLake depth: %.1f height units" % info.water_depth
 	if info.has("feature_id"):
 		var names := {"landmass": "Large landmass", "island": "Island", "open_water": "Open water", "inland_water": "Inland water (lake candidate)"}
 		var distance: String = "No coastline" if info.coast_distance < 0.0 else "About %.1f map units from coast" % info.coast_distance
 		_cell_label.text += "\n%s #%d\n%s · %d cells\nFeature area: %.1f map units²\n%s\n%s" % [names[info.feature_kind], info.feature_id, "Touches map border" if info.touches_border else "Enclosed within map", info.feature_cells, info.feature_area, "Coastal cell" if info.coastal else "Away from coast", distance]
 		if not info.land:
-			_cell_label.text += "\nDepth: %d height units below sea" % info.depth
+			_cell_label.text += "\nHeight below sea datum: %d units" % info.depth
 	if info.has("temperature"):
 		_cell_label.text += "\nBiome: %s\nLatitude: %+.1f°\nTemperature: %.1f°C\nRainfall: %.0f mm/yr (est.)\nWind travels: %s" % [info.biome, info.latitude, info.temperature, info.rainfall, _wind_name(info.wind)]
+		if info.has("canopy"):
+			_cell_label.text += "\nPotential tree cover: %.0f%% · nearby water: %.0f%%" % [info.canopy * 100.0, info.water_support * 100.0]
+
 
 
 func _wind_name(wind: Vector2) -> String:

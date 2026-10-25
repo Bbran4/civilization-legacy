@@ -4,7 +4,10 @@ extends Node3D
 
 signal climate_changed
 signal terrain_regenerated
+const SurfaceMaterials = preload("res://scripts/rendering/terrain_materials.gd")
 const Biomes = preload("res://scripts/domain/terrain_biomes.gd")
+const Hydrology = preload("res://scripts/domain/terrain_hydrology.gd")
+const HydrologyView = preload("res://scripts/rendering/terrain_hydrology_view.gd")
 const Climate = preload("res://scripts/domain/terrain_climate.gd")
 const Geography = preload("res://scripts/domain/terrain_geography.gd")
 const GeographyView = preload("res://scripts/rendering/terrain_geography_view.gd")
@@ -188,6 +191,9 @@ var height_samples := PackedFloat32Array()
 var _dirty: bool = true
 var _delay: float = 0.0
 var _land_material: ShaderMaterial
+var _regional_tint: Texture2D
+var _regional_seed: String = ""
+var _regional_size := Vector2.ZERO
 var _recipe_samples := PackedFloat32Array()
 var graph: RefCounted
 var _graph_key: String = ""
@@ -198,6 +204,11 @@ var generator_version: int = 4
 var detail: Node3D
 var biomes: RefCounted
 var _biome_texture: Texture2D
+var _habitat_texture: Texture2D
+var _biome_field_texture: Texture2D
+var hydrology: RefCounted
+var hydrology_view: Node3D
+var _hydrology_texture: Texture2D
 var climate: RefCounted
 var climate_settings: Dictionary = Climate.DEFAULTS.duplicate()
 var climate_view: int = 0
@@ -298,13 +309,7 @@ func regenerate() -> void:
 			geography_view = GeographyView.new()
 			geography_view.name = "GeographyView"
 			add_child(geography_view, false, Node.INTERNAL_MODE_BACK)
-		# Old manually raised water levels retain their appearance without drawing
-		# a shoreline that falsely claims the canonical sea datum is still visible.
-		var canonical_sea: bool = is_equal_approx(sea_level, height_offset)
-		geography_view.build(geography if show_water and canonical_sea else null, map_size, sea_level * relief_scale(), sand_color)
-		geography_view.set_overview_blend(overview_blend)
-		geography_view.set_heightmap_view(heightmap_view)
-	_refresh_climate()
+	_refresh_climate(true)
 	generation_ms = (Time.get_ticks_usec() - started) / 1000.0
 	terrain_regenerated.emit()
 
@@ -320,27 +325,66 @@ func apply_climate(options: Dictionary) -> String:
 	return ""
 
 
-func _refresh_climate() -> void:
+func _refresh_climate(rebuild_views: bool = false) -> void:
+	var changed: bool = false
 	if geography == null:
 		climate = null
 		biomes = null
 		_biome_texture = null
+		_habitat_texture = null
+		_biome_field_texture = null
 		_climate_texture = null
 	elif climate == null or climate.source_hash != geography.source_hash or climate.settings != climate_settings:
+		changed = true
 		climate = Climate.new()
 		climate.generate(geography, climate_settings)
 		var image := Image.create_from_data(climate.size.x, climate.size.y, false, Image.FORMAT_RGBAF, climate.field.to_byte_array())
 		_climate_texture = ImageTexture.create_from_image(image)
+	_refresh_hydrology(changed, rebuild_views)
+	if changed or (biomes == null and climate != null):
 		biomes = Biomes.new()
-		biomes.generate(climate, geography)
+		biomes.generate(climate, geography, graph, hydrology)
 		if _biome_texture == null:
 			_biome_texture = ImageTexture.create_from_image(biomes.image)
+		_habitat_texture = ImageTexture.create_from_image(biomes.habitat_field) if biomes.habitat_field != null else null
+		_biome_field_texture = ImageTexture.create_from_image(biomes.biome_field) if biomes.biome_field != null else null
 	set_climate_view(climate_view)
 	climate_changed.emit()
 
 
+func _refresh_hydrology(climate_changed: bool, rebuild_views: bool) -> void:
+	if climate == null or graph == null:
+		hydrology = null
+		_hydrology_texture = null
+	else:
+		if hydrology == null or hydrology.source_hash != geography.source_hash:
+			hydrology = Hydrology.new()
+			hydrology.build(graph, geography)
+			climate_changed = true
+		if not hydrology.error.is_empty():
+			push_warning(hydrology.error)
+			_hydrology_texture = null
+		elif climate_changed:
+			hydrology.apply_climate(graph, climate)
+			_hydrology_texture = ImageTexture.create_from_image(hydrology.display_field(graph))
+	if Engine.is_editor_hint():
+		return
+	if hydrology_view == null:
+		hydrology_view = HydrologyView.new()
+		hydrology_view.name = "HydrologyView"
+		add_child(hydrology_view, false, Node.INTERNAL_MODE_BACK)
+	if climate_changed or rebuild_views or hydrology == null:
+		hydrology_view.build(self)
+		if geography_view != null:
+			var canonical_sea: bool = is_equal_approx(sea_level, height_offset)
+			var filter: Callable = hydrology.is_ocean_coast.bind(graph) if hydrology != null and hydrology.error.is_empty() else Callable()
+			geography_view.build(geography if show_water and canonical_sea else null, map_size, sea_level * relief_scale(), sand_color, filter)
+			geography_view.set_overview_blend(overview_blend)
+			geography_view.set_heightmap_view(heightmap_view)
+
+
 func set_climate_view(mode: int) -> void:
-	climate_view = clampi(mode, 0, 3)
+	climate_view = clampi(mode, 0, 5)
 	var visible_mode: int = climate_view if climate != null else 0
 	for material in [_land_material, (get_node("Water") as MeshInstance3D).get_active_material(0)]:
 		if material is ShaderMaterial:
@@ -348,8 +392,17 @@ func set_climate_view(mode: int) -> void:
 			material.set_shader_parameter("climate_mode", visible_mode)
 			material.set_shader_parameter("biomes_enabled", biomes != null)
 			material.set_shader_parameter("biome_palette", _biome_texture)
+			material.set_shader_parameter("habitat_field", _habitat_texture)
+			material.set_shader_parameter("biome_field", _biome_field_texture)
+			material.set_shader_parameter("habitats_enabled", _habitat_texture != null)
+			material.set_shader_parameter("drainage_field", _hydrology_texture)
+			material.set_shader_parameter("hydrology_enabled", _hydrology_texture != null and is_equal_approx(sea_level, height_offset))
 	if detail != null:
 		detail.set_climate_view(visible_mode, _climate_texture, _biome_texture)
+		detail.set_hydrology_field(_hydrology_texture)
+		detail.set_habitat_fields(_habitat_texture, _biome_field_texture)
+	if hydrology_view != null:
+		hydrology_view.set_view(climate_view, heightmap_view)
 
 
 func display_size() -> Vector2:
@@ -511,6 +564,8 @@ func set_overview_blend(value: float) -> void:
 
 func set_heightmap_view(enabled: bool) -> void:
 	heightmap_view = enabled
+	if hydrology_view != null:
+		hydrology_view.set_view(climate_view, enabled)
 	if _land_material != null:
 		_land_material.set_shader_parameter("heightmap_view", enabled)
 	if detail != null:
@@ -567,6 +622,12 @@ func _update_material(surface: MeshInstance3D) -> void:
 	if _land_material == null:
 		_land_material = ShaderMaterial.new()
 		_land_material.shader = TERRAIN_SHADER
+	SurfaceMaterials.bind_library(_land_material)
+	if _regional_tint == null or _regional_seed != map_seed or _regional_size != map_size:
+		_regional_tint = SurfaceMaterials.regional_field(map_size, map_seed)
+		_regional_seed = map_seed
+		_regional_size = map_size
+	_land_material.set_shader_parameter("regional_tint", _regional_tint)
 	_land_material.set_shader_parameter("map_size", display_size())
 	_land_material.set_shader_parameter("sea_level", sea_level * relief_scale())
 	_land_material.set_shader_parameter("height_scale", elevation * relief_scale())
@@ -594,12 +655,34 @@ func cell_info(cell: int) -> Dictionary:
 		info.merge(geography.cell_info(cell))
 	if climate != null:
 		info.merge(climate.cell_info(graph.points[cell] / map_size))
-		info.merge(Biomes.cell_info(info.temperature, info.rainfall, info.land))
+	if hydrology != null and hydrology.error.is_empty():
+		info.merge(hydrology.cell_info(cell))
+		info["flow_strength"] = info.discharge / hydrology.river_threshold
+	if biomes != null and biomes.canopy.size() == graph.count:
+		info.merge(biomes.native_cell_info(cell), true)
+	elif climate != null:
+		info.merge(Biomes.cell_info(info.temperature, info.rainfall, info.land), true)
 	return info
 
 
 func surface_height(uv: Vector2) -> float:
 	return detail.height_at(uv) if detail != null and detail.contains(uv) else base_surface_height(uv)
+
+
+func visible_surface_height(uv: Vector2) -> float:
+	var height: float = surface_height(uv)
+	if not show_water:
+		return height
+	if hydrology == null or not hydrology.error.is_empty() or heightmap_view or not is_equal_approx(sea_level, height_offset):
+		return maxf(height, sea_level * relief_scale())
+	var cell: int = graph.nearest_cell(uv * map_size)
+	if hydrology.ocean[cell]:
+		return maxf(height, sea_level * relief_scale())
+	var lake_id: int = hydrology.lake_ids[cell]
+	if climate_view == 0 and lake_id >= 0 and hydrology.lakes[lake_id].active:
+		var lake_height: float = (height_offset + (hydrology.lakes[lake_id].level / 100.0 - 0.2) * elevation) * relief_scale()
+		return maxf(height, lake_height)
+	return height
 
 
 func base_surface_height(uv: Vector2) -> float:
@@ -644,17 +727,13 @@ func ray_surface_hit(ray_origin: Vector3, ray_direction: Vector3) -> Variant:
 		var t: float = lerpf(enter, leave, float(step_index) / steps)
 		var point: Vector3 = origin + direction * t
 		var uv := Vector2(point.x, point.z) / extent + Vector2(0.5, 0.5)
-		var height: float = surface_height(uv)
-		if show_water:
-			height = maxf(height, sea_level * relief_scale())
+		var height: float = visible_surface_height(uv)
 		if point.y <= height:
 			for refinement in range(16):
 				var middle: float = (previous_t + t) * 0.5
 				point = origin + direction * middle
 				uv = Vector2(point.x, point.z) / extent + Vector2(0.5, 0.5)
-				height = surface_height(uv)
-				if show_water:
-					height = maxf(height, sea_level * relief_scale())
+				height = visible_surface_height(uv)
 				if point.y > height:
 					previous_t = middle
 				else:

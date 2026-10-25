@@ -249,3 +249,16 @@ func set_climate_view(mode: int, field: Texture2D, biome_palette: Texture2D = nu
 		_material.set_shader_parameter("climate_field", field)
 		_material.set_shader_parameter("biomes_enabled", biome_palette != null)
 		_material.set_shader_parameter("biome_palette", biome_palette)
+
+
+func set_hydrology_field(field: Texture2D) -> void:
+	if _material != null:
+		_material.set_shader_parameter("drainage_field", field)
+		_material.set_shader_parameter("hydrology_enabled", field != null)
+
+
+func set_habitat_fields(habitat: Texture2D, biome: Texture2D) -> void:
+	if _material != null:
+		_material.set_shader_parameter("habitat_field", habitat)
+		_material.set_shader_parameter("biome_field", biome)
+		_material.set_shader_parameter("habitats_enabled", habitat != null)

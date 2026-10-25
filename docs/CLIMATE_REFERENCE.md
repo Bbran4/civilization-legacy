@@ -2,7 +2,8 @@
 
 The bottom-right climate panel controls a deterministic annual climate estimate.
 It generates temperature, prevailing wind direction and rainfall. It does not
-simulate daily weather, seasons, ocean currents, rivers or lake levels.
+simulate daily weather, seasons or ocean currents. The separate
+[hydrology pass](HYDROLOGY_REFERENCE.md) now derives drainage, lakes and rivers.
 Climate now also drives [first-pass biome cover](BIOMES_REFERENCE.md) in normal terrain.
 
 ## Using the gizmo
@@ -23,6 +24,7 @@ Climate now also drives [first-pass biome cover](BIOMES_REFERENCE.md) in normal 
 - Choose **Temperature**, **Rainfall** or **Winds** below the button to inspect
   the fields. Each view includes its own legend. Arrows point where air travels,
   rather than where the wind comes from, and do not indicate speed.
+  The additional Drainage basins view shows catchments from the hydrology pass.
 - **Terrain** shows climate-driven desert, grassland, forest, tundra and ice colours. **Show heights** takes visual
   precedence over climate overlays; turn it off to see climate colours again.
 - Click the map for latitude, temperature, rainfall wind direction and biome in the
@@ -62,8 +64,9 @@ choices, not calibration to historical precipitation observations.
 
 Very thin mountain barriers below the climate grid/transport scale may be missed.
 The model does not conserve a full atmospheric energy budget and is not a weather
-forecast. Rainfall is a field suitable for the next runoff stage; no catchments,
-river paths, lake outlets or runoff accumulation are generated yet.
+forecast. Rainfall supplies the current runoff stage; catchments,
+river paths, lake outlets and runoff accumulation are now derived by the separate
+hydrology pass, rather than being part of the atmospheric solver.
 The derived biome cover is a visible response to climate; forest objects and
 vegetation simulation remain future work.
 
@@ -74,9 +77,9 @@ simplified implementation.
 
 ## Saving
 
-Version 6 terrain documents save climate algorithm version 1 and the five applied
+Version 8 terrain documents retain climate algorithm version 1 and the five applied
 settings. Fields are regenerated from the saved geographic source on load instead
-of persisting another large derived cache. Versions 1–5 remain supported and gain
+of persisting another large derived cache. Versions 1–7 remain supported and gain
 default climate on load when they contain a cell graph. Old graphless terrain
 retains its saved surface and needs Generate before climate can be derived.
 Invalid values and latitude ranges are rejected before terrain mutation. View

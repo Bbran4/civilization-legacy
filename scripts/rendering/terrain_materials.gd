@@ -1,0 +1,128 @@
+@tool
+extends RefCounted
+## Original procedural surface library. Cached assets are shared by base and LODs.
+const Biomes = preload("res://scripts/domain/terrain_biomes.gd")
+const Grid = preload("res://scripts/domain/heightmap_grid.gd")
+const NAMES := ["Grass", "Dry grass", "Soil", "Sand", "Rock", "Snow", "Wet ground"]
+const TILE_SIZE := 128
+const TILE_WORLD_SIZE := 8.0
+static var albedo: Texture2DArray
+static var normals: Texture2DArray
+static var weights: ImageTexture
+static var build_count: int = 0
+
+
+static func _hash(x: int, y: int, seed_value: int) -> float:
+	var n: int = (x * 374761393 + y * 668265263 + seed_value * 1274126177) & 0x7fffffff
+	n = ((n ^ (n >> 13)) * 1274126177) & 0x7fffffff
+	return float(n ^ (n >> 16)) / 2147483647.0
+
+
+static func _noise(uv: Vector2, cells: Vector2i, seed_value: int) -> float:
+	var p: Vector2 = uv * Vector2(cells)
+	var x: int = floori(p.x)
+	var y: int = floori(p.y)
+	var f: Vector2 = p - Vector2(x, y)
+	f = f * f * (Vector2(3, 3) - 2.0 * f)
+	return lerpf(lerpf(_hash(posmod(x, cells.x), posmod(y, cells.y), seed_value), _hash(posmod(x + 1, cells.x), posmod(y, cells.y), seed_value), f.x), lerpf(_hash(posmod(x, cells.x), posmod(y + 1, cells.y), seed_value), _hash(posmod(x + 1, cells.x), posmod(y + 1, cells.y), seed_value), f.x), f.y)
+
+
+static func relief(uv: Vector2, layer: int) -> float:
+	var broad: float = _noise(uv, Vector2i(8, 8), 19 + layer)
+	var grain: float = _noise(uv, Vector2i(64, 64), 47 + layer)
+	match layer:
+		0, 1: return 0.25 * broad + 0.4 * _noise(uv, Vector2i(48, 16), 81) + 0.35 * grain
+		2, 6: return 0.45 * broad + 0.55 * grain
+		3: return 0.5 + 0.12 * sin(uv.y * TAU * 16 + broad * 2.0) + 0.18 * (grain - 0.5)
+		4: return 0.65 * (1.0 - absf(broad * 2.0 - 1.0)) + 0.35 * grain
+		_: return 0.5 + 0.15 * (broad - 0.5) + 0.08 * (grain - 0.5)
+
+
+static func base_weights(id: int) -> Color:
+	# RGBA = grass, dry grass, soil, sand; ecological identity stays in Biomes.
+	match id:
+		0, 12: return Color(0, 0, 1, 0)
+		1, 2: return Color(0.1, 0.15, 0.65, 0.1)
+		3, 4: return Color(0, 0.1, 0.15, 0.75)
+		5: return Color(0.1, 0.75, 0.1, 0.05)
+		7: return Color(0.3, 0.55, 0.15, 0)
+		8, 9, 10, 11, 14: return Color(0.45, 0.05, 0.5, 0)
+		13: return Color(0.35, 0.1, 0.55, 0)
+		_: return Color(0.8, 0.15, 0.05, 0)
+
+
+static func ensure_library() -> bool:
+	if albedo != null:
+		return true
+	var diffuse_images: Array[Image] = []
+	var normal_images: Array[Image] = []
+	for layer in range(NAMES.size()):
+		var diffuse := Image.create(TILE_SIZE, TILE_SIZE, false, Image.FORMAT_RGBA8)
+		var normal := Image.create(TILE_SIZE, TILE_SIZE, false, Image.FORMAT_RGBA8)
+		var field := PackedFloat32Array()
+		field.resize(TILE_SIZE * TILE_SIZE)
+		for y in range(TILE_SIZE):
+			for x in range(TILE_SIZE):
+				field[y * TILE_SIZE + x] = relief(Vector2(x, y) / TILE_SIZE, layer)
+		for y in range(TILE_SIZE):
+			for x in range(TILE_SIZE):
+				var h: float = field[y * TILE_SIZE + x]
+				var contrast: float = 0.22 if layer != 4 else 0.4
+				var value: float = 0.5 + (h - 0.5) * contrast
+				var tint := Color(1, 1, 1)
+				if layer in [2, 6]:
+					tint = Color(1.04, 0.97, 0.9)
+				var color: Color = Color(value * tint.r, value * tint.g, value * tint.b).linear_to_srgb()
+				color.a = h # Explicit micro-height, never biome identity.
+				diffuse.set_pixel(x, y, color)
+				var dx: float = field[y * TILE_SIZE + posmod(x + 1, TILE_SIZE)] - field[y * TILE_SIZE + posmod(x - 1, TILE_SIZE)]
+				var dy: float = field[posmod(y + 1, TILE_SIZE) * TILE_SIZE + x] - field[posmod(y - 1, TILE_SIZE) * TILE_SIZE + x]
+				var strength: float = 3.0 if layer == 4 else 1.4
+				var n: Vector3 = Vector3(-dx * strength, -dy * strength, 1.0).normalized()
+				var roughness: float = 0.76 if layer == 6 else 0.92
+				normal.set_pixel(x, y, Color(n.x * 0.5 + 0.5, n.y * 0.5 + 0.5, n.z * 0.5 + 0.5, roughness))
+		diffuse.generate_mipmaps()
+		normal.generate_mipmaps(true)
+		diffuse_images.append(diffuse)
+		normal_images.append(normal)
+	albedo = Texture2DArray.new()
+	normals = Texture2DArray.new()
+	var diffuse_error: Error = albedo.create_from_images(diffuse_images)
+	var normal_error: Error = normals.create_from_images(normal_images)
+	if diffuse_error != OK or normal_error != OK:
+		push_error("Cannot create terrain texture arrays: %s / %s" % [error_string(diffuse_error), error_string(normal_error)])
+		albedo = null
+		normals = null
+		return false
+	var palette := Image.create(Biomes.PALETTE_SIZE.x, Biomes.PALETTE_SIZE.y, false, Image.FORMAT_RGBA8)
+	for y in range(palette.get_height()):
+		for x in range(palette.get_width()):
+			palette.set_pixel(x, y, base_weights(Biomes.classify(-80.0 + x * 0.5, y * 10.0)))
+	weights = ImageTexture.create_from_image(Biomes._soften_palette(palette))
+	build_count += 1
+	return true
+
+
+static func bind_library(material: ShaderMaterial) -> void:
+	if not ensure_library():
+		material.set_shader_parameter("surface_materials_enabled", false)
+		return
+	material.set_shader_parameter("surface_albedo", albedo)
+	material.set_shader_parameter("surface_normals", normals)
+	material.set_shader_parameter("surface_weights", weights)
+	material.set_shader_parameter("surface_tile_size", TILE_WORLD_SIZE)
+	material.set_shader_parameter("surface_materials_enabled", true)
+
+
+static func regional_field(map_size: Vector2, seed_text: String) -> ImageTexture:
+	# Linear RGB multipliers, not a second biome identity/colour map.
+	var size: Vector2i = Grid.sample_size_for(map_size, 128)
+	var image := Image.create(size.x, size.y, false, Image.FORMAT_RGBAF)
+	var seed_value: int = posmod(seed_text.hash(), 10000)
+	for y in range(size.y):
+		for x in range(size.x):
+			var uv: Vector2 = Vector2(x, y) / Vector2(size - Vector2i.ONE)
+			var broad: float = _noise(uv, Vector2i(5, 5), seed_value) - 0.5
+			var local: float = _noise(uv, Vector2i(17, 17), seed_value + 1) - 0.5
+			image.set_pixel(x, y, Color(1.0 + broad * 0.12 + local * 0.025, 1.0 + broad * 0.08, 1.0 - broad * 0.08, 1))
+	return ImageTexture.create_from_image(image)

@@ -15,15 +15,19 @@ func clear() -> void:
 	_material = null
 
 
-func build(geography: RefCounted, extent: Vector2, sea: float, colour: Color) -> void:
+func build(geography: RefCounted, extent: Vector2, sea: float, colour: Color, coast_filter: Callable = Callable()) -> void:
 	clear()
 	if geography == null or geography.coastlines.is_empty():
 		return
 	var vertices := PackedVector3Array()
 	for coast in geography.coastlines:
+		if coast_filter.is_valid() and not coast_filter.call(coast.points[0]):
+			continue
 		for index in range(coast.points.size() if coast.closed else coast.points.size() - 1):
 			for point in [coast.points[index], coast.points[(index + 1) % coast.points.size()]]:
 				vertices.append(Vector3(point.x - extent.x * 0.5, sea, point.y - extent.y * 0.5))
+	if vertices.is_empty():
+		return
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = vertices

@@ -120,3 +120,8 @@ func generate(geography: RefCounted, options: Dictionary) -> void:
 func cell_info(uv: Vector2) -> Dictionary:
 	var wind: Vector2 = wind_at(latitude_at(uv.y, settings), settings.wind_rotation)
 	return {"latitude": latitude_at(uv.y, settings), "temperature": Grid.sample(temperature, size, uv), "rainfall": Grid.sample(rainfall, size, uv), "wind": wind}
+
+
+static func evaporative_demand(temperature_c: float) -> float:
+	# Shared annual game proxy, in mm/year, for biome aridity and lake losses.
+	return maxf(150.0, 400.0 + maxf(-5.0, temperature_c) * 45.0)

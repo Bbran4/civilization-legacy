@@ -15,6 +15,9 @@ void vertex() {
 }
 
 void fragment() {
+	if (hydrology_enabled && !heightmap_view && all(greaterThanEqual(map_uv, vec2(0.0))) && all(lessThanEqual(map_uv, vec2(1.0))) && texture(drainage_field, map_uv).a < 0.5) {
+		discard;
+	}
 	float ground = texture(height_field, clamp(map_uv, vec2(0.0), vec2(1.0))).r;
 	float depth = max(0.0, water_height - ground);
 	float offshore = smoothstep(0.0, 0.16, depth);

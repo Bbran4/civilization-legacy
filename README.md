@@ -19,12 +19,16 @@ simulation, provinces, skill trees and prestige are planned gameplay systems.
 - Independent map width and height, optional island shaping and adjustable relief.
 - Connected islands, large landmasses, open water, inland-water candidates and
   coastline outlines, with cell inspection and ocean-depth colours.
+- Drainage basins, lake spill levels and outlets, and rainfall-fed rivers that
+  collect upstream runoff and widen downstream.
 - Basic annual temperature, wind and rainfall generation, including mountain
   cooling and rain shadows.
 - A bottom-right climate globe and wind dial, with latitude, warmth and rainfall
   controls plus temperature, rainfall and wind overlays.
 - Climate-driven biome ground colours: deserts, steppe, grassland, savanna,
   forests, tundra and ice-covered land, with gently blended boundaries.
+- Seven original tiled ground materials, fine normals, wet-ground roughness and
+  seeded regional colour, fading into a clean overview.
 - Three prebuilt terrain detail levels per chunk, deep zoom, pan, orbit and tilt.
 - An overhead, north-up map at full zoom-out, transitioning to shaded 3D up close.
 - Portable terrain save/load, embedded imported heightmaps, overwrite backups
@@ -87,7 +91,8 @@ Adjust **Warmth offset** and **Rainfall**, then press **Apply climate**.
 
 Warmth is an adjustment of up to ±20°C, not a 20°C cap on actual temperatures.
 The panel shows the calculated temperature range. Select **Terrain** to see the
-resulting biome ground cover, or choose a climate overlay to inspect its inputs.
+resulting biome ground cover, lakes and rivers, or choose a climate overlay to
+inspect its inputs. **Drainage basins** shows where water collects and exits.
 **Show heights** temporarily overrides these colours with grayscale.
 
 Climate edits preserve terrain geometry and coastlines. The model is a simplified
@@ -101,12 +106,13 @@ not yet included.
 | --- | --- | --- |
 | **1. Land and water** | Implemented | Wider edge-case and large-map validation |
 | **2. Basic climate** | Implemented prototype | Rainfall, wind and temperature calibration across map types |
-| **3. Lakes and rivers** | **Next** | Drainage basins, runoff, lake levels/outlets and downhill river networks |
-| **4. Biomes** | First-pass data and ground colours implemented | Wetlands, river-fed habitats, richer vegetation and biome tuning |
+| **3. Lakes and rivers** | First pass implemented | Partial/seasonal lake levels, channel erosion and presentation tuning |
+| **4. Biomes** | Climate and water-driven habitats, wetlands, riparian woodland and canopy suitability implemented | Detailed vegetation art, seasonal ecology and tuning |
 | **5. Ice and presentation** | Partial | Ocean-depth colours, beaches and temperature-based land snow tint exist; frozen water, snowpack and vegetation remain |
 
-An enclosed water area is currently a **lake candidate**, not a lake with a resolved
-level or outlet. Provinces, political borders, settlements, economy, skill trees,
+Reservoir candidates now have geometric spill levels, rainfall-fed inflow and
+open/closed outlet states. Lake surfaces use spill-capacity levels; underfed lakes
+do not yet shrink to equilibrium shorelines. Provinces, political borders, settlements, economy, skill trees,
 prestige, terrain painting and complete campaign saves are not implemented.
 
 See the [terrain roadmap](docs/TERRAIN_GENERATION_ROADMAP.md) and
@@ -114,10 +120,10 @@ See the [terrain roadmap](docs/TERRAIN_GENERATION_ROADMAP.md) and
 
 ## Save format
 
-**Save terrain…** writes version **6** `*.terrain.json` documents containing the
+**Save terrain…** writes version **8** `*.terrain.json` documents containing the
 source graph, exact saved surface samples, imported image data, terrain settings,
-geographic metadata and applied climate parameters. Derived geography, climate
-and biome cover are rebuilt from saved source data. Versions **1–5** remain loadable.
+geographic metadata, applied climate parameters and hydrology/biome algorithm versions. Derived geography, climate
+biome cover and hydrology are rebuilt from saved source data. Versions **1–7** remain loadable.
 Older graphless surfaces need Generate before cell climate can be derived.
 
 Overwriting preserves a `.bak`; documents are bounded to 64 MiB. Pending map or
@@ -131,13 +137,17 @@ image, not the complete editable map. No distribution builds are configured yet.
 - [Land, water and coastline generation](docs/GEOGRAPHY_REFERENCE.md)
 - [Climate gizmo and model limits](docs/CLIMATE_REFERENCE.md)
 - [Biome rules and presentation](docs/BIOMES_REFERENCE.md)
+- [Lakes, rivers and drainage](docs/HYDROLOGY_REFERENCE.md)
+
+See [layered terrain materials](docs/TERRAIN_MATERIALS.md) for the new surface library,
+zoom behaviour and graphics verification.
 
 ## Source layout
 
 ```text
 project.godot        Godot project entry point
 scenes/             Main terrain-editor scene
-scripts/domain/     Heightmaps, geographic graphs, climate and biomes
+scripts/domain/     Heightmaps, geographic graphs, climate, biomes and hydrology
 scripts/rendering/  Terrain meshes, fixed LOD, water and shaders
 scripts/ui/         Runtime editor, camera and climate gizmo
 scripts/storage/    Validated terrain documents and migration
@@ -161,7 +171,9 @@ Run relevant checks with Godot on your PATH:
 ```text
 godot --headless --path . --script res://tests/terrain_editor_smoke.gd
 godot --headless --path . --script res://tests/terrain_geography_smoke.gd
+godot --headless --path . --script res://tests/terrain_hydrology_smoke.gd
 godot --headless --path . --script res://tests/terrain_climate_smoke.gd
+godot --headless --path . --script res://tests/terrain_biomes_smoke.gd
 godot --headless --path . --script res://tests/strategy_zoom_smoke.gd
 ```
 
@@ -169,12 +181,19 @@ For optional rendered captures, run a visual check without `--headless`:
 
 ```text
 godot --path . --script res://tests/terrain_climate_smoke.gd
+godot --path . --script res://tests/terrain_materials_smoke.gd
 ```
 
 Generation currently runs synchronously and can pause the editor on large maps.
 The climate and biome models are simplified and need broader tuning. Some immediate
 headless editor-shutdown checks have logged native transform errors, while runtime
 and GPU verification completed without those errors; see the technical notes.
+
+Stage 4 now uses lakes and rivers to support wetlands and riparian woodland. Choose
+**Biomes** in the climate panel and click a cell for potential tree cover and water
+availability. Layered terrain materials are now implemented; tree models and further presentation follow in the
+[CK2-inspired presentation plan](docs/CK2-map-to-Godot-implementation-manual.md);
+[inspected asset evidence](docs/CK2_ASSET_REFERENCE.md) documents the reference files.
 
 ## Third-party notices
 

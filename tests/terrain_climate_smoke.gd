@@ -122,7 +122,7 @@ func _run() -> void:
 	terrain.apply_climate(original_options)
 	var saved_biomes: PackedByteArray = terrain.biomes.ids.duplicate()
 	var saved: Dictionary = Document.capture(terrain)
-	_check(saved.version == 6 and Document.validate(saved).is_empty(), "Climate parameters must form a valid version 6 map document.")
+	_check(saved.version == Document.VERSION and Document.validate(saved).is_empty(), "Climate parameters must form a valid current-version map document.")
 	var path := "res://.godot/climate-roundtrip.terrain.json"
 	_check(Document.save_file(path, terrain).is_empty(), "Climate maps must save through the real file pipeline.")
 	var saved_field: PackedFloat32Array = terrain.climate.field.duplicate()

@@ -107,5 +107,7 @@ Concurrent checks were active. Child-process/GPU memory, steady FPS, agent-token
 cost and equivalent cold/warm comparisons were not measured; these observations
 are not a controlled before/after benchmark.
 
-Basic [climate generation](CLIMATE_REFERENCE.md) is now implemented. Drainage,
-river generation and lake levels/outlets remain the next work.
+Basic [climate generation](CLIMATE_REFERENCE.md) and initial
+[hydrology](HYDROLOGY_REFERENCE.md) are now implemented. Drainage, river networks
+and static lake spill levels/outlets are derived after geography; partial/seasonal
+lake levels and erosion remain future work.

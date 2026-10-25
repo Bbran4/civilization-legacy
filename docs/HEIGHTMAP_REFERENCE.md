@@ -146,7 +146,7 @@ claim of finished Europa Universalis art or simulation.
 
 ## Documents and compatibility
 
-Version 6 terrain files store graph sites, triangles and integer heights in
+Version 8 terrain files store graph sites, triangles and integer heights in
 addition to exact final float32 surface samples, seed/density and editor settings.
 Neighbors/polygons are derived from their topology on load. Custom source images
 are embedded as red-channel samples at saved mesh resolution, with their original
@@ -161,7 +161,8 @@ density mode (version 3 uses an explicit total). Version 4 introduced the densit
 local-detail settings. Saved canonical mesh heights remain unchanged by world
 scaling; prebuilt LOD meshes are derived and are not serialized. The existing
 version 4 detail fields now configure fixed chunk detail rather than a moving patch.
-Version 6 adds validated climate settings; fields regenerate from the saved graph.
+Version 8 records hydrology algorithm version 1; lake and river data are derived
+from the saved source without editing original terrain. Version 6 added validated climate settings; fields regenerate from the saved graph.
 Version 5 added geographic feature IDs, areas, coast/depth/distance arrays and
 ordered display shoreline paths. They are a bounded, validated derived cache: load
 reconstructs facts from saved graph data. See the [geography reference](GEOGRAPHY_REFERENCE.md).
@@ -272,5 +273,6 @@ LOD and camera movement do not touch component IDs or shoreline geometry. The
 editor also exposes island shaping, relief and three live zoom controls. Shoreline outlines appear only with the
 flat overview, and the ocean material uses the fixed geographic display-height
 texture for depth colour. Temperature, wind and rainfall now come from the
-[climate model](CLIMATE_REFERENCE.md) and bottom-right gizmo. Rivers and lake
-outlets remain unimplemented.
+[climate model](CLIMATE_REFERENCE.md) and bottom-right gizmo. The [hydrology pass](HYDROLOGY_REFERENCE.md) now adds drainage basins, lake spill
+levels/outlets and rainfall-fed rivers. Partial or seasonal lake filling and
+erosion remain future work.
