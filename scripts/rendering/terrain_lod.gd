@@ -13,6 +13,7 @@ var build_count: int = 0
 var bounds := Vector2.ZERO
 var field_heights := PackedFloat32Array()
 var field_size := Vector2i.ZERO
+var height_textures: Array[Texture2D] = []
 var target_level: int = 0
 var displayed_detail: float = 0.0
 var current_level: int = 0
@@ -30,6 +31,7 @@ func reset() -> void:
 	for chunk in chunks:
 		chunk.node.free()
 	chunks.clear()
+	height_textures.clear()
 	field_heights.clear()
 	field_size = Vector2i.ZERO
 	if is_instance_valid(_terrain):
@@ -80,6 +82,7 @@ func build() -> void:
 			for col in range(size.x):
 				field[row * size.x + col] = source[row * stride * source_size.x + col * stride]
 		level_normals.append(Grid.normals_from_heights(field, size, _terrain.map_size))
+		height_textures.append(ImageTexture.create_from_image(Image.create_from_data(size.x, size.y, false, Image.FORMAT_RF, field.to_byte_array())))
 	_material = _terrain._land_material.duplicate()
 	_material.set_shader_parameter("terrain_lod", true)
 	_material.set_shader_parameter("lod_blend", 1.0)

@@ -87,17 +87,17 @@ border stays a landmass because the map may crop a larger continent. This is a
 map-relative game rule, not an Earth continent definition.
 
 The editor automatically groups connected land and water, outlines shores in the
-flat overview and shades shallow water lighter than deep water. Click a cell to
+flat overview and angled terrain view, and shades shallow water lighter than deep water. Click a cell to
 see its landmass or water-body ID, area, border contact and approximate distance
 from coastal cells. Water cells also show depth in height units, not metres.
 
 **Open water** reaches the map border; **inland water** is enclosed inside the
-map. Inland water is labeled a lake candidate because lake levels and outlets
-have not been simulated. Enclosed land under 10% of map area is labelled Island; larger or
+map. The geographic label identifies an inland-water candidate; hydrology adds
+its active lake level, depth and outlet. Enclosed land under 10% of map area is labelled Island; larger or
 border-touching land is labelled Large landmass, without claiming continent names.
 
 Current saves include this data; older graph saves gain it when loaded without
-changing their saved heights. Shoreline outlines fade away as you zoom into 3D.
+changing their saved heights. Shoreline outlines stay visible in 3D, soften at the edges and hide behind foreground terrain.
 
 ## What comes next
 
@@ -159,3 +159,11 @@ snow textures, with small bumps affecting their lighting. Their size stays the
 same when you generate a wider map. Zooming out fades fine texture into the broad
 biome colours. No extra settings are required. The diagnostic views still show
 their original data. See [terrain material notes](TERRAIN_MATERIALS.md).
+
+## Coastline outlines
+
+In **Terrain**, coast outlines automatically keep a thin visible width as you
+zoom. They follow the current terrain detail and respect foreground mountains
+and objects. The coloured line is separate from the sandy beach; it is not foam
+or a political border. Diagnostic views and Show heights hide it. No new settings
+are needed. See [coastline notes](COASTLINE_RENDERING.md).

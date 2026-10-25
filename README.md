@@ -18,7 +18,8 @@ simulation, provinces, skill trees and prestige are planned gameplay systems.
   heightmaps, and custom image import.
 - Independent map width and height, optional island shaping and adjustable relief.
 - Connected islands, large landmasses, open water, inland-water candidates and
-  coastline outlines, with cell inspection and ocean-depth colours.
+  depth-tested coastline ribbons with controlled width, cell inspection and
+  ocean-depth colours.
 - Drainage basins, lake spill levels and outlets, and rainfall-fed rivers that
   collect upstream runoff and widen downstream.
 - Basic annual temperature, wind and rainfall generation, including mountain
@@ -135,6 +136,7 @@ image, not the complete editable map. No distribution builds are configured yet.
 - [Map editor guide](docs/MAP_EDITOR_GUIDE.md)
 - [Heightmap implementation](docs/HEIGHTMAP_REFERENCE.md)
 - [Land, water and coastline generation](docs/GEOGRAPHY_REFERENCE.md)
+- [Coastline ribbon rendering and checks](docs/COASTLINE_RENDERING.md)
 - [Climate gizmo and model limits](docs/CLIMATE_REFERENCE.md)
 - [Biome rules and presentation](docs/BIOMES_REFERENCE.md)
 - [Lakes, rivers and drainage](docs/HYDROLOGY_REFERENCE.md)
@@ -182,6 +184,7 @@ For optional rendered captures, run a visual check without `--headless`:
 ```text
 godot --path . --script res://tests/terrain_climate_smoke.gd
 godot --path . --script res://tests/terrain_materials_smoke.gd
+godot --path . --script res://tests/terrain_coastline_smoke.gd
 ```
 
 Generation currently runs synchronously and can pause the editor on large maps.

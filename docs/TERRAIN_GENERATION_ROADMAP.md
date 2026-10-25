@@ -94,8 +94,9 @@ See [biome rules and limitations](BIOMES_REFERENCE.md).
 
 The first material step of the [CK2-inspired implementation manual](CK2-map-to-Godot-implementation-manual.md)
 is implemented: seven original tiled surfaces, fine normals, roughness and regional
-colour. See [material implementation](TERRAIN_MATERIALS.md). Next are depth-aware
-coast outlines with controlled width. Hydrology is already
+colour. See [material implementation](TERRAIN_MATERIALS.md). Depth-tested
+[coast ribbons with controlled width](COASTLINE_RENDERING.md) are now implemented
+in both overview and angled views. Deterministic biome-driven vegetation is next. Hydrology is already
 connected; the manual's original missing-integration notes are historical.
 Reference evidence is in [CK2 asset notes](CK2_ASSET_REFERENCE.md).
 

@@ -376,9 +376,7 @@ func _refresh_hydrology(climate_changed: bool, rebuild_views: bool) -> void:
 	if climate_changed or rebuild_views or hydrology == null:
 		hydrology_view.build(self)
 		if geography_view != null:
-			var canonical_sea: bool = is_equal_approx(sea_level, height_offset)
-			var filter: Callable = hydrology.is_ocean_coast.bind(graph) if hydrology != null and hydrology.error.is_empty() else Callable()
-			geography_view.build(geography if show_water and canonical_sea else null, map_size, sea_level * relief_scale(), sand_color, filter)
+			geography_view.build(self)
 			geography_view.set_overview_blend(overview_blend)
 			geography_view.set_heightmap_view(heightmap_view)
 
@@ -401,6 +399,8 @@ func set_climate_view(mode: int) -> void:
 		detail.set_climate_view(visible_mode, _climate_texture, _biome_texture)
 		detail.set_hydrology_field(_hydrology_texture)
 		detail.set_habitat_fields(_habitat_texture, _biome_field_texture)
+	if geography_view != null:
+		geography_view.set_climate_view(climate_view)
 	if hydrology_view != null:
 		hydrology_view.set_view(climate_view, heightmap_view)
 

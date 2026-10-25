@@ -88,5 +88,6 @@ Godot references: [spatial shader normal spaces and OUTPUT_IS_SRGB](https://docs
 The original [presentation manual](CK2-map-to-Godot-implementation-manual.md)
 provides design context; its historical source findings are preserved.
 
-Next presentation step: width-controlled, depth-aware coast outlines, kept
-separate from beach ground, water foam and future political borders.
+The next presentation step is now implemented: [width-controlled, depth-tested
+coast outlines](COASTLINE_RENDERING.md), separate from beach ground, water foam
+and future political borders. Deterministic biome-driven vegetation can follow.

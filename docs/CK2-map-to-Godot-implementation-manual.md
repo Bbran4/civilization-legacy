@@ -10,7 +10,12 @@
 > Material update: chapter 6 now has an initial implementation with seven original
 > procedural surfaces, packed normals/roughness, regional tint and distance fading.
 > See [current material scope and checks](TERRAIN_MATERIALS.md). Historical audit
-> observations below are retained; coast outlines and later presentation remain next.
+> observations below are retained.
+
+> Coastline update: chapter 7 now has depth-tested triangle ribbons, controlled
+> screen width, bounded joins and displayed-LOD height following. See the
+> [implementation, limits and executed checks](COASTLINE_RENDERING.md). Foam,
+> political borders and later presentation remain separate work.
 
 Prepared 25 October 2026. No implementation code is included. Neither game project was changed.
 

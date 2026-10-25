@@ -25,9 +25,11 @@ var _node_ids: Dictionary = {}
 var _next: Dictionary = {}
 var _incoming: Dictionary = {}
 var _visited := PackedByteArray()
+var _contour_level: float = 0.2
 
 
 func generate(graph: RefCounted, smoothing: int) -> void:
+	_contour_level = 0.2
 	var started: int = Time.get_ticks_usec()
 	map_size = graph.map_size
 	source_hash = graph.source_fingerprint(smoothing)
@@ -133,6 +135,16 @@ func _pop() -> Array:
 	return first
 
 
+func trace_display_contours(field: PackedFloat32Array, size: Vector2i, extent: Vector2, level: float) -> Array[Dictionary]:
+	# Use a separate Geography instance: presentation sampling never replaces saved facts.
+	display_heights = field
+	contour_size = size
+	map_size = extent
+	_contour_level = level
+	_contours()
+	return coastlines
+
+
 func _contours() -> void:
 	coastlines.clear()
 	discarded_contours = 0
@@ -164,9 +176,9 @@ func _contours() -> void:
 
 
 func _triangle(a: int, b: int, c: int) -> void:
-	var la: bool = display_heights[a] >= 0.2
-	var lb: bool = display_heights[b] >= 0.2
-	var lc: bool = display_heights[c] >= 0.2
+	var la: bool = display_heights[a] >= _contour_level
+	var lb: bool = display_heights[b] >= _contour_level
+	var lc: bool = display_heights[c] >= _contour_level
 	if la == lb and lb == lc:
 		return
 	var ids: Array[int] = [a, b, c]
@@ -196,7 +208,7 @@ func _crossing(a: int, b: int) -> int:
 		return _node_ids[key]
 	var h0: float = display_heights[low]
 	var h1: float = display_heights[high]
-	var weight: float = clampf((0.2 - h0) / (h1 - h0), 0.0, 1.0)
+	var weight: float = clampf((_contour_level - h0) / (h1 - h0), 0.0, 1.0)
 	var p0 := Vector2(low % contour_size.x, low / contour_size.x)
 	var p1 := Vector2(high % contour_size.x, high / contour_size.x)
 	var point: Vector2 = p0.lerp(p1, weight) / Vector2(contour_size - Vector2i.ONE) * map_size

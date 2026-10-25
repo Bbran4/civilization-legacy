@@ -44,11 +44,16 @@ rings have positive signed area, water holes negative. Shores reaching a cropped
 boundary remain open; no fake coast is inserted along the rectangular map frame.
 Zero-size paths collapsed by floating-point precision are counted separately.
 
-Paths and the height texture are fixed until the source changes. The overview
-renders lines without depth testing so low-LOD height approximation cannot hide
-them; lines fade out with the flat-to-3D blend. Height display hides the coloured
-lines. Water shades use the fixed height texture for depth colour. This is visual
-bathymetry from the supplied field, not an ocean or wave simulation.
+Canonical paths and the height texture stay fixed until source changes. Visible
+sea outlines now use depth-tested triangle ribbons in both overview and angled
+views, with camera-controlled width and the active terrain LOD's height fields.
+Their detailed presentation contours are traced separately from the fixed highest
+rendered field using the same contour algorithm. This does not replace saved
+geographic identities or the coarser canonical paths described above. Climate and
+height diagnostic modes hide the decoration. See [coastline rendering](COASTLINE_RENDERING.md)
+for geometry, width, depth, sampling limits and executed checks.
+Water shades remain visual bathymetry from the supplied field, not an ocean or
+wave simulation.
 
 The contour grid can omit features below its sampling scale, and display smoothing
 can make contours differ from categorical cell boundaries. Neither changes feature

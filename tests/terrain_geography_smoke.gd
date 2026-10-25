@@ -137,13 +137,13 @@ func _run() -> void:
 	_check(Document.apply(terrain, old).is_empty() and terrain.geography.snapshot() == before, "Version 4 graph saves must gain geography without changing their heights.")
 	var cache = terrain.geography
 	var camera = world.get_node("CameraRig")
-	var shore_mesh: int = terrain.geography_view._lines.mesh.get_instance_id()
+	var shore_mesh: int = terrain.geography_view._ribbons.mesh.get_instance_id()
 	for zoom in [1.0, 5.0, 20.0]:
 		camera._zoom = zoom
 		camera._apply_zoom()
 		terrain.detail._process(1.0)
 		_check(terrain.geography == cache and terrain.geography.snapshot() == before, "Zoom and LOD must never regenerate geographic identities or shorelines.")
-		_check(terrain.geography_view._lines.mesh.get_instance_id() == shore_mesh and terrain.geography_view._lines.visible == (zoom == 1.0), "Overview shores must fade by visibility without rebuilding their mesh.")
+		_check(terrain.geography_view._ribbons.mesh.get_instance_id() == shore_mesh and terrain.geography_view._ribbons.visible, "Shore ribbons must remain visible in overview and angled views without rebuilding their mesh.")
 	var info: Dictionary = terrain.cell_info(0)
 	_check(info.has("feature_kind") and info.has("coast_distance") and info.has("depth"), "The cell inspector must consume generated geography facts.")
 	DirAccess.remove_absolute(path)
