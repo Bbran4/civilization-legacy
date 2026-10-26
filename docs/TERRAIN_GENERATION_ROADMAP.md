@@ -143,8 +143,9 @@ can remain attached across runs.
 ## Visual direction and deferred weather
 
 The CK3 Nile screenshot motivates broader noise-shaped material transitions and
-physical river channels/banks connected to lake/ocean water. These are proposed
-terrain refinements; the screenshot does not establish CK3's exact implementation.
+physical river channels/banks connected to lake/ocean water. Seeded multiscale
+material blending is now implemented; physical channels remain proposed. The
+screenshot does not establish CK3's exact implementation.
 See [visual direction and channel proposals](TERRAIN_VISUAL_DIRECTION.md).
 
 Cloud layers, soft moving cloud shadows, storms, rain and lightning are recorded

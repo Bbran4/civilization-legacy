@@ -188,6 +188,7 @@ For optional rendered captures, run a visual check without `--headless`:
 ```text
 godot --path . --script res://tests/terrain_climate_smoke.gd
 godot --path . --script res://tests/terrain_materials_smoke.gd
+godot --path . --script res://tests/terrain_blending_smoke.gd
 godot --path . --script res://tests/terrain_coastline_smoke.gd
 godot --path . --script res://tests/terrain_vegetation_smoke.gd
 godot --path . --script res://tests/terrain_presentation_controls_smoke.gd
@@ -201,7 +202,9 @@ and GPU verification completed without those errors; see the technical notes.
 
 Stage 4 now uses lakes and rivers to support wetlands and riparian woodland. Choose
 **Biomes** in the climate panel and click a cell for potential tree cover and water
-availability. Layered materials, coast ribbons and seeded tree placement are now
+availability. Seeded terrain patches now blend ground colour, roughness and normal
+detail at several scales; patch size stays fixed when map dimensions change.
+Layered materials, coast ribbons and seeded tree placement are now
 implemented. Further seasonal and political presentation follows the
 [CK2-inspired presentation plan](docs/CK2-map-to-Godot-implementation-manual.md);
 [inspected asset evidence](docs/CK2_ASSET_REFERENCE.md) documents the reference files.

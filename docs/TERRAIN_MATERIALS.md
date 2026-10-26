@@ -31,10 +31,37 @@ a wet bank. Zoom out to compare the clean flat overview. Temperature, Rainfall,
 Winds, Drainage basins, Biomes and Show heights bypass decorative tint/detail so
 their numeric or categorical meaning remains readable.
 
+## Seeded terrain transitions
+
+The Terrain view now uses three scales of world-space noise to break up material
+contacts and add restrained grass, dry-ground and soil patches inside mixed
+habitats. Approximate patch spacings are 32, 6 and 1.5 world units; these are
+fixed presentation scales, independent of map width and height. A bounded warp
+(up to two units per axis) bends appearance sampling near contacts. Small
+appearance-only climate offsets interrupt otherwise uniform colour bands.
+
+Ground weights remain normalized. The same weights influence pigment, texture,
+roughness and fine normals; micro-height adds smaller contact detail. Wet ground,
+beach sand, rock and snow also receive restrained contact variation while pure
+mask interiors stay intact. These changes do not create different native biome
+IDs, temperature/rainfall measurements, terrain geometry or water routing.
+
+The map seed selects a stable offset into one shared, periodic RGBA noise texture.
+Base terrain and all three LODs use that same field. Zoom fades unresolved noise
+scales and texture detail without regenerating patterns or relocating the broad
+warp. Larger maps retain the same physical patch scale. This remains a periodic
+procedural starter material: authored textures and broader art tuning can improve
+it further, and it does not claim to reproduce CK3's shader.
+
+Blending is automatic in **Terrain**. There are no new generation controls. Height,
+climate and categorical diagnostic views bypass this decorative layer.
+
 ## Data and ownership
 
 - `scripts/rendering/terrain_materials.gd` owns the original procedural library,
-  climate-to-material weight palette and seeded regional multipliers.
+  climate-to-material weight palette, shared numeric transition noise and seeded regional multipliers.
+- `terrain_blending.gdshaderinc` owns world-space transition masks, appearance warp,
+  normalized patch weights and pigment variation.
 - `terrain_surface.gdshaderinc` owns the normalized texture blending and normal
   composition; `terrain.gdshader` combines it with biome ground colour, beaches,
   exposed rock, snow and diagnostic views.
@@ -73,6 +100,7 @@ Executed on Godot 4.7.2 Compatibility / OpenGL with the GTX 1050 Ti:
 
 ```text
 godot --path . --script res://tests/terrain_materials_smoke.gd
+godot --path . --script res://tests/terrain_blending_smoke.gd
 ```
 
 The check verifies seven matching texture layers, periodic seams, mipmaps,
@@ -82,7 +110,11 @@ application and no library rebuild on zoom. GPU captures compare layered versus
 plain close terrain and assert that toggling decoration does not alter rainfall
 diagnostic pixels. A brightness check guards the Compatibility neutral baseline.
 Captures are written to `.godot/materials-*.png`. The climate regression was also
-run with graphics and passed. No frame-rate or cross-renderer performance claim
+run with graphics and passed. The blending GPU check compares enabled/disabled uniform-ground patches, fixed
+world scale after doubling map dimensions, different/repeated seeds, unchanged
+rainfall/height diagnostic pixels and unchanged native data and mesh identity
+across zooms. Captures are in `.godot/blending-*.png`; close terrain and the
+controlled transition comparison were inspected visually. No frame-rate or cross-renderer performance claim
 is made.
 
 Godot references: [spatial shader normal spaces and OUTPUT_IS_SRGB](https://docs.godotengine.org/en/4.7/tutorials/shaders/shader_reference/spatial_shader.html),

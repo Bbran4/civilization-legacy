@@ -5,14 +5,15 @@ uniform sampler2D surface_weights : filter_linear, repeat_disable;
 uniform sampler2D regional_tint : filter_linear, repeat_disable;
 uniform bool surface_materials_enabled = false;
 uniform float surface_tile_size = 8.0;
+#include "res://scripts/rendering/terrain_blending.gdshaderinc"
 
 vec3 surface_gradient(vec4 encoded) {
 	vec3 n = encoded.rgb * 2.0 - 1.0;
 	return vec3(n.x, 0.0, n.y) / max(n.z, 0.25);
 }
 
-void layered_surface(vec3 p, vec3 macro_normal, vec4 ground, float wet, float rock, float snow, float detail, out vec3 tint, out vec3 perturbed, out float roughness) {
-	tint = vec3(1.0);
+void layered_surface(vec3 p, vec3 macro_normal, vec4 ground, vec4 patches, float wet, float rock, float snow, float detail, out vec3 tint, out vec3 perturbed, out float roughness) {
+	tint = terrain_patch_tint(patches, ground, wet, rock, snow);
 	perturbed = macro_normal;
 	roughness = 0.94;
 	if (surface_materials_enabled && detail > 0.001) {
@@ -24,7 +25,7 @@ void layered_surface(vec3 p, vec3 macro_normal, vec4 ground, float wet, float ro
 		vec4 g2 = texture(surface_albedo, vec3(tile, 2.0));
 		vec4 g3 = texture(surface_albedo, vec3(tile, 3.0));
 		// Albedo alpha is micro-height: perturb transitions, then renormalize.
-		vec4 w = ground * exp2((vec4(g0.a, g1.a, g2.a, g3.a) - 0.5) * 2.5);
+		vec4 w = patches * exp2((vec4(g0.a, g1.a, g2.a, g3.a) - 0.5) * 2.5);
 		w /= max(dot(w, vec4(1.0)), 0.0001);
 		vec4 n0 = texture(surface_normals, vec3(tile, 0.0));
 		vec4 n1 = texture(surface_normals, vec3(tile, 1.0));
@@ -59,7 +60,8 @@ void layered_surface(vec3 p, vec3 macro_normal, vec4 ground, float wet, float ro
 		diffuse = mix(diffuse, ice_diffuse.rgb / neutral, snow);
 		gradient = mix(gradient, surface_gradient(ice_normal), snow);
 		r = mix(r, ice_normal.a, snow);
-		tint = mix(vec3(1.0), diffuse, detail);
+		vec3 pigment = terrain_patch_tint(w, ground, wet, rock, snow);
+		tint = mix(tint, pigment * diffuse, detail);
 		// All detail gradients are in terrain-local space. Project onto the macro tangent plane.
 		gradient -= macro_normal * dot(gradient, macro_normal);
 		perturbed = normalize(macro_normal + gradient * detail * 0.65);

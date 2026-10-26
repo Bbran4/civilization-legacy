@@ -651,7 +651,7 @@ func _update_material(surface: MeshInstance3D) -> void:
 	if _land_material == null:
 		_land_material = ShaderMaterial.new()
 		_land_material.shader = TERRAIN_SHADER
-	SurfaceMaterials.bind_library(_land_material)
+	SurfaceMaterials.bind_library(_land_material, map_seed)
 	if _regional_tint == null or _regional_seed != map_seed or _regional_size != map_size:
 		_regional_tint = SurfaceMaterials.regional_field(map_size, map_seed)
 		_regional_seed = map_seed

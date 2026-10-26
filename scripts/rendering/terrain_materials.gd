@@ -1,6 +1,7 @@
 @tool
 extends RefCounted
 ## Original procedural surface library. Cached assets are shared by base and LODs.
+const Alea = preload("res://scripts/domain/alea.gd")
 const Biomes = preload("res://scripts/domain/terrain_biomes.gd")
 const Grid = preload("res://scripts/domain/heightmap_grid.gd")
 const NAMES := ["Grass", "Dry grass", "Soil", "Sand", "Rock", "Snow", "Wet ground"]
@@ -9,6 +10,7 @@ const TILE_WORLD_SIZE := 8.0
 static var albedo: Texture2DArray
 static var normals: Texture2DArray
 static var weights: ImageTexture
+static var transition_noise: ImageTexture
 static var build_count: int = 0
 
 
@@ -79,7 +81,7 @@ static func ensure_library() -> bool:
 				var dy: float = field[posmod(y + 1, TILE_SIZE) * TILE_SIZE + x] - field[posmod(y - 1, TILE_SIZE) * TILE_SIZE + x]
 				var strength: float = 3.0 if layer == 4 else 1.4
 				var n: Vector3 = Vector3(-dx * strength, -dy * strength, 1.0).normalized()
-				var roughness: float = 0.76 if layer == 6 else 0.92
+				var roughness: float = [0.92, 0.96, 0.88, 0.98, 0.86, 0.90, 0.76][layer]
 				normal.set_pixel(x, y, Color(n.x * 0.5 + 0.5, n.y * 0.5 + 0.5, n.z * 0.5 + 0.5, roughness))
 		diffuse.generate_mipmaps()
 		normal.generate_mipmaps(true)
@@ -99,11 +101,21 @@ static func ensure_library() -> bool:
 		for x in range(palette.get_width()):
 			palette.set_pixel(x, y, base_weights(Biomes.classify(-80.0 + x * 0.5, y * 10.0)))
 	weights = ImageTexture.create_from_image(Biomes._soften_palette(palette))
+	var noise_image := Image.create(TILE_SIZE, TILE_SIZE, false, Image.FORMAT_RGBA8)
+	for y in range(TILE_SIZE):
+		for x in range(TILE_SIZE):
+			var uv: Vector2 = Vector2(x, y) / TILE_SIZE
+			var values := Color(0, 0, 0, 0)
+			for channel in range(4):
+				values[channel] = _noise(uv, Vector2i(4, 4), 211 + channel * 37) * 0.7 + _noise(uv, Vector2i(8, 8), 229 + channel * 43) * 0.3
+			noise_image.set_pixel(x, y, values)
+	noise_image.generate_mipmaps()
+	transition_noise = ImageTexture.create_from_image(noise_image)
 	build_count += 1
 	return true
 
 
-static func bind_library(material: ShaderMaterial) -> void:
+static func bind_library(material: ShaderMaterial, seed_text: String = "42") -> void:
 	if not ensure_library():
 		material.set_shader_parameter("surface_materials_enabled", false)
 		return
@@ -112,6 +124,9 @@ static func bind_library(material: ShaderMaterial) -> void:
 	material.set_shader_parameter("surface_weights", weights)
 	material.set_shader_parameter("surface_tile_size", TILE_WORLD_SIZE)
 	material.set_shader_parameter("surface_materials_enabled", true)
+	material.set_shader_parameter("transition_noise", transition_noise)
+	var random = Alea.new(seed_text + ":terrain-blending")
+	material.set_shader_parameter("blend_seed_offset", Vector2(random.next() * 4096.0, random.next() * 4096.0))
 
 
 static func regional_field(map_size: Vector2, seed_text: String) -> ImageTexture:

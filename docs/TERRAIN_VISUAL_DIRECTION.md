@@ -5,33 +5,21 @@ Recorded from the user's CK3 Egypt/Nile screenshot and discussion on 26 October
 or an implementation report. No CK3 installation/shaders were inspected for this
 note; the screenshot cannot establish exact blending, channel or water algorithms.
 
-## Material transitions: proposed terrain polish
+## Material transitions: first pass implemented
 
 Observed in the screenshot: broad green river-country and sandy desert regions
 meet through irregular mottled patches, with smaller ground details inside each
 region. This is a useful target for the game's terrain presentation.
 
-Current code already blends four ground material weights using tile micro-height,
-then adds wet ground, rock and snow. Regional colour and detail/macro normals are
-separate layers. That does not yet provide the full broad, broken-up transition
-pattern shown in the reference.
+The terrain now uses seeded world-space noise at three scales, bounded appearance
+warping, normalized material patch weights and micro-height contacts. Pigment,
+roughness and fine normals use the shared material weights; wet ground, rock,
+snow and beach contacts vary locally. Fine noise fades at distance. Source
+climate, biome IDs, heights and water data stay authoritative and unchanged.
 
-Proposed extension:
-
-- Modulate continuous material weights with several scales of seeded world-space
-  noise. Broad noise shapes transition patches, medium noise produces islands of
-  exposed soil/grass, and micro-height controls fine contact edges.
-- Use restrained coordinate warping and varying tile scale/orientation to reduce
-  visible repetition, with mip/derivative-aware fading at distance.
-- Preserve normalized weights, biome identity and source climate measurements.
-  Noise should change appearance inside suitable habitats rather than randomly
-  turning the same native cell into a different ecosystem.
-- Carry regional colour, roughness and normals through the same transition so the
-  boundary reads as mixed ground, rather than a soft blur over two flat colours.
-- Validate cold/warm, dry/wet and flat/steep regions at overview, middle and close
-  zooms, including deterministic saves and stable chunk edges.
-
-This is proposed original work. It does not assert that CK3 uses these exact steps.
+See [material implementation and executed checks](TERRAIN_MATERIALS.md). This is
+original procedural work inspired by the reference, not a recovered CK3 shader.
+The starter textures still need authored art and further visual tuning.
 
 ## Rivers: connected water and physical channels
 
@@ -67,6 +55,14 @@ A channel still needs rendered water geometry/materials. The important change is
 that terrain supplies an actual opening and banks, so the water belongs to the
 landform instead of appearing painted across its top.
 
+### Later river-authoring reference
+
+The user supplied [a modder's Game of Thrones map video](https://www.youtube.com/watch?v=5Pk-2gKdkSs)
+and described rivers being drawn in Photoshop/Illustrator before importing into
+the map editor. The video fetch failed, so its contents were not independently
+verified. Keep authored river masks/import alongside procedural channel generation
+as a future design option. This terrain-blending change includes no river work.
+
 ## Deferred: clouds, shadows, storms and rain
 
 User preference: keep these ideas for **after natural terrain is finished**.
@@ -100,7 +96,7 @@ prototype has been measured for the cloud proposal.
 
 ## Work ordering
 
-Before weather: improve material transition masks, physical river channels/banks,
+The first material transition pass is implemented. Before weather: physical river channels/banks,
 water integration and the remaining snow/ice terrain work. Preserve the existing
 editor, adjustable assets, seeded generation, fixed LODs and flat overview.
 Weather remains a later optional presentation/simulation layer, not a dependency

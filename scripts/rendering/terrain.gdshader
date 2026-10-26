@@ -55,35 +55,45 @@ void fragment() {
 	float pixel_span = max(length(dFdx(terrain_position.xz)), length(dFdy(terrain_position.xz)));
 	bool diagnostic = climate_mode > 0 || heightmap_view;
 	float material_detail = diagnostic ? 0.0 : (1.0 - smoothstep(0.04, 0.4, pixel_span)) * (1.0 - overview_blend);
+	vec2 blend_warp;
+	vec4 blend_signals;
+	terrain_blend_data(terrain_position.xz, pixel_span, blend_warp, blend_signals);
+	if (terrain_blending_enabled && surface_materials_enabled) { variation = blend_signals.g; }
+	vec2 appearance_uv = clamp(uv + vec2(0.5) + blend_warp / map_size, vec2(0.0), vec2(1.0));
 	vec4 local_climate = texture(climate_field, uv + vec2(0.5));
+	vec4 appearance_climate = texture(climate_field, appearance_uv);
 	// Classify the continuously sampled climate through the domain-owned palette,
 	// rather than magnifying a blurred, low-resolution map of biome colours.
-	vec4 habitat = habitats_enabled ? texture(habitat_field, uv + vec2(0.5)) : vec4(0.0);
-	float demand = max(150.0, 400.0 + 45.0 * max(-5.0, local_climate.r * 140.0 - 80.0));
-	vec2 ecological_climate = vec2(local_climate.r, local_climate.g + habitat.r * demand * 1.2 / 6000.0);
+	vec4 habitat = habitats_enabled ? texture(habitat_field, appearance_uv) : vec4(0.0);
+	float demand = max(150.0, 400.0 + 45.0 * max(-5.0, appearance_climate.r * 140.0 - 80.0));
+	vec2 ecological_climate = vec2(appearance_climate.r + (blend_signals.a - 0.5) * 0.9 / 140.0, appearance_climate.g + habitat.r * demand * 1.2 / 6000.0 + (blend_signals.r - 0.5) * 160.0 / 6000.0);
 	vec2 palette_size = vec2(textureSize(biome_palette, 0));
 	vec2 palette_uv = (clamp(ecological_climate, vec2(0.0), vec2(1.0)) * (palette_size - vec2(1.0)) + vec2(0.5)) / palette_size;
 	vec3 cover_color = biomes_enabled ? texture(biome_palette, palette_uv).rgb : grass_color.rgb;
 	cover_color = mix(cover_color, vec3(0.4, 0.52, 0.41), habitat.g);
 	cover_color = mix(cover_color, vec3(0.294, 0.502, 0.333), habitat.b);
 	vec3 grass = cover_color * mix(0.94, 1.06, variation);
-	vec3 color = mix(sand_color.rgb, grass, smoothstep(0.2, beach_width, altitude));
+	float beach = terrain_patch_edge(1.0 - smoothstep(0.2, beach_width, altitude), blend_signals.a);
+	vec3 color = mix(grass, sand_color.rgb, beach);
 	float rock = max(smoothstep(rock_slope, min(rock_slope + 0.25, 1.0), slope), smoothstep(height_scale * 0.55, height_scale * 0.8, altitude));
+	rock = terrain_patch_edge(rock, blend_signals.b);
 	color = mix(color, rock_color.rgb, rock);
 	float temperature_c = local_climate.r * 140.0 - 80.0;
 	float snow = biomes_enabled ? 1.0 - smoothstep(-10.0, 0.0, temperature_c) : smoothstep(snow_height, snow_height + 3.0, altitude + variation);
 	snow *= 1.0 - smoothstep(0.4, 0.75, slope);
+	snow = terrain_patch_edge(snow, blend_signals.g);
 	color = mix(color, snow_color.rgb, snow);
 	vec3 material_tint;
 	vec3 detail_normal;
 	float material_roughness;
 	vec4 ground_weights = surface_materials_enabled ? texture(surface_weights, palette_uv) : vec4(1.0, 0.0, 0.0, 0.0);
 	ground_weights = mix(ground_weights, vec4(0.3, 0.05, 0.65, 0.0), habitat.a * 0.35);
-	float beach = 1.0 - smoothstep(0.2, beach_width, altitude);
 	ground_weights = mix(ground_weights, vec4(0.0, 0.0, 0.0, 1.0), beach);
-	float wet = clamp(max(habitat.g, habitat.r * 0.45) * (1.0 - rock), 0.0, 1.0);
+	float wet = terrain_patch_edge(clamp(max(habitat.g, habitat.r * 0.45) * (1.0 - rock), 0.0, 1.0), blend_signals.b);
+	ground_weights /= max(dot(ground_weights, vec4(1.0)), 0.0001);
+	vec4 patch_weights = terrain_patch_weights(ground_weights, blend_signals);
 	vec3 macro_normal = macro_normals_enabled ? normalize(texture(macro_normal_field, uv + vec2(0.5)).rgb * 2.0 - 1.0) : normalize(terrain_normal);
-	layered_surface(terrain_position, macro_normal, ground_weights, wet, rock, snow, material_detail, material_tint, detail_normal, material_roughness);
+	layered_surface(terrain_position, macro_normal, ground_weights, patch_weights, wet, rock, snow, material_detail, material_tint, detail_normal, material_roughness);
 	if (surface_materials_enabled) {
 		color *= texture(regional_tint, uv + vec2(0.5)).rgb * material_tint;
 	}
