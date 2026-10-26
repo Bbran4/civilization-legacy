@@ -61,9 +61,10 @@ These are restrained starter textures; detailed authored art, seasonal variation
 richer authored vegetation art and erosion are future work. The separate
 [vegetation pass](VEGETATION.md) now supplies original starter tree models. Repeating motifs can still become
 visible across large uniform regions. Normal detail changes lighting, not terrain
-silhouettes or water depth. The existing river-water rendering is unchanged.
+silhouettes or water depth. River presentation is documented separately in
+[presentation refinements](PRESENTATION_REFINEMENTS.md).
 
-Version 8 saves remain valid: presentation is derived from the saved map seed,
+Version 9 stores the tree target and still derives material presentation: presentation is derived from the saved map seed,
 extent and current biome/climate facts rather than another persisted image cache.
 
 ## Validation
@@ -92,3 +93,6 @@ provides design context; its historical source findings are preserved.
 The next presentation step is now implemented: [width-controlled, depth-tested
 coast outlines](COASTLINE_RENDERING.md), separate from beach ground, water foam
 and future political borders. Deterministic [biome-driven vegetation](VEGETATION.md) is now implemented.
+
+A fixed high-detail macro-normal field now supplies per-pixel terrain relief
+shading across mesh LODs; see [presentation refinements](PRESENTATION_REFINEMENTS.md).

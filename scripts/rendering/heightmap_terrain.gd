@@ -3,6 +3,7 @@ extends Node3D
 ## A bounded heightfield whose generated mesh is rebuilt from Inspector settings.
 
 signal climate_changed
+signal vegetation_changed
 signal terrain_regenerated
 const SurfaceMaterials = preload("res://scripts/rendering/terrain_materials.gd")
 const VegetationView = preload("res://scripts/rendering/terrain_vegetation_view.gd")
@@ -205,6 +206,8 @@ var generator_version: int = 4
 var detail: Node3D
 var biomes: RefCounted
 var vegetation_view: Node3D
+@export_range(0, 250000, 100) var tree_population: int = 20000
+@export var tree_catalog: Resource = preload("res://assets/trees/catalog.tres")
 var _biome_texture: Texture2D
 var _habitat_texture: Texture2D
 var _biome_field_texture: Texture2D
@@ -327,6 +330,16 @@ func apply_climate(options: Dictionary) -> String:
 	return ""
 
 
+func apply_tree_population(amount: int) -> void:
+	tree_population = clampi(amount, 0, 250000)
+	tree_catalog = preload("res://scripts/rendering/terrain_tree_library.gd").reload_assets(tree_catalog)
+	if vegetation_view != null:
+		vegetation_view.build(self)
+		vegetation_view.set_overview_blend(overview_blend)
+		vegetation_view.set_view(climate_view, heightmap_view)
+	vegetation_changed.emit()
+
+
 func _refresh_climate(rebuild_views: bool = false) -> void:
 	var changed: bool = false
 	if geography == null:
@@ -357,6 +370,7 @@ func _refresh_climate(rebuild_views: bool = false) -> void:
 			add_child(vegetation_view, false, Node.INTERNAL_MODE_BACK)
 		vegetation_view.build(self)
 		vegetation_view.set_overview_blend(overview_blend)
+		vegetation_changed.emit()
 	set_climate_view(climate_view)
 	climate_changed.emit()
 

@@ -2,6 +2,7 @@ extends RefCounted
 ## Plain-language help for the map editor.
 
 const HINTS: Dictionary = {
+	"Apply trees": "Replant trees using this count and reload your saved tree scenes without rebuilding the map.",
 	"terrain_template": "Choose a world shape or supplied heightmap, or import an image of your own.",
 	"map_size.x": "Make the world wider from left to right without changing your window size.",
 	"map_size.y": "Make the world taller from top to bottom without changing your window size.",

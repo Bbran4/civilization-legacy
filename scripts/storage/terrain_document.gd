@@ -6,9 +6,10 @@ const Hydrology = preload("res://scripts/domain/terrain_hydrology.gd")
 const Climate = preload("res://scripts/domain/terrain_climate.gd")
 const Geography = preload("res://scripts/domain/terrain_geography.gd")
 const Recipe = preload("res://scripts/domain/heightmap_recipe.gd")
-const VERSION: int = 8
+const VERSION: int = 9
 const MAX_BYTES: int = 64 * 1024 * 1024
 const NUMBERS: Dictionary = {
+	"tree_population": [0, 250000, true],
 	"close_detail_resolution": [32, 256, true], "micro_detail_strength": [0, 2],
 	"graph_points": [1000, 100000, true], "surface_smoothing": [0, 4, true],
 	"resolution": [16, 1024, true], "template_resolution": [32, 256, true], "elevation": [1, 100], "height_offset": [-50, 50],
@@ -70,7 +71,7 @@ static func validate(document: Variant) -> String:
 	if not document is Dictionary:
 		return "The file must contain a terrain document object."
 	if document.get("format") != "civilization-legacy-terrain" or not _within(document.get("version"), [1, VERSION, true]):
-		return "This is not a supported Civilization Legacy terrain file (versions 1–8)."
+		return "This is not a supported Civilization Legacy terrain file (versions 1–9)."
 	if not _within(document.get("generator_version"), [1, 4, true]):
 		return "The terrain generator version is unsupported."
 	var settings: Variant = document.get("settings")
@@ -81,6 +82,8 @@ static func validate(document: Variant) -> String:
 	if document.version >= 3 and (not settings.get("map_seed") is String or settings.map_seed.is_empty() or settings.map_seed.length() > 128):
 		return "Invalid map seed."
 	for key in NUMBERS:
+		if document.version < 9 and key == "tree_population":
+			continue
 		if document.version < 4 and key in ["close_detail_resolution", "micro_detail_strength"]:
 			continue
 		if document.version < 3 and key in ["graph_points", "surface_smoothing"]:
@@ -158,8 +161,8 @@ static func apply(terrain: Node, document: Dictionary) -> String:
 	var settings: Dictionary = document.settings
 	var size: Vector2i = _sample_size(document)
 	for key in NUMBERS:
-		var defaults: Dictionary = {"graph_points": 10000, "surface_smoothing": 1, "template_resolution": 192, "close_detail_resolution": 128, "micro_detail_strength": 0.15}
-		var legacy: bool = (document.version < 3 and key in ["graph_points", "surface_smoothing"]) or (document.version < 4 and key in ["close_detail_resolution", "micro_detail_strength"])
+		var defaults: Dictionary = {"tree_population": 20000, "graph_points": 10000, "surface_smoothing": 1, "template_resolution": 192, "close_detail_resolution": 128, "micro_detail_strength": 0.15}
+		var legacy: bool = (document.version < 9 and key == "tree_population") or (document.version < 3 and key in ["graph_points", "surface_smoothing"]) or (document.version < 4 and key in ["close_detail_resolution", "micro_detail_strength"])
 		var value: Variant = defaults[key] if legacy else settings.get(key, defaults.get(key, 0))
 		terrain.set(key, int(value) if NUMBERS[key].size() > 2 else float(value))
 	for key in BOOLEANS:

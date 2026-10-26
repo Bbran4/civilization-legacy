@@ -1,0 +1,10 @@
+[gd_resource type="Resource" load_steps=7 format=3]
+[ext_resource type="Script" path="res://scripts/rendering/tree_catalog.gd" id="script"]
+[ext_resource type="Resource" path="res://assets/trees/broadleaf.tres" id="0"]
+[ext_resource type="Resource" path="res://assets/trees/conifer.tres" id="1"]
+[ext_resource type="Resource" path="res://assets/trees/dry_woodland.tres" id="2"]
+[ext_resource type="Resource" path="res://assets/trees/tropical.tres" id="3"]
+[ext_resource type="Resource" path="res://assets/trees/wetland.tres" id="4"]
+[resource]
+script = ExtResource("script")
+definitions = Array[Resource]([ExtResource("0"), ExtResource("1"), ExtResource("2"), ExtResource("3"), ExtResource("4")])

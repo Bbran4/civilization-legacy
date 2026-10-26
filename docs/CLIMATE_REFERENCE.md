@@ -77,9 +77,9 @@ simplified implementation.
 
 ## Saving
 
-Version 8 terrain documents retain climate algorithm version 1 and the five applied
+Version 9 terrain documents retain climate algorithm version 1 and the five applied
 settings. Fields are regenerated from the saved geographic source on load instead
-of persisting another large derived cache. Versions 1–7 remain supported and gain
+of persisting another large derived cache. Versions 1–8 remain supported and gain
 default climate on load when they contain a cell graph. Old graphless terrain
 retains its saved surface and needs Generate before climate can be derived.
 Invalid values and latitude ranges are rejected before terrain mutation. View

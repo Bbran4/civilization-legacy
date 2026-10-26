@@ -1,0 +1,88 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="Trunk"]
+albedo_color = Color(0.396, 0.314, 0.227, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="Leaves"]
+albedo_color = Color(0.21, 0.37, 0.29, 1)
+roughness = 0.95
+
+[sub_resource type="CylinderMesh" id="DetailedTrunk"]
+material = SubResource("Trunk")
+top_radius = 0.025
+bottom_radius = 0.05
+height = 0.55
+radial_segments = 8
+rings = 1
+
+[sub_resource type="CylinderMesh" id="DetailedCrown0"]
+material = SubResource("Leaves")
+top_radius = 0
+bottom_radius = 0.3
+height = 0.48
+radial_segments = 8
+rings = 1
+
+[sub_resource type="CylinderMesh" id="DetailedCrown1"]
+material = SubResource("Leaves")
+top_radius = 0
+bottom_radius = 0.235
+height = 0.48
+radial_segments = 8
+rings = 1
+
+[sub_resource type="CylinderMesh" id="DetailedCrown2"]
+material = SubResource("Leaves")
+top_radius = 0
+bottom_radius = 0.16999999999999998
+height = 0.48
+radial_segments = 8
+rings = 1
+
+[sub_resource type="CylinderMesh" id="DistantTrunk"]
+material = SubResource("Trunk")
+top_radius = 0.025
+bottom_radius = 0.05
+height = 0.55
+radial_segments = 6
+rings = 1
+
+[sub_resource type="CylinderMesh" id="DistantCrown0"]
+material = SubResource("Leaves")
+top_radius = 0
+bottom_radius = 0.3
+height = 0.72
+radial_segments = 6
+rings = 1
+
+[node name="Conifer" type="Node3D"]
+
+[node name="Detailed" type="Node3D" parent="."]
+
+[node name="Trunk" type="MeshInstance3D" parent="Detailed"]
+position = Vector3(0, 0.275, 0)
+mesh = SubResource("DetailedTrunk")
+
+[node name="Crown0" type="MeshInstance3D" parent="Detailed"]
+position = Vector3(0, 0.6, 0)
+mesh = SubResource("DetailedCrown0")
+
+[node name="Crown1" type="MeshInstance3D" parent="Detailed"]
+position = Vector3(0, 0.78, 0)
+mesh = SubResource("DetailedCrown1")
+
+[node name="Crown2" type="MeshInstance3D" parent="Detailed"]
+position = Vector3(0, 0.96, 0)
+mesh = SubResource("DetailedCrown2")
+
+[node name="Distant" type="Node3D" parent="."]
+visible = false
+
+[node name="Trunk" type="MeshInstance3D" parent="Distant"]
+position = Vector3(0, 0.275, 0)
+mesh = SubResource("DistantTrunk")
+
+[node name="Crown0" type="MeshInstance3D" parent="Distant"]
+position = Vector3(0, 0.6, 0)
+mesh = SubResource("DistantCrown0")

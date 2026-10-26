@@ -13,6 +13,7 @@ var build_count: int = 0
 var bounds := Vector2.ZERO
 var field_heights := PackedFloat32Array()
 var field_size := Vector2i.ZERO
+var macro_normal_texture: Texture2D
 var height_textures: Array[Texture2D] = []
 var height_fields: Array[PackedFloat32Array] = []
 var height_sizes: Array[Vector2i] = []
@@ -33,6 +34,9 @@ func reset() -> void:
 	for chunk in chunks:
 		chunk.node.free()
 	chunks.clear()
+	macro_normal_texture = null
+	if is_instance_valid(_terrain) and _terrain._land_material != null:
+		_terrain._land_material.set_shader_parameter("macro_normals_enabled", false)
 	height_textures.clear()
 	height_fields.clear()
 	height_sizes.clear()
@@ -92,6 +96,16 @@ func build() -> void:
 		height_sizes.append(size)
 		level_normals.append(Grid.normals_from_heights(field, size, _terrain.map_size))
 		height_textures.append(ImageTexture.create_from_image(Image.create_from_data(size.x, size.y, false, Image.FORMAT_RF, field.to_byte_array())))
+	var normal_image := Image.create(source_size.x, source_size.y, false, Image.FORMAT_RGBA8)
+	var fine_normals: PackedVector3Array = level_normals[-1]
+	for row in range(source_size.y):
+		for col in range(source_size.x):
+			var n: Vector3 = fine_normals[row * source_size.x + col]
+			normal_image.set_pixel(col, row, Color(n.x * 0.5 + 0.5, n.y * 0.5 + 0.5, n.z * 0.5 + 0.5, 1))
+	normal_image.generate_mipmaps(true)
+	macro_normal_texture = ImageTexture.create_from_image(normal_image)
+	_terrain._land_material.set_shader_parameter("macro_normal_field", macro_normal_texture)
+	_terrain._land_material.set_shader_parameter("macro_normals_enabled", true)
 	_material = _terrain._land_material.duplicate()
 	_material.set_shader_parameter("terrain_lod", true)
 	_material.set_shader_parameter("lod_blend", 1.0)

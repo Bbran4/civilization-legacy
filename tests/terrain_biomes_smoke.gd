@@ -77,7 +77,7 @@ func _run() -> void:
 	_check(terrain.detail._material.get_shader_parameter("climate_mode") == 5 and terrain._land_material.get_shader_parameter("habitats_enabled"), "Biomes view and ecology must reach all terrain materials.")
 	_check(terrain.detail.chunks[0].meshes[0].get_instance_id() == mesh, "Inspection must preserve prebuilt LOD meshes.")
 	_check(terrain.cell_info(0).has("canopy"), "Cell inspection must expose authoritative canopy data.")
-	_check(Document.validate(saved).is_empty() and saved.version == 8, "New maps must record the biome algorithm version.")
+	_check(Document.validate(saved).is_empty() and saved.version == Document.VERSION, "New maps must record the biome algorithm version.")
 	var bad: Dictionary = saved.duplicate(true)
 	bad.biomes.version = 999
 	_check(not Document.apply(terrain, bad).is_empty(), "Unknown biome algorithms must be rejected before applying a map.")

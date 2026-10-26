@@ -139,7 +139,7 @@ or land to see its basin, river-flow strength, lake level and outlet information
 while preserving the ocean and original terrain. **Show heights** hides water
 presentation for inspecting the source heightmap.
 
-Maps save in version 8; earlier files still load. See the
+Maps save in version 9; earlier files still load. See the
 [hydrology model and verification](HYDROLOGY_REFERENCE.md) for details and limits.
 
 ## Biomes and tree suitability
@@ -177,3 +177,18 @@ loading the same saved map recreates the same placement. Zooming changes only
 visible detail. Individual trees disappear in the flat overview and in diagnostic
 views. The inspector's **Placed trees** count is separate from potential cover.
 See [vegetation rules and limits](VEGETATION.md).
+
+## Choose tree population and edit assets
+
+Scroll to **TREES**, enter **Requested tree population**, then press **Apply trees**.
+Zero removes trees. The status compares actual and requested counts because water,
+cliffs and crowded ground can prevent full planting. This also reloads saved tree
+scenes without rebuilding the map. The applied count is saved with the terrain.
+Open the `.tscn` files under `assets/trees/` to edit geometry/materials; use
+`catalog.tres` and its definitions to add desert, snowy or other variants.
+See [step-by-step asset instructions](VEGETATION.md).
+
+Rivers now respect foreground terrain, animate downstream and stop at receiving
+water shores. Steep reaches have a cascade effect; detached waterfalls and carved
+channels remain future work. Terrain now also uses a fixed detailed macro-normal
+field. See [presentation status](PRESENTATION_REFINEMENTS.md).

@@ -110,7 +110,7 @@ func _run() -> void:
 	terrain.apply_climate(options)
 	var vegetation = terrain.vegetation_view
 	var layout = vegetation.layout
-	_check(layout.instances.size() > 20 and layout.instances.size() <= 60000 and layout.candidate_count <= 200000, "Vegetation must be visible but obey bounded placement budgets.")
+	_check(layout.instances.size() > 20 and layout.instances.size() <= terrain.tree_population and layout.candidate_count <= 1100000, "Vegetation must be visible but obey bounded placement budgets.")
 	_check(vegetation.groups.size() > 1, "Forests must use spatial chunks rather than one world-sized MultiMesh.")
 	var snapshot: Array = layout.instances.duplicate(true)
 	var source_heights: PackedFloat32Array = terrain.height_samples.duplicate()

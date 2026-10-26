@@ -22,6 +22,12 @@
 > automatic detail/fading. See [vegetation scope and checks](VEGETATION.md). Historical
 > observations below still describe the original inspection snapshot.
 
+> Refinement update: tree population is now adjustable; tree models are editable
+> scenes with an extensible habitat catalog. Rivers use depth-tested animated
+> surfaces clipped to receiving water shores. Fixed macro normals improve terrain
+> shading. Dedicated detached waterfalls and channel carving remain separate work.
+> See [current scope and checks](PRESENTATION_REFINEMENTS.md).
+
 Prepared 25 October 2026. No implementation code is included. Neither game project was changed.
 
 ## 1. What the investigation establishes

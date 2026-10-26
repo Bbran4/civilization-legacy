@@ -22,6 +22,8 @@ var _dialog_action: String = ""
 var _selected_cell: int = -1
 var _cell_panel: PanelContainer
 var _cell_label: Label
+var _tree_population: SpinBox
+var _tree_status: Label
 var _custom_index: int = -1
 var _image_size := Vector2i.ZERO
 
@@ -33,6 +35,7 @@ func _ready() -> void:
 	_camera_rig = get_parent().get_parent().get_node("CameraRig")
 	_build_interface()
 	_camera_rig.zoom_changed.connect(_update_zoom_status)
+	_terrain.vegetation_changed.connect(_update_tree_status)
 	_sync_from_terrain()
 	_update_zoom_status()
 	_terrain.terrain_regenerated.connect(_update_preview)
@@ -130,6 +133,18 @@ func _build_interface() -> void:
 	_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_form.add_child(_preview)
 	_help(_preview, "preview")
+	_section("TREES")
+	_label("Requested tree population", 13)
+	_tree_population = SpinBox.new()
+	_tree_population.name = "TreePopulation"
+	_tree_population.min_value = 0
+	_tree_population.max_value = 250000
+	_tree_population.step = 1
+	_set_hint(_tree_population, "Choose how many trees to try to plant; water, cliffs and crowded ground can leave fewer places.")
+	_form.add_child(_tree_population)
+	_button("Apply trees", _apply_trees, null, "ApplyTrees")
+	_tree_status = _label("", 12, Color("a9bdc8"))
+	_tree_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_section("VIEW")
 	_number("Minimum zoom (×)", "min_zoom", 0.1, 1, 0.1, true)
 	_number("Maximum zoom (×)", "max_zoom", 1, 8192, 1, true)
@@ -229,6 +244,8 @@ func _button(title: String, action: Callable, parent: Node = null, node_name: St
 
 func _sync_from_terrain() -> void:
 	_syncing = true
+	_tree_population.set_value_no_signal(_terrain.tree_population)
+	_update_tree_status()
 	(_controls["map_seed"] as LineEdit).text = _terrain.map_seed
 	(_controls["map_size.x"] as SpinBox).set_value_no_signal(_terrain.map_size.x)
 	(_controls["map_size.y"] as SpinBox).set_value_no_signal(_terrain.map_size.y)
@@ -250,6 +267,22 @@ func _sync_from_terrain() -> void:
 				picker.select(i)
 	_update_description()
 	_syncing = false
+
+
+func _apply_trees() -> void:
+	_tree_population.apply()
+	await get_tree().process_frame
+	_terrain.apply_tree_population(int(_tree_population.value))
+	_update_tree_status()
+	_refresh_selected_cell()
+
+func _update_tree_status() -> void:
+	if _tree_status == null:
+		return
+	var actual: int = _terrain.vegetation_view.layout.instances.size() if _terrain.vegetation_view != null and _terrain.vegetation_view.layout != null else 0
+	_tree_status.text = "Placed %d / requested %d" % [actual, _terrain.tree_population]
+	if actual < _terrain.tree_population:
+		_tree_status.text += "\nLimited by suitable ground, spacing and placement budget."
 
 
 func _zoom_limits_changed() -> void:

@@ -98,7 +98,10 @@ is implemented: seven original tiled surfaces, fine normals, roughness and regio
 colour. See [material implementation](TERRAIN_MATERIALS.md). Depth-tested
 [coast ribbons with controlled width](COASTLINE_RENDERING.md) are now implemented
 in both overview and angled views. Deterministic [biome-driven vegetation](VEGETATION.md)
-is now implemented with five original model families and automatic detail/fading.
+is now implemented with an editable scene/catalog asset library, a runtime
+population target and automatic detail/fading. Rivers are depth tested, animate
+and stop at receiving water shores; fixed macro normals support relief shading.
+See [current refinements and remaining waterfall work](PRESENTATION_REFINEMENTS.md).
 Snow/season/frozen-water presentation can follow before political map layers. Hydrology is already
 connected; the manual's original missing-integration notes are historical.
 Reference evidence is in [CK2 asset notes](CK2_ASSET_REFERENCE.md).

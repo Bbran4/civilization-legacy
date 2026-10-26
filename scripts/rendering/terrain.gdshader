@@ -9,6 +9,8 @@ uniform float overview_blend = 0.0;
 uniform bool terrain_lod = false;
 uniform float lod_blend = 1.0;
 uniform bool heightmap_view = false;
+uniform bool macro_normals_enabled = false;
+uniform sampler2D macro_normal_field : filter_linear_mipmap, repeat_disable;
 uniform float beach_width = 2.0;
 uniform float rock_slope = 0.32;
 uniform float snow_height = 18.0;
@@ -80,7 +82,8 @@ void fragment() {
 	float beach = 1.0 - smoothstep(0.2, beach_width, altitude);
 	ground_weights = mix(ground_weights, vec4(0.0, 0.0, 0.0, 1.0), beach);
 	float wet = clamp(max(habitat.g, habitat.r * 0.45) * (1.0 - rock), 0.0, 1.0);
-	layered_surface(terrain_position, normalize(terrain_normal), ground_weights, wet, rock, snow, material_detail, material_tint, detail_normal, material_roughness);
+	vec3 macro_normal = macro_normals_enabled ? normalize(texture(macro_normal_field, uv + vec2(0.5)).rgb * 2.0 - 1.0) : normalize(terrain_normal);
+	layered_surface(terrain_position, macro_normal, ground_weights, wet, rock, snow, material_detail, material_tint, detail_normal, material_roughness);
 	if (surface_materials_enabled) {
 		color *= texture(regional_tint, uv + vec2(0.5)).rgb * material_tint;
 	}

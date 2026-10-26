@@ -31,7 +31,7 @@ simulation, provinces, skill trees and prestige are planned gameplay systems.
 - Seven original tiled ground materials, fine normals, wet-ground roughness and
   seeded regional colour, fading into a clean overview.
 - Deterministic biome-driven trees, clustered forests and clearings, with five
-  original model families, chunked rendering and automatic detail/fading.
+  editable scene families, a population target, chunked rendering and automatic detail/fading.
 - Three prebuilt terrain detail levels per chunk, deep zoom, pan, orbit and tilt.
 - An overhead, north-up map at full zoom-out, transitioning to shaded 3D up close.
 - Portable terrain save/load, embedded imported heightmaps, overwrite backups
@@ -123,10 +123,10 @@ See the [terrain roadmap](docs/TERRAIN_GENERATION_ROADMAP.md) and
 
 ## Save format
 
-**Save terrain…** writes version **8** `*.terrain.json` documents containing the
+**Save terrain…** writes version **9** `*.terrain.json` documents containing the
 source graph, exact saved surface samples, imported image data, terrain settings,
 geographic metadata, applied climate parameters and hydrology/biome algorithm versions. Derived geography, climate
-biome cover and hydrology are rebuilt from saved source data. Versions **1–7** remain loadable.
+biome cover and hydrology are rebuilt from saved source data. Versions **1–8** remain loadable.
 Older graphless surfaces need Generate before cell climate can be derived.
 
 Overwriting preserves a `.bak`; documents are bounded to 64 MiB. Pending map or
@@ -139,7 +139,8 @@ image, not the complete editable map. No distribution builds are configured yet.
 - [Heightmap implementation](docs/HEIGHTMAP_REFERENCE.md)
 - [Land, water and coastline generation](docs/GEOGRAPHY_REFERENCE.md)
 - [Coastline ribbon rendering and checks](docs/COASTLINE_RENDERING.md)
-- [Miniature vegetation, placement rules and checks](docs/VEGETATION.md)
+- [Tree population, editable scenes and habitat catalog](docs/VEGETATION.md)
+- [River occlusion/mouth fixes and macro normals](docs/PRESENTATION_REFINEMENTS.md)
 - [Climate gizmo and model limits](docs/CLIMATE_REFERENCE.md)
 - [Biome rules and presentation](docs/BIOMES_REFERENCE.md)
 - [Lakes, rivers and drainage](docs/HYDROLOGY_REFERENCE.md)
@@ -189,6 +190,8 @@ godot --path . --script res://tests/terrain_climate_smoke.gd
 godot --path . --script res://tests/terrain_materials_smoke.gd
 godot --path . --script res://tests/terrain_coastline_smoke.gd
 godot --path . --script res://tests/terrain_vegetation_smoke.gd
+godot --path . --script res://tests/terrain_presentation_controls_smoke.gd
+godot --path . --script res://tests/river_surface_smoke.gd
 ```
 
 Generation currently runs synchronously and can pause the editor on large maps.

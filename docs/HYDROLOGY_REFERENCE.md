@@ -81,12 +81,14 @@ redefine what counts as a major channel.
 `scripts/rendering/terrain_hydrology_view.gd` builds horizontal lake surfaces by
 clipping native Delaunay triangles against each lake level. River ribbons follow
 connected drainage cells, get wider with increasing discharge and round their
-visual bends while retaining source/mouth locations. Heights sample the fixed
+visual bends while keeping the underlying cell route unchanged. Visible mouths
+are now trimmed at the receiving water shore. Heights sample the fixed
 high-resolution surface, rather than regenerating while zooming.
 
-Water uses an unshaded map overlay with depth testing disabled, keeping narrow
-rivers and small lakes legible over lower-detail terrain. This is presentation,
-not channel carving; tilt occlusion and shore precision can be improved later.
+Water uses depth-tested surfaces. Rivers animate downstream, follow the displayed
+terrain height blend and clip to actual standing-water edges; their banks use
+bounded shared joins. Steep spans receive foamy cascade shading. Detached
+waterfalls and channel carving remain future work.
 Rounded visual ribbons approximate the exact cell route. Hydrological downhill
 and accumulation guarantees apply to the graph and conditioned water elevations,
 not every interpolated vertex of the decorative ribbon.
@@ -107,7 +109,7 @@ assuming that every low location is covered by the ocean.
 Version **7** terrain documents record hydrology algorithm version 1, along with
 the existing height, geography and climate source data. Derived networks and
 water meshes are regenerated on load rather than persisted as a second large cache.
-Versions 1–7 remain supported. Old graph maps gain hydrology while preserving their
+Versions 1–8 remain supported. Old graph maps gain hydrology while preserving their
 saved heights and climate choices. Graphless legacy maps need Generate before
 cell drainage can be derived. Invalid hydrology versions are rejected before
 mutating the visible world.
@@ -144,3 +146,7 @@ controlled performance benchmark.
 Remaining work includes partial/seasonal lake levels, channel erosion, improved
 shore and tilt presentation, river-fed wetlands and floodplains. These are not
 represented as completed simulation features.
+
+Presentation update: water is now depth tested; river surfaces animate, follow
+displayed terrain LODs and are clipped at actual lake/ocean shores. The original
+routing/flow facts above remain unchanged. See [implementation limits and checks](PRESENTATION_REFINEMENTS.md).
