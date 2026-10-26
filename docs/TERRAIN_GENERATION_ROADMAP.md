@@ -139,3 +139,16 @@ Resources, fertility, travel costs, provinces, settlements, routes and civilizat
 simulation can build on the natural map. For this game's legacy system, persistent
 land and water identities will also provide places where later civilization traces
 can remain attached across runs.
+
+## Visual direction and deferred weather
+
+The CK3 Nile screenshot motivates broader noise-shaped material transitions and
+physical river channels/banks connected to lake/ocean water. These are proposed
+terrain refinements; the screenshot does not establish CK3's exact implementation.
+See [visual direction and channel proposals](TERRAIN_VISUAL_DIRECTION.md).
+
+Cloud layers, soft moving cloud shadows, storms, rain and lightning are recorded
+as **deferred until natural terrain is finished**. A future Compatibility-friendly
+visual pass could share a moving cloud-coverage field between cloud geometry and
+projected ground shadows. Weather simulation and feedback into hydrology need
+separate time/units and water-balance decisions. No weather code is implemented.
