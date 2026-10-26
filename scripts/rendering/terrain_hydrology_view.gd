@@ -8,9 +8,14 @@ var _terrain: Node
 var _heights_view: bool = false
 var _mode: int = 0
 var build_count: int = 0
+var river_corridors: Array[Dictionary] = []
+var _river_buckets: Dictionary = {}
+var _bucket_size: float = 1.0
 
 
 func clear() -> void:
+	river_corridors.clear()
+	_river_buckets.clear()
 	for mesh in [lakes_mesh, rivers_mesh]:
 		if is_instance_valid(mesh):
 			mesh.free()
@@ -119,6 +124,7 @@ func _width(cell: int, hydro: RefCounted) -> float:
 
 
 func _build_rivers(graph: RefCounted, hydro: RefCounted) -> void:
+	_bucket_size = maxf(1.0, graph.spacing * 2.0)
 	var vertices := PackedVector3Array()
 	var colours := PackedColorArray()
 	var indices := PackedInt32Array()
@@ -147,6 +153,20 @@ func _build_rivers(graph: RefCounted, hydro: RefCounted) -> void:
 		var rounded: Dictionary = _round_river(points, widths, graph, hydro, lift)
 		points = rounded.points
 		widths = rounded.widths
+		for i in range(points.size() - 1):
+			var a: Vector2 = Vector2(points[i].x, points[i].z) + graph.map_size * 0.5
+			var b: Vector2 = Vector2(points[i + 1].x, points[i + 1].z) + graph.map_size * 0.5
+			var radius: float = maxf(widths[i], widths[i + 1]) * 0.5
+			var id: int = river_corridors.size()
+			river_corridors.append({"a": a, "b": b, "radius": radius})
+			var low := Vector2i(((a.min(b) - Vector2.ONE * radius) / _bucket_size).floor())
+			var high := Vector2i(((a.max(b) + Vector2.ONE * radius) / _bucket_size).floor())
+			for y in range(low.y, high.y + 1):
+				for x in range(low.x, high.x + 1):
+					var key := Vector2i(x, y)
+					if not _river_buckets.has(key):
+						_river_buckets[key] = []
+					_river_buckets[key].append(id)
 		var offset: int = vertices.size()
 		for i in range(points.size()):
 			var tangent: Vector3 = points[mini(i + 1, points.size() - 1)] - points[maxi(0, i - 1)]
@@ -188,3 +208,16 @@ func set_view(mode: int, heights: bool) -> void:
 
 func _update_visibility() -> void:
 	visible = not _heights_view and _mode == 0
+
+
+func river_near(point: Vector2, clearance: float = 0.0) -> bool:
+	var cell := Vector2i((point / _bucket_size).floor())
+	var reach: int = ceili(clearance / _bucket_size) + 1
+	for y in range(cell.y - reach, cell.y + reach + 1):
+		for x in range(cell.x - reach, cell.x + reach + 1):
+			for id in _river_buckets.get(Vector2i(x, y), []):
+				var segment: Dictionary = river_corridors[id]
+				var closest: Vector2 = Geometry2D.get_closest_point_to_segment(point, segment.a, segment.b)
+				if point.distance_to(closest) <= segment.radius + clearance:
+					return true
+	return false

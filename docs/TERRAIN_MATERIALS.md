@@ -58,7 +58,8 @@ their numeric or categorical meaning remains readable.
 The library is generated from original periodic noise at 128 by 128 texels per
 surface. There are no copied CK2 images/shaders, downloads or added packages.
 These are restrained starter textures; detailed authored art, seasonal variations,
-vegetation models and erosion are future work. Repeating motifs can still become
+richer authored vegetation art and erosion are future work. The separate
+[vegetation pass](VEGETATION.md) now supplies original starter tree models. Repeating motifs can still become
 visible across large uniform regions. Normal detail changes lighting, not terrain
 silhouettes or water depth. The existing river-water rendering is unchanged.
 
@@ -90,4 +91,4 @@ provides design context; its historical source findings are preserved.
 
 The next presentation step is now implemented: [width-controlled, depth-tested
 coast outlines](COASTLINE_RENDERING.md), separate from beach ground, water foam
-and future political borders. Deterministic biome-driven vegetation can follow.
+and future political borders. Deterministic [biome-driven vegetation](VEGETATION.md) is now implemented.

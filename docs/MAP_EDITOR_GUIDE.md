@@ -149,7 +149,7 @@ Click terrain to read the exact biome, potential tree cover and nearby-water
 influence. Wetlands prefer flat wet ground; suitable river and lake banks can
 support woodland even when the surrounding country is dry. Rainfall remains
 the amount falling from the sky. Potential tree cover is a habitat estimate;
-actual tree models come in the later presentation stage. Use **Terrain** to
+actual tree models are now placed separately, with their cell count shown below. Use **Terrain** to
 return to blended natural ground colours.
 
 ## Ground surface detail
@@ -167,3 +167,13 @@ zoom. They follow the current terrain detail and respect foreground mountains
 and objects. The coloured line is separate from the sandy beach; it is not foam
 or a political border. Diagnostic views and Show heights hide it. No new settings
 are needed. See [coastline notes](COASTLINE_RENDERING.md).
+
+## Trees and forests
+
+Zoom into **Terrain** to see miniature trees: conifers, broadleaf, dry-climate,
+tropical and wetland varieties follow the biome. Forests have seeded clusters
+and clearings. Applying a wetter/drier climate changes where trees can grow;
+loading the same saved map recreates the same placement. Zooming changes only
+visible detail. Individual trees disappear in the flat overview and in diagnostic
+views. The inspector's **Placed trees** count is separate from potential cover.
+See [vegetation rules and limits](VEGETATION.md).

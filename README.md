@@ -30,6 +30,8 @@ simulation, provinces, skill trees and prestige are planned gameplay systems.
   forests, tundra and ice-covered land, with gently blended boundaries.
 - Seven original tiled ground materials, fine normals, wet-ground roughness and
   seeded regional colour, fading into a clean overview.
+- Deterministic biome-driven trees, clustered forests and clearings, with five
+  original model families, chunked rendering and automatic detail/fading.
 - Three prebuilt terrain detail levels per chunk, deep zoom, pan, orbit and tilt.
 - An overhead, north-up map at full zoom-out, transitioning to shaded 3D up close.
 - Portable terrain save/load, embedded imported heightmaps, overwrite backups
@@ -97,9 +99,9 @@ inspect its inputs. **Drainage basins** shows where water collects and exits.
 **Show heights** temporarily overrides these colours with grayscale.
 
 Climate edits preserve terrain geometry and coastlines. The model is a simplified
-annual estimate; it does not simulate seasons, daily weather, runoff or ecosystems.
-Biome colours and labels are implemented; placed trees and vegetation assets are
-not yet included.
+annual estimate rather than daily weather. Hydrology derives runoff separately;
+biome colours, labels and seeded miniature tree models are implemented. Seasons
+and dynamic ecosystem growth remain future work.
 
 ## Development roadmap
 
@@ -109,7 +111,7 @@ not yet included.
 | **2. Basic climate** | Implemented prototype | Rainfall, wind and temperature calibration across map types |
 | **3. Lakes and rivers** | First pass implemented | Partial/seasonal lake levels, channel erosion and presentation tuning |
 | **4. Biomes** | Climate and water-driven habitats, wetlands, riparian woodland and canopy suitability implemented | Detailed vegetation art, seasonal ecology and tuning |
-| **5. Ice and presentation** | Partial | Ocean-depth colours, beaches and temperature-based land snow tint exist; frozen water, snowpack and vegetation remain |
+| **5. Ice and presentation** | Partial | Ocean-depth colours, beaches and temperature-based land snow tint exist; frozen water, snowpack and seasonal vegetation remain |
 
 Reservoir candidates now have geometric spill levels, rainfall-fed inflow and
 open/closed outlet states. Lake surfaces use spill-capacity levels; underfed lakes
@@ -137,6 +139,7 @@ image, not the complete editable map. No distribution builds are configured yet.
 - [Heightmap implementation](docs/HEIGHTMAP_REFERENCE.md)
 - [Land, water and coastline generation](docs/GEOGRAPHY_REFERENCE.md)
 - [Coastline ribbon rendering and checks](docs/COASTLINE_RENDERING.md)
+- [Miniature vegetation, placement rules and checks](docs/VEGETATION.md)
 - [Climate gizmo and model limits](docs/CLIMATE_REFERENCE.md)
 - [Biome rules and presentation](docs/BIOMES_REFERENCE.md)
 - [Lakes, rivers and drainage](docs/HYDROLOGY_REFERENCE.md)
@@ -185,6 +188,7 @@ For optional rendered captures, run a visual check without `--headless`:
 godot --path . --script res://tests/terrain_climate_smoke.gd
 godot --path . --script res://tests/terrain_materials_smoke.gd
 godot --path . --script res://tests/terrain_coastline_smoke.gd
+godot --path . --script res://tests/terrain_vegetation_smoke.gd
 ```
 
 Generation currently runs synchronously and can pause the editor on large maps.
@@ -194,7 +198,8 @@ and GPU verification completed without those errors; see the technical notes.
 
 Stage 4 now uses lakes and rivers to support wetlands and riparian woodland. Choose
 **Biomes** in the climate panel and click a cell for potential tree cover and water
-availability. Layered terrain materials are now implemented; tree models and further presentation follow in the
+availability. Layered materials, coast ribbons and seeded tree placement are now
+implemented. Further seasonal and political presentation follows the
 [CK2-inspired presentation plan](docs/CK2-map-to-Godot-implementation-manual.md);
 [inspected asset evidence](docs/CK2_ASSET_REFERENCE.md) documents the reference files.
 

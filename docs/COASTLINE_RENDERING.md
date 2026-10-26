@@ -92,6 +92,6 @@ regression also passed with the new outlines, including its diagnostic image
 comparison. No native CK2 rendering behavior is claimed or required.
 
 This implements the first coastline step in chapter 7 of the
-[presentation manual](CK2-map-to-Godot-implementation-manual.md). A suitable next
-step is deterministic vegetation placement from the existing biome/canopy/water
-facts, before province presentation.
+[presentation manual](CK2-map-to-Godot-implementation-manual.md). Deterministic
+[vegetation placement](VEGETATION.md) now consumes the biome/canopy/water facts.
+The shader height sampler and LOD field binder are shared with tree presentation.

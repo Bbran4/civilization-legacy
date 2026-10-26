@@ -465,6 +465,9 @@ func _show_cell_info(info: Dictionary) -> void:
 		_cell_label.text += "\nBiome: %s\nLatitude: %+.1f°\nTemperature: %.1f°C\nRainfall: %.0f mm/yr (est.)\nWind travels: %s" % [info.biome, info.latitude, info.temperature, info.rainfall, _wind_name(info.wind)]
 		if info.has("canopy"):
 			_cell_label.text += "\nPotential tree cover: %.0f%% · nearby water: %.0f%%" % [info.canopy * 100.0, info.water_support * 100.0]
+		if info.has("tree_count"):
+			_cell_label.text += "\nPlaced trees in this cell: %d" % info.tree_count
+
 
 
 

@@ -89,14 +89,17 @@ full water storage, channel erosion and detailed floodplain dynamics remain open
 
 Biomes now consume climate and active lakes/rivers: wetlands, riparian woodland,
 forest/grassland/desert/tundra categories and independent canopy suitability.
-This is habitat generation, not placed vegetation or seasonal ecology.
+Habitat classification and separate seeded tree placement are implemented; seasonal
+ecological simulation remains future work.
 See [biome rules and limitations](BIOMES_REFERENCE.md).
 
 The first material step of the [CK2-inspired implementation manual](CK2-map-to-Godot-implementation-manual.md)
 is implemented: seven original tiled surfaces, fine normals, roughness and regional
 colour. See [material implementation](TERRAIN_MATERIALS.md). Depth-tested
 [coast ribbons with controlled width](COASTLINE_RENDERING.md) are now implemented
-in both overview and angled views. Deterministic biome-driven vegetation is next. Hydrology is already
+in both overview and angled views. Deterministic [biome-driven vegetation](VEGETATION.md)
+is now implemented with five original model families and automatic detail/fading.
+Snow/season/frozen-water presentation can follow before political map layers. Hydrology is already
 connected; the manual's original missing-integration notes are historical.
 Reference evidence is in [CK2 asset notes](CK2_ASSET_REFERENCE.md).
 

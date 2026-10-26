@@ -14,6 +14,8 @@ var bounds := Vector2.ZERO
 var field_heights := PackedFloat32Array()
 var field_size := Vector2i.ZERO
 var height_textures: Array[Texture2D] = []
+var height_fields: Array[PackedFloat32Array] = []
+var height_sizes: Array[Vector2i] = []
 var target_level: int = 0
 var displayed_detail: float = 0.0
 var current_level: int = 0
@@ -32,6 +34,8 @@ func reset() -> void:
 		chunk.node.free()
 	chunks.clear()
 	height_textures.clear()
+	height_fields.clear()
+	height_sizes.clear()
 	field_heights.clear()
 	field_size = Vector2i.ZERO
 	if is_instance_valid(_terrain):
@@ -76,11 +80,16 @@ func build() -> void:
 	for count in levels:
 		var size := chunk_count * count + Vector2i.ONE
 		var field := PackedFloat32Array()
-		field.resize(size.x * size.y)
-		var stride: int = high_cells / count
-		for row in range(size.y):
-			for col in range(size.x):
-				field[row * size.x + col] = source[row * stride * source_size.x + col * stride]
+		if count == high_cells:
+			field = source
+		else:
+			field.resize(size.x * size.y)
+			var stride: int = high_cells / count
+			for row in range(size.y):
+				for col in range(size.x):
+					field[row * size.x + col] = source[row * stride * source_size.x + col * stride]
+		height_fields.append(field)
+		height_sizes.append(size)
 		level_normals.append(Grid.normals_from_heights(field, size, _terrain.map_size))
 		height_textures.append(ImageTexture.create_from_image(Image.create_from_data(size.x, size.y, false, Image.FORMAT_RF, field.to_byte_array())))
 	_material = _terrain._land_material.duplicate()
@@ -265,3 +274,9 @@ func set_habitat_fields(habitat: Texture2D, biome: Texture2D) -> void:
 		_material.set_shader_parameter("habitat_field", habitat)
 		_material.set_shader_parameter("biome_field", biome)
 		_material.set_shader_parameter("habitats_enabled", habitat != null)
+
+
+func apply_surface_state(material: ShaderMaterial) -> void:
+	material.set_shader_parameter("height_coarse", height_textures[maxi(0, current_level - 1)])
+	material.set_shader_parameter("height_fine", height_textures[current_level])
+	material.set_shader_parameter("field_blend", blend)

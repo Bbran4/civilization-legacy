@@ -17,6 +17,11 @@
 > [implementation, limits and executed checks](COASTLINE_RENDERING.md). Foam,
 > political borders and later presentation remain separate work.
 
+> Vegetation update: chapter 10 now has deterministic tree placement, five original
+> miniature model families, spatial MultiMesh groups, water/cliff exclusions and
+> automatic detail/fading. See [vegetation scope and checks](VEGETATION.md). Historical
+> observations below still describe the original inspection snapshot.
+
 Prepared 25 October 2026. No implementation code is included. Neither game project was changed.
 
 ## 1. What the investigation establishes

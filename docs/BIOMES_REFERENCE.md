@@ -4,7 +4,8 @@ Stage 4 now produces native-cell biome identity, water availability and potentia
 canopy cover after climate and hydrology. In the bottom-right panel choose
 **Biomes** for categorical habitat colours, or **Terrain** for gently blended
 natural cover. Click a cell to see its biome, potential tree cover and nearby-water
-influence. These percentages describe suitability, not placed tree models.
+influence. These percentages describe suitability. The separate [vegetation pass](VEGETATION.md)
+now places models and exposes their cell counts independently.
 
 ## Ownership and rules
 
@@ -41,7 +42,7 @@ groundwater and detailed floodplain modeling remain future refinements.
 
 Potential canopy differs by habitat, fades at the cold treeline and steep slopes,
 and is zero on ocean, active lakes and active river channel cells. Habitat and
-canopy are separate from future deterministic tree placement and art.
+canopy remain separate from the implemented deterministic tree-placement layer.
 
 ## Rendering and saving
 
@@ -72,6 +73,6 @@ checks the lake identity and canopy exclusion alongside drainage and picking.
 The installed CK2 files were inspected as reference only; see
 [asset evidence and recommendations](CK2_ASSET_REFERENCE.md). No CK2 assets or
 shaders are copied. Tiled textures and detail normals now have an initial
-[layered material implementation](TERRAIN_MATERIALS.md). Tree instances, province
+[layered material implementation](TERRAIN_MATERIALS.md). Tree instances now have an initial [placement implementation](VEGETATION.md). Province
 borders and the remaining [implementation manual](CK2-map-to-Godot-implementation-manual.md)
 are the subsequent presentation work, not part of this classifier milestone.

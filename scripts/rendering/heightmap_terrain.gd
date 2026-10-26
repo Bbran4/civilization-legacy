@@ -5,6 +5,7 @@ extends Node3D
 signal climate_changed
 signal terrain_regenerated
 const SurfaceMaterials = preload("res://scripts/rendering/terrain_materials.gd")
+const VegetationView = preload("res://scripts/rendering/terrain_vegetation_view.gd")
 const Biomes = preload("res://scripts/domain/terrain_biomes.gd")
 const Hydrology = preload("res://scripts/domain/terrain_hydrology.gd")
 const HydrologyView = preload("res://scripts/rendering/terrain_hydrology_view.gd")
@@ -203,6 +204,7 @@ var generation_ms: float = 0.0
 var generator_version: int = 4
 var detail: Node3D
 var biomes: RefCounted
+var vegetation_view: Node3D
 var _biome_texture: Texture2D
 var _habitat_texture: Texture2D
 var _biome_field_texture: Texture2D
@@ -348,6 +350,13 @@ func _refresh_climate(rebuild_views: bool = false) -> void:
 			_biome_texture = ImageTexture.create_from_image(biomes.image)
 		_habitat_texture = ImageTexture.create_from_image(biomes.habitat_field) if biomes.habitat_field != null else null
 		_biome_field_texture = ImageTexture.create_from_image(biomes.biome_field) if biomes.biome_field != null else null
+	if not Engine.is_editor_hint() and (changed or rebuild_views or vegetation_view == null):
+		if vegetation_view == null:
+			vegetation_view = VegetationView.new()
+			vegetation_view.name = "VegetationView"
+			add_child(vegetation_view, false, Node.INTERNAL_MODE_BACK)
+		vegetation_view.build(self)
+		vegetation_view.set_overview_blend(overview_blend)
 	set_climate_view(climate_view)
 	climate_changed.emit()
 
@@ -401,6 +410,8 @@ func set_climate_view(mode: int) -> void:
 		detail.set_habitat_fields(_habitat_texture, _biome_field_texture)
 	if geography_view != null:
 		geography_view.set_climate_view(climate_view)
+	if vegetation_view != null:
+		vegetation_view.set_view(climate_view, heightmap_view)
 	if hydrology_view != null:
 		hydrology_view.set_view(climate_view, heightmap_view)
 
@@ -553,6 +564,8 @@ func heightmap_image() -> Image:
 
 
 func set_overview_blend(value: float) -> void:
+	if vegetation_view != null:
+		vegetation_view.set_overview_blend(value)
 	overview_blend = clampf(value, 0.0, 1.0)
 	if _land_material != null:
 		_land_material.set_shader_parameter("overview_blend", overview_blend)
@@ -564,6 +577,8 @@ func set_overview_blend(value: float) -> void:
 
 func set_heightmap_view(enabled: bool) -> void:
 	heightmap_view = enabled
+	if vegetation_view != null:
+		vegetation_view.set_view(climate_view, enabled)
 	if hydrology_view != null:
 		hydrology_view.set_view(climate_view, enabled)
 	if _land_material != null:
@@ -662,6 +677,8 @@ func cell_info(cell: int) -> Dictionary:
 		info.merge(biomes.native_cell_info(cell), true)
 	elif climate != null:
 		info.merge(Biomes.cell_info(info.temperature, info.rainfall, info.land), true)
+	if vegetation_view != null and vegetation_view.layout != null and vegetation_view.layout.counts.size() == graph.count:
+		info["tree_count"] = vegetation_view.layout.counts[cell]
 	return info
 
 

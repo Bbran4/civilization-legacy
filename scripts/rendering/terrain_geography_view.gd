@@ -187,7 +187,7 @@ func _process(_delta: float) -> void:
 	var key := Vector2(detail.current_level, detail.blend)
 	if key != _lod_key:
 		_lod_key = key
-		set_surface_fields(detail.height_textures[maxi(0, detail.current_level - 1)], detail.height_textures[detail.current_level], detail.blend)
+		detail.apply_surface_state(_material)
 
 
 func set_overview_blend(value: float) -> void:
