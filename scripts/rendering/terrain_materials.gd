@@ -10,6 +10,8 @@ const TILE_WORLD_SIZE := 8.0
 static var albedo: Texture2DArray
 static var normals: Texture2DArray
 static var weights: ImageTexture
+static var transition_colors: ImageTexture
+static var transition_weights: ImageTexture
 static var transition_noise: ImageTexture
 static var build_count: int = 0
 
@@ -101,6 +103,9 @@ static func ensure_library() -> bool:
 		for x in range(palette.get_width()):
 			palette.set_pixel(x, y, base_weights(Biomes.classify(-80.0 + x * 0.5, y * 10.0)))
 	weights = ImageTexture.create_from_image(Biomes._soften_palette(palette))
+	# Both appearance lookups share a broader ecotone; classification remains in Biomes.
+	transition_colors = ImageTexture.create_from_image(_ecotone_palette(Biomes.palette_image()))
+	transition_weights = ImageTexture.create_from_image(_ecotone_palette(weights.get_image(), true))
 	var noise_image := Image.create(TILE_SIZE, TILE_SIZE, false, Image.FORMAT_RGBA8)
 	for y in range(TILE_SIZE):
 		for x in range(TILE_SIZE):
@@ -115,6 +120,40 @@ static func ensure_library() -> bool:
 	return true
 
 
+static func _ecotone_palette(source: Image, normalize_weights: bool = false) -> Image:
+	# Two box passes form a triangular kernel: +/-4 C and +/-240 mm/year.
+	# Sliding sums keep the work linear in palette size, independent of radius.
+	var image := source.duplicate() as Image
+	image.convert(Image.FORMAT_RGBAF)
+	for iteration in range(2):
+		for axis in range(2):
+			var radius: int = 4 if axis == 0 else 12
+			var lines: int = image.get_height() if axis == 0 else image.get_width()
+			var length: int = image.get_width() if axis == 0 else image.get_height()
+			var target := Image.create(image.get_width(), image.get_height(), false, Image.FORMAT_RGBAF)
+			for line in range(lines):
+				var total := Color(0, 0, 0, 0)
+				for tap in range(-radius, radius + 1):
+					var index: int = clampi(tap, 0, length - 1)
+					total += image.get_pixel(index if axis == 0 else line, line if axis == 0 else index)
+				for index in range(length):
+					target.set_pixel(index if axis == 0 else line, line if axis == 0 else index, total / float(radius * 2 + 1))
+					var leaving: int = clampi(index - radius, 0, length - 1)
+					var entering: int = clampi(index + radius + 1, 0, length - 1)
+					total -= image.get_pixel(leaving if axis == 0 else line, line if axis == 0 else leaving)
+					total += image.get_pixel(entering if axis == 0 else line, line if axis == 0 else entering)
+			image = target
+	if normalize_weights:
+		# Existing RGBA8 palette filtering has rounding loss; publish normalized weights.
+		for y in range(image.get_height()):
+			for x in range(image.get_width()):
+				var w: Color = image.get_pixel(x, y)
+				w = Color(maxf(w.r, 0), maxf(w.g, 0), maxf(w.b, 0), maxf(w.a, 0))
+				image.set_pixel(x, y, w / maxf(w.r + w.g + w.b + w.a, 0.0001))
+	image.convert(Image.FORMAT_RGBA8)
+	return image
+
+
 static func bind_library(material: ShaderMaterial, seed_text: String = "42") -> void:
 	if not ensure_library():
 		material.set_shader_parameter("surface_materials_enabled", false)
@@ -125,6 +164,8 @@ static func bind_library(material: ShaderMaterial, seed_text: String = "42") -> 
 	material.set_shader_parameter("surface_tile_size", TILE_WORLD_SIZE)
 	material.set_shader_parameter("surface_materials_enabled", true)
 	material.set_shader_parameter("transition_noise", transition_noise)
+	material.set_shader_parameter("transition_colors", transition_colors)
+	material.set_shader_parameter("transition_weights", transition_weights)
 	var random = Alea.new(seed_text + ":terrain-blending")
 	material.set_shader_parameter("blend_seed_offset", Vector2(random.next() * 4096.0, random.next() * 4096.0))
 

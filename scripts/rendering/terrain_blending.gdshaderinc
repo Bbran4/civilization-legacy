@@ -1,5 +1,7 @@
 // Seeded, world-space appearance masks. Native biome and climate data stay unchanged.
 uniform sampler2D transition_noise : filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D transition_colors : source_color, filter_linear, repeat_disable;
+uniform sampler2D transition_weights : filter_linear, repeat_disable;
 uniform bool terrain_blending_enabled = true;
 uniform vec2 blend_seed_offset = vec2(0.0);
 

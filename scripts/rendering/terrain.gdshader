@@ -66,10 +66,11 @@ void fragment() {
 	// rather than magnifying a blurred, low-resolution map of biome colours.
 	vec4 habitat = habitats_enabled ? texture(habitat_field, appearance_uv) : vec4(0.0);
 	float demand = max(150.0, 400.0 + 45.0 * max(-5.0, appearance_climate.r * 140.0 - 80.0));
-	vec2 ecological_climate = vec2(appearance_climate.r + (blend_signals.a - 0.5) * 0.9 / 140.0, appearance_climate.g + habitat.r * demand * 1.2 / 6000.0 + (blend_signals.r - 0.5) * 160.0 / 6000.0);
+	vec2 ecological_climate = vec2(appearance_climate.r + (blend_signals.a - 0.5) * 8.0 / 140.0, appearance_climate.g + habitat.r * demand * 1.2 / 6000.0 + (blend_signals.r - 0.5) * 1000.0 / 6000.0);
 	vec2 palette_size = vec2(textureSize(biome_palette, 0));
 	vec2 palette_uv = (clamp(ecological_climate, vec2(0.0), vec2(1.0)) * (palette_size - vec2(1.0)) + vec2(0.5)) / palette_size;
-	vec3 cover_color = biomes_enabled ? texture(biome_palette, palette_uv).rgb : grass_color.rgb;
+	bool ecotone = terrain_blending_enabled && surface_materials_enabled;
+	vec3 cover_color = biomes_enabled ? (ecotone ? texture(transition_colors, palette_uv).rgb : texture(biome_palette, palette_uv).rgb) : grass_color.rgb;
 	cover_color = mix(cover_color, vec3(0.4, 0.52, 0.41), habitat.g);
 	cover_color = mix(cover_color, vec3(0.294, 0.502, 0.333), habitat.b);
 	vec3 grass = cover_color * mix(0.94, 1.06, variation);
@@ -86,7 +87,7 @@ void fragment() {
 	vec3 material_tint;
 	vec3 detail_normal;
 	float material_roughness;
-	vec4 ground_weights = surface_materials_enabled ? texture(surface_weights, palette_uv) : vec4(1.0, 0.0, 0.0, 0.0);
+	vec4 ground_weights = surface_materials_enabled ? (ecotone ? texture(transition_weights, palette_uv) : texture(surface_weights, palette_uv)) : vec4(1.0, 0.0, 0.0, 0.0);
 	ground_weights = mix(ground_weights, vec4(0.3, 0.05, 0.65, 0.0), habitat.a * 0.35);
 	ground_weights = mix(ground_weights, vec4(0.0, 0.0, 0.0, 1.0), beach);
 	float wet = terrain_patch_edge(clamp(max(habitat.g, habitat.r * 0.45) * (1.0 - rock), 0.0, 1.0), blend_signals.b);

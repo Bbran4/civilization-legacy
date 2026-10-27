@@ -159,7 +159,8 @@ snow textures, with small bumps affecting their lighting. Their size stays the
 same when you generate a wider map. Zooming out fades fine texture into the broad
 biome colours. No extra settings are required. The diagnostic views still show
 their original data. Grass, soil and sand now mix through seeded patches at several sizes, with
-irregular contacts instead of only smooth colour bands. This happens automatically
+irregular contacts instead of only smooth colour bands. Forest and desert edges
+now share the same broader colour-and-texture transition zone. This happens automatically
 in Terrain; the same seed recreates the pattern, and wider maps keep the same
 patch size. It changes appearance only. See [terrain material notes](TERRAIN_MATERIALS.md).
 

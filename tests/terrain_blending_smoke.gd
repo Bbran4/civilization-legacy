@@ -29,8 +29,46 @@ func _texture(colour: Color) -> Texture2D:
 	var image := Image.create(2, 2, false, Image.FORMAT_RGBAF)
 	image.fill(colour)
 	return ImageTexture.create_from_image(image)
+func _boundary_metrics(image: Image) -> Vector2:
+	# Locate the halfway colour contour across a deliberately straight climate boundary.
+	var left: Color = image.get_pixel(250, 400)
+	var right: Color = image.get_pixel(1030, 400)
+	var origin := Vector3(left.r, left.g, left.b)
+	var delta := Vector3(right.r, right.g, right.b) - origin
+	var positions := PackedFloat32Array()
+	var edge: float = 0.0
+	for y in range(180, 620, 8):
+		var best: float = INF
+		var position: float = 0.0
+		var strongest: float = 0.0
+		for x in range(350, 930):
+			var c: Color = image.get_pixel(x, y)
+			var value: float = (Vector3(c.r, c.g, c.b) - origin).dot(delta) / maxf(delta.length_squared(), 0.0001)
+			if absf(value - 0.5) < best:
+				best = absf(value - 0.5)
+				position = x
+			# Four-pixel slope avoids treating 8-bit capture quantization as a colour seam.
+			var previous: Color = image.get_pixel(x - 4, y)
+			strongest = maxf(strongest, Vector3(c.r - previous.r, c.g - previous.g, c.b - previous.b).length() / 4.0)
+		positions.append(position)
+		edge += strongest
+	var mean: float = 0.0
+	for position in positions:
+		mean += position / positions.size()
+	var variance: float = 0.0
+	for position in positions:
+		variance += pow(position - mean, 2) / positions.size()
+	return Vector2(sqrt(variance), edge / positions.size())
+
 func _run() -> void:
 	_check(Materials.ensure_library() and Materials.transition_noise != null and Materials.transition_noise.get_image().has_mipmaps(), "Transition masks must use a shared mipmapped numeric noise field.")
+	var transition_weights: Image = Materials.transition_weights.get_image()
+	for y in range(0, transition_weights.get_height(), 13):
+		for x in range(0, transition_weights.get_width(), 7):
+			var w: Color = transition_weights.get_pixel(x, y)
+			_check(absf(w.r + w.g + w.b + w.a - 1.0) < 0.02, "Broader contacts must preserve normalized material weights.")
+	var interior: Color = Materials.transition_colors.get_image().get_pixel(220, 0)
+	_check(Vector3(interior.r - Biomes.COLORS[4].r, interior.g - Biomes.COLORS[4].g, interior.b - Biomes.COLORS[4].b).length() < 0.01, "Deep hot-desert interiors must keep their original colour.")
 	if DisplayServer.get_name() != "headless":
 		var fixture := Node3D.new()
 		root.add_child(fixture)
@@ -83,6 +121,33 @@ func _run() -> void:
 		Materials.bind_library(material, "blend-fixture")
 		var repeat: Image = await _capture("repeat")
 		_check(_difference(resized, repeat) < 0.00001, "The same seed and world coordinates must reproduce identical blending.")
+		# Regression: tiny palette smoothing previously left these contacts nearly straight.
+		camera.size = 96
+		mesh.size = Vector2(128, 96)
+		material.set_shader_parameter("map_size", mesh.size)
+		material.set_shader_parameter("habitat_field", _texture(Color(0, 0, 0, 0)))
+		for contact in ["forest-dry", "hot-desert"]:
+			var boundary := Image.create(129, 97, false, Image.FORMAT_RGBAF)
+			for y in range(97):
+				for x in range(129):
+					var temperature: float = lerpf(16, 24, x / 128.0) if contact == "forest-dry" else 25.0
+					var rain: float = 1000.0 if contact == "forest-dry" else lerpf(100, 600, x / 128.0)
+					boundary.set_pixel(x, y, Color((temperature + 80.0) / 140.0, rain / 6000.0, 0.5, 0.5))
+			material.set_shader_parameter("climate_field", ImageTexture.create_from_image(boundary))
+			material.set_shader_parameter("terrain_blending_enabled", false)
+			var before: Image = await _capture(contact + "-before")
+			material.set_shader_parameter("terrain_blending_enabled", true)
+			var after: Image = await _capture(contact + "-after")
+			var old_metrics: Vector2 = _boundary_metrics(before)
+			var new_metrics: Vector2 = _boundary_metrics(after)
+			print(contact, " contour spread / strongest edge: ", old_metrics, " -> ", new_metrics)
+			_check(new_metrics.x > old_metrics.x + 2.0, contact + " must gain a visibly irregular colour boundary, not just interior grain.")
+			# Hold noise neutral to measure the underlying seam separately from intentional patches.
+			material.set_shader_parameter("transition_noise", _texture(Color(0.5, 0.5, 0.5, 0.5)))
+			var softened: Image = await _capture(contact + "-neutral-noise")
+			var smooth_metrics: Vector2 = _boundary_metrics(softened)
+			_check(smooth_metrics.y < old_metrics.y * 0.85, contact + " must broaden the palette contact before adding noisy patches.")
+			material.set_shader_parameter("transition_noise", Materials.transition_noise)
 		var gradient := Image.create(129, 97, false, Image.FORMAT_RGBAF)
 		for y in range(97):
 			for x in range(129):

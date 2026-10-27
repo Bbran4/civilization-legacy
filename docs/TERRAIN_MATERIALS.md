@@ -37,8 +37,25 @@ The Terrain view now uses three scales of world-space noise to break up material
 contacts and add restrained grass, dry-ground and soil patches inside mixed
 habitats. Approximate patch spacings are 32, 6 and 1.5 world units; these are
 fixed presentation scales, independent of map width and height. A bounded warp
-(up to two units per axis) bends appearance sampling near contacts. Small
-appearance-only climate offsets interrupt otherwise uniform colour bands.
+(up to two units per axis) bends appearance sampling near contacts. Appearance-only climate offsets interrupt otherwise uniform colour bands.
+
+The colour lookup and material-weight lookup now share a broader transition band
+around climate classification thresholds. The previous narrow palette smoothing
+could leave an almost straight forest/dry-ground or desert edge even when material
+noise was active. Two sliding box passes per axis produce a triangular filter
+with support of +/-4 degrees C and +/-240 mm/year (plus the original small
+palette smoothing). This is a cached rendering lookup, separate from the original
+domain palette and categorical biome field. Uniform interiors stay unchanged
+when the filter footprint contains only their own biome.
+
+Seeded signals offset appearance lookup coordinates by `(signal - 0.5) * 8` C
+and `(signal - 0.5) * 1000` mm/year before material patch weighting. These are
+bounded visual variations, not edits to annual climate measurements. Broadening
+both lookups allows neighbouring ground materials to participate at the same
+contacts as the colour transition, rather than applying noise only inside an
+otherwise sharply coloured biome. The width of this colour band on the map
+depends on the local climate gradient; the noise patch spacing remains fixed in
+world units.
 
 Ground weights remain normalized. The same weights influence pigment, texture,
 roughness and fine normals; micro-height adds smaller contact detail. Wet ground,
@@ -59,7 +76,8 @@ climate and categorical diagnostic views bypass this decorative layer.
 ## Data and ownership
 
 - `scripts/rendering/terrain_materials.gd` owns the original procedural library,
-  climate-to-material weight palette, shared numeric transition noise and seeded regional multipliers.
+  climate-to-material weight palette, matched appearance transition colour/weight
+  lookups, shared numeric transition noise and seeded regional multipliers.
 - `terrain_blending.gdshaderinc` owns world-space transition masks, appearance warp,
   normalized patch weights and pigment variation.
 - `terrain_surface.gdshaderinc` owns the normalized texture blending and normal
@@ -113,7 +131,11 @@ Captures are written to `.godot/materials-*.png`. The climate regression was als
 run with graphics and passed. The blending GPU check compares enabled/disabled uniform-ground patches, fixed
 world scale after doubling map dimensions, different/repeated seeds, unchanged
 rainfall/height diagnostic pixels and unchanged native data and mesh identity
-across zooms. Captures are in `.godot/blending-*.png`; close terrain and the
+across zooms. Dedicated forest/dry-ground and hot-desert gradient fixtures check
+that halfway colour contours gain noise variation. Neutral-noise captures isolate
+the underlying palette contact and verify a smaller strongest colour slope across
+four pixels, avoiding 8-bit capture quantization. Material weights remain normalized
+and deep desert interiors retain their colour. Captures are in `.godot/blending-*.png`; close terrain and the
 controlled transition comparison were inspected visually. No frame-rate or cross-renderer performance claim
 is made.
 
