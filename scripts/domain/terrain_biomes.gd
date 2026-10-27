@@ -40,6 +40,17 @@ func native_cell_info(cell: int) -> Dictionary:
 
 
 
+func support_at(uv: Vector2) -> float:
+	if habitat_field == null:
+		return 0.0
+	var point: Vector2 = uv.clamp(Vector2.ZERO, Vector2.ONE) * Vector2(habitat_field.get_size() - Vector2i.ONE)
+	var x: int = floori(point.x)
+	var y: int = floori(point.y)
+	var right: int = mini(x + 1, habitat_field.get_width() - 1)
+	var bottom: int = mini(y + 1, habitat_field.get_height() - 1)
+	return lerpf(lerpf(habitat_field.get_pixel(x, y).r, habitat_field.get_pixel(right, y).r, point.x - x), lerpf(habitat_field.get_pixel(x, bottom).r, habitat_field.get_pixel(right, bottom).r, point.x - x), point.y - y)
+
+
 static func moisture_ratio(temperature: float, rainfall: float) -> float:
 	# Annual evaporative-demand proxy in mm, not a hydrological PET solution.
 	return rainfall / Climate.evaporative_demand(temperature)

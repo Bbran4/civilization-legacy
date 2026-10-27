@@ -361,7 +361,7 @@ func _refresh_climate(rebuild_views: bool = false) -> void:
 		biomes.generate(climate, geography, graph, hydrology)
 		if _biome_texture == null:
 			_biome_texture = ImageTexture.create_from_image(biomes.image)
-		_habitat_texture = ImageTexture.create_from_image(biomes.habitat_field) if biomes.habitat_field != null else null
+		_habitat_texture = SurfaceMaterials.habitat_texture(biomes.habitat_field)
 		_biome_field_texture = ImageTexture.create_from_image(biomes.biome_field) if biomes.biome_field != null else null
 	if not Engine.is_editor_hint() and (changed or rebuild_views or vegetation_view == null):
 		if vegetation_view == null:
@@ -709,10 +709,12 @@ func visible_surface_height(uv: Vector2) -> float:
 	var cell: int = graph.nearest_cell(uv * map_size)
 	if hydrology.ocean[cell]:
 		return maxf(height, sea_level * relief_scale())
-	var lake_id: int = hydrology.lake_ids[cell]
-	if climate_view == 0 and lake_id >= 0 and hydrology.lakes[lake_id].active:
-		var lake_height: float = (height_offset + (hydrology.lakes[lake_id].level / 100.0 - 0.2) * elevation) * relief_scale()
-		return maxf(height, lake_height)
+	if climate_view == 0 and hydrology_view != null:
+		# Query the same clipped lake footprint used by water rendering, not its cell label.
+		var level: float = hydrology_view.water_level_at(uv * map_size)
+		if not is_nan(level):
+			return maxf(height, level)
+
 	return height
 
 
@@ -727,7 +729,44 @@ func pick_cell(ray_origin: Vector3, ray_direction: Vector3) -> Dictionary:
 	if point == null:
 		return {}
 	var local: Vector3 = to_local(point)
-	return cell_info(graph.nearest_cell(Vector2(local.x, local.z) + map_size * 0.5))
+	return point_info(Vector2(local.x, local.z) + map_size * 0.5)
+
+
+func point_info(map_point: Vector2) -> Dictionary:
+	if graph == null:
+		return {}
+	var cell: int = graph.nearest_cell(map_point)
+	var info: Dictionary = cell_info(cell)
+	info.cell_surface_kind = info.get("surface_kind", "Land")
+	info.cell_biome = info.get("biome", "Unknown")
+	info.inspected_position = map_point
+	var uv: Vector2 = map_point / map_size
+	var bed: float = surface_height(uv)
+	var water: float = NAN
+	if show_water and not heightmap_view and hydrology != null and hydrology.error.is_empty():
+		if hydrology.ocean[cell]:
+			water = sea_level * relief_scale()
+		elif climate_view == 0 and hydrology_view != null:
+			water = hydrology_view.water_level_at(map_point)
+	var submerged: bool = not is_nan(water) and water > bed + 0.00001
+	info.surface_kind = ("Open water" if hydrology.ocean[cell] else "Lake") if submerged else "Land"
+	info.water_depth = maxf(0.0, (water - bed) / relief_scale() / elevation * 100.0) if submerged else 0.0
+	if climate != null and biomes != null:
+		var local_climate: Dictionary = climate.cell_info(uv)
+		info.merge(local_climate, true)
+		var support: float = biomes.support_at(uv)
+		var point_height: float = (bed / relief_scale() - height_offset) / elevation * 100.0 + 20.0
+		var delta: Vector2 = Vector2.ONE / map_size
+		var dx: float = (surface_height(uv + Vector2(delta.x, 0)) - surface_height(uv - Vector2(delta.x, 0))) / relief_scale() / elevation * 50.0
+		var dz: float = (surface_height(uv + Vector2(0, delta.y)) - surface_height(uv - Vector2(0, delta.y))) / relief_scale() / elevation * 50.0
+		var slope: float = maxf(absf(dx), absf(dz)) * maxf(map_size.x, map_size.y) / 1600.0
+		var result: Dictionary = Biomes.habitat(local_climate.temperature, local_climate.rainfall, support, slope, (0 if hydrology.ocean[cell] else 12) if submerged else -1, point_height)
+		info.biome_id = result.biome_id
+		info.biome = Biomes.NAMES[result.biome_id]
+		info.canopy = result.canopy
+		info.water_support = support
+		info.effective_rainfall = result.effective_rainfall
+	return info
 
 
 func ray_surface_hit(ray_origin: Vector3, ray_direction: Vector3) -> Variant:

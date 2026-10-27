@@ -35,7 +35,7 @@ their numeric or categorical meaning remains readable.
 
 The Terrain view now uses three scales of world-space noise to break up material
 contacts and add restrained grass, dry-ground and soil patches inside mixed
-habitats. Approximate patch spacings are 32, 6 and 1.5 world units; these are
+habitats. Approximate patch spacings are 32, 8 and 2 world units; these are
 fixed presentation scales, independent of map width and height. A bounded warp
 (up to two units per axis) bends appearance sampling near contacts. Appearance-only climate offsets interrupt otherwise uniform colour bands.
 
@@ -59,7 +59,7 @@ world units.
 
 Ground weights remain normalized. The same weights influence pigment, texture,
 roughness and fine normals; micro-height adds smaller contact detail. Wet ground,
-beach sand, rock and snow also receive restrained contact variation while pure
+beach sand, rock and snow use the same coverage-threshold blend while pure
 mask interiors stay intact. These changes do not create different native biome
 IDs, temperature/rainfall measurements, terrain geometry or water routing.
 
@@ -73,11 +73,43 @@ it further, and it does not claim to reproduce CK3's shader.
 Blending is automatic in **Terrain**. There are no new generation controls. Height,
 climate and categorical diagnostic views bypass this decorative layer.
 
+## Beach and water-fed coverage
+
+The October 27 shoreline screenshots revealed two additional paths that bypassed
+the earlier colour/weight lookup fix: narrow height-based beach coverage, and
+categorical wetland/woodland overlays sampled from a coarse native-cell field.
+
+The shared noise now favours broad shapes (55% broad, 35% medium, 10% fine),
+with increased contrast. Contact masks are thresholded around that noise instead
+of receiving a small tint perturbation. A pure mask of zero or one stays pure;
+transition zones admit islands of each material. Beach coverage spans 1.8 times
+the existing beach-height range before thresholding; the waterline stays sand.
+The same sand coverage drives visible colour and material weights.
+
+Wetland/woodland colour overlays now pass through those same noisy contact masks.
+Their numeric appearance texture has mipmaps generated on a copy; a fixed
+10-world-unit footprint prefilters categorical cell edges before thresholding.
+This avoids preserving a cell polygon under the noise. Freezing temperatures
+suppress green overlays. The original ecology image, native biome IDs, canopy
+and water support arrays remain unchanged. The shader-only prefilter also means
+some narrow habitat patches become less prominent; these are appearance masks,
+not changes to their native ecological classification.
+
+The following controlled beach ramp uses the production shader; white is sand
+coverage and black is the neighbouring ground. This demonstrates the actual
+coverage mask, with lighting and ground grain removed for inspection.
+
+![Production beach coverage on a controlled height ramp](images/terrain-beach-coverage.png)
+
+[The coloured view](images/terrain-beach-blending.png) uses the same ramp and seed.
+This is an isolated material fixture, not a full generated-map screenshot.
+
 ## Data and ownership
 
 - `scripts/rendering/terrain_materials.gd` owns the original procedural library,
   climate-to-material weight palette, matched appearance transition colour/weight
-  lookups, shared numeric transition noise and seeded regional multipliers.
+  lookups, shared numeric transition noise, copied/mipmapped habitat appearance
+  textures and seeded regional multipliers.
 - `terrain_blending.gdshaderinc` owns world-space transition masks, appearance warp,
   normalized patch weights and pigment variation.
 - `terrain_surface.gdshaderinc` owns the normalized texture blending and normal
@@ -126,7 +158,9 @@ normal-vector/roughness ranges, shared base/LOD resources, fixed world scale,
 climate updates retaining meshes/library, deterministic presentation after save
 application and no library rebuild on zoom. GPU captures compare layered versus
 plain close terrain and assert that toggling decoration does not alter rainfall
-diagnostic pixels. A brightness check guards the Compatibility neutral baseline.
+diagnostic pixels. A brightness check guards the Compatibility neutral baseline with coverage
+blending disabled in both comparison images, isolating texture colour conversion
+from intentional changes to vegetation/sand coverage.
 Captures are written to `.godot/materials-*.png`. The climate regression was also
 run with graphics and passed. The blending GPU check compares enabled/disabled uniform-ground patches, fixed
 world scale after doubling map dimensions, different/repeated seeds, unchanged
@@ -135,7 +169,10 @@ across zooms. Dedicated forest/dry-ground and hot-desert gradient fixtures check
 that halfway colour contours gain noise variation. Neutral-noise captures isolate
 the underlying palette contact and verify a smaller strongest colour slope across
 four pixels, avoiding 8-bit capture quantization. Material weights remain normalized
-and deep desert interiors retain their colour. Captures are in `.godot/blending-*.png`; close terrain and the
+and deep desert interiors retain their colour. Beach, wetland and woodland
+fixtures additionally render their actual production coverage masks in black and
+white and require noisy halfway contours, so interior grain cannot satisfy the
+coverage check. The updated full-map close capture was also inspected. Captures are in `.godot/blending-*.png`; close terrain and the
 controlled transition comparison were inspected visually. No frame-rate or cross-renderer performance claim
 is made.
 

@@ -94,17 +94,23 @@ func _run() -> void:
 		rig._apply_zoom()
 		terrain.detail._process(1.0)
 		var layered: Image = await _capture("materials-close")
+		# Isolate texture colour-space conversion from the intentional coverage changes.
+		for material in [terrain._land_material, terrain.detail._material]:
+			material.set_shader_parameter("terrain_blending_enabled", false)
+		var neutral_layered: Image = await _capture("materials-neutral-close")
 		_set_enabled(terrain, false)
 		var plain: Image = await _capture("materials-close-plain")
 		var bright: float = 0.0
 		var reference: float = 0.0
 		for y in range(200, 600, 5):
 			for x in range(430, 930, 5):
-				bright += layered.get_pixel(x, y).get_luminance()
+				bright += neutral_layered.get_pixel(x, y).get_luminance()
 				reference += plain.get_pixel(x, y).get_luminance()
 		_check(bright / maxf(reference, 0.001) < 1.15, "Neutral material multipliers must preserve the base biome brightness in Compatibility.")
 		_check(_difference(layered, plain) > 10.0, "Rendered close terrain must visibly use the new surface materials.")
 		_set_enabled(terrain, true)
+		for material in [terrain._land_material, terrain.detail._material]:
+			material.set_shader_parameter("terrain_blending_enabled", true)
 		terrain.set_climate_view(2)
 		var climate_a: Image = await _capture("materials-rainfall")
 		_set_enabled(terrain, false)

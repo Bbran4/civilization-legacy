@@ -3,7 +3,7 @@ uniform bool hydrology_enabled = false;
 uniform sampler2D biome_palette : source_color, filter_linear, repeat_disable;
 uniform bool biomes_enabled = false;
 uniform sampler2D climate_field : filter_linear, repeat_disable;
-uniform sampler2D habitat_field : filter_linear, repeat_disable;
+uniform sampler2D habitat_field : filter_linear_mipmap, repeat_disable;
 uniform sampler2D biome_field : source_color, filter_nearest, repeat_disable;
 uniform bool habitats_enabled = false;
 uniform int climate_mode = 0;

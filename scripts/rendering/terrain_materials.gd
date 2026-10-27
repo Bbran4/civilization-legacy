@@ -170,6 +170,14 @@ static func bind_library(material: ShaderMaterial, seed_text: String = "42") -> 
 	material.set_shader_parameter("blend_seed_offset", Vector2(random.next() * 4096.0, random.next() * 4096.0))
 
 
+static func habitat_texture(source: Image) -> ImageTexture:
+	if source == null:
+		return null
+	var appearance := source.duplicate() as Image
+	appearance.generate_mipmaps()
+	return ImageTexture.create_from_image(appearance)
+
+
 static func regional_field(map_size: Vector2, seed_text: String) -> ImageTexture:
 	# Linear RGB multipliers, not a second biome identity/colour map.
 	var size: Vector2i = Grid.sample_size_for(map_size, 128)

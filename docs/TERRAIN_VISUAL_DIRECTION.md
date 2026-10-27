@@ -14,7 +14,10 @@ region. This is a useful target for the game's terrain presentation.
 The terrain now uses seeded world-space noise at three scales, bounded appearance
 warping, normalized material patch weights and micro-height contacts. A shared
 broader appearance colour/weight lookup now includes forest/dry-ground and desert
-contacts that previously retained narrow, almost straight palette edges. Pigment,
+contacts that previously retained narrow, almost straight palette edges. Beach
+and water-fed overlays now use larger noisy coverage masks too, including
+filtered native-cell habitat edges; see the controlled black/white mask in the
+material guide. Pigment,
 roughness and fine normals use the shared material weights; wet ground, rock,
 snow and beach contacts vary locally. Fine noise fades at distance. Source
 climate, biome IDs, heights and water data stay authoritative and unchanged.

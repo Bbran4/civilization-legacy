@@ -201,6 +201,24 @@ func _run() -> void:
 	_check(is_equal_approx(terrain.visible_surface_height(uv), water_height), "Water picking must use the lake level instead of sea level or its submerged bed.")
 	var picked: Dictionary = terrain.pick_cell(Vector3(point.x, 10000, point.y), Vector3.DOWN)
 	_check(picked.id == water_cell and picked.surface_kind == "Lake" and picked.biome == "Lake water" and picked.canopy == 0 and picked.water_depth > 20.0, "Picking a lake must expose current lake and basin data.")
+	# A lake's native cell can include dry terrain outside the clipped water surface.
+	var checked_dry_margin: bool = false
+	for cell in selected_lake.cells:
+		for vertex in terrain.graph.polygon(cell):
+			var probe: Vector2 = terrain.graph.points[cell].lerp(vertex, 0.95)
+			if is_nan(terrain.hydrology_view.water_level_at(probe)):
+				var inspected: Dictionary = terrain.point_info(probe)
+				_check(inspected.surface_kind == "Land" and inspected.biome != "Lake water" and inspected.cell_biome == "Lake water", "Dry parts of a lake cell must inspect as land while preserving the native lake-cell classification.")
+				var ray_point: Vector2 = probe - terrain.map_size * 0.5
+				var picked_margin: Dictionary = terrain.pick_cell(Vector3(ray_point.x, 10000, ray_point.y), Vector3.DOWN)
+				_check(picked_margin.surface_kind == "Land" and picked_margin.water_depth == 0, "A click on exposed lake-margin terrain must not hit an imaginary lake surface.")
+				editor._show_cell_info(picked_margin)
+				_check(editor._cell_label.text.contains("Cell classification:") and editor._cell_label.text.contains("Biome at point:"), "The inspector must distinguish a clicked land point from its whole-cell biome.")
+				checked_dry_margin = true
+				break
+		if checked_dry_margin:
+			break
+	_check(checked_dry_margin, "The lake fixture must exercise an exposed part of a native lake cell.")
 	var original_samples: PackedFloat32Array = terrain.height_samples.duplicate()
 	var original_cells: PackedByteArray = terrain.graph.heights.duplicate()
 	var mesh_id: int = terrain.detail.chunks[0].meshes[0].get_instance_id()

@@ -204,6 +204,8 @@ Stage 4 now uses lakes and rivers to support wetlands and riparian woodland. Cho
 **Biomes** in the climate panel and click a cell for potential tree cover and water
 availability. Seeded terrain patches now blend ground colour, roughness and normal
 detail at several scales; patch size stays fixed when map dimensions change.
+Beaches and water-fed margins now use broad coverage blotches, and lake-edge
+clicks distinguish exposed ground from the native lake-cell classification.
 Layered materials, coast ribbons and seeded tree placement are now
 implemented. Further seasonal and political presentation follows the
 [CK2-inspired presentation plan](docs/CK2-map-to-Godot-implementation-manual.md);

@@ -20,6 +20,7 @@ var _image_path: String = ""
 var _dialog: FileDialog
 var _dialog_action: String = ""
 var _selected_cell: int = -1
+var _selected_point := Vector2.INF
 var _cell_panel: PanelContainer
 var _cell_label: Label
 var _tree_population: SpinBox
@@ -450,6 +451,7 @@ func _build_cell_inspector() -> void:
 
 func _reset_cell_inspector() -> void:
 	_selected_cell = -1
+	_selected_point = Vector2.INF
 	_cell_label.text = "CELL DATA\nClick the map to inspect its terrain." if _terrain.graph != null else "LEGACY TERRAIN\nGenerate to create cell data."
 	_cell_panel.anchor_bottom = 0.0
 	_cell_panel.offset_bottom = 84
@@ -462,12 +464,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		var info: Dictionary = _terrain.pick_cell(camera.project_ray_origin(event.position), camera.project_ray_normal(event.position))
 		if not info.is_empty():
 			_selected_cell = info.id
+			_selected_point = info.inspected_position
 			_show_cell_info(info)
 
 
 func _refresh_selected_cell() -> void:
 	if _selected_cell >= 0:
-		var info: Dictionary = _terrain.cell_info(_selected_cell)
+		var info: Dictionary = _terrain.point_info(_selected_point) if _selected_point.is_finite() else _terrain.cell_info(_selected_cell)
 		if not info.is_empty():
 			_show_cell_info(info)
 
@@ -476,6 +479,10 @@ func _show_cell_info(info: Dictionary) -> void:
 	_cell_panel.anchor_bottom = 1.0
 	_cell_panel.offset_bottom = -470
 	_cell_label.text = "CELL %d · %s\nX %.2f   Y %.2f\nHeight %d / 100 · sea datum 20\n%d neighbors\nArea %.2f map units²" % [info.id, info.get("surface_kind", "Land" if info.land else "Water"), info.position.x, info.position.y, info.height, info.neighbor_count, info.area]
+	if info.has("inspected_position"):
+		_cell_label.text += "\nClicked at %.2f, %.2f · %s" % [info.inspected_position.x, info.inspected_position.y, info.surface_kind]
+		if info.cell_biome != info.biome or info.cell_surface_kind != info.surface_kind:
+			_cell_label.text += "\nCell classification: %s · %s" % [info.cell_surface_kind, info.cell_biome]
 	if info.has("basin_id"):
 		if info.basin_id >= 0:
 			var basin: Dictionary = _terrain.hydrology.basins[info.basin_id]
@@ -495,9 +502,11 @@ func _show_cell_info(info: Dictionary) -> void:
 		if not info.land:
 			_cell_label.text += "\nHeight below sea datum: %d units" % info.depth
 	if info.has("temperature"):
-		_cell_label.text += "\nBiome: %s\nLatitude: %+.1f°\nTemperature: %.1f°C\nRainfall: %.0f mm/yr (est.)\nWind travels: %s" % [info.biome, info.latitude, info.temperature, info.rainfall, _wind_name(info.wind)]
+		_cell_label.text += "\nBiome at point: %s\nLatitude: %+.1f°\nTemperature: %.1f°C\nRainfall: %.0f mm/yr (est.)\nWind travels: %s" % [info.biome, info.latitude, info.temperature, info.rainfall, _wind_name(info.wind)]
 		if info.has("canopy"):
 			_cell_label.text += "\nPotential tree cover: %.0f%% · nearby water: %.0f%%" % [info.canopy * 100.0, info.water_support * 100.0]
+		if info.get("water_support", 0.0) > 0.05 and info.get("surface_kind", "Land") == "Land":
+			_cell_label.text += "\nWater-fed margin: ground cover blends locally"
 		if info.has("tree_count"):
 			_cell_label.text += "\nPlaced trees in this cell: %d" % info.tree_count
 

@@ -148,6 +148,57 @@ func _run() -> void:
 			var smooth_metrics: Vector2 = _boundary_metrics(softened)
 			_check(smooth_metrics.y < old_metrics.y * 0.85, contact + " must broaden the palette contact before adding noisy patches.")
 			material.set_shader_parameter("transition_noise", Materials.transition_noise)
+		# Real shader regressions for the two bypass paths shown in the user's screenshots.
+		material.set_shader_parameter("climate_field", _texture(Color(95.0 / 140.0, 1200.0 / 6000.0, 0.5, 0.5)))
+		for contact in ["beach", "wetland-margin", "woodland-margin"]:
+			material.set_shader_parameter("habitat_field", _texture(Color(0, 0, 0, 0)))
+			material.set_shader_parameter("sea_level", -4.0)
+			if contact == "beach":
+				var ramp := PlaneMesh.new()
+				ramp.size = mesh.size
+				ramp.subdivide_width = 64
+				var arrays: Array = ramp.get_mesh_arrays()
+				var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+				for index in range(vertices.size()):
+					vertices[index].y = 1.8 + vertices[index].x * 0.04
+				arrays[Mesh.ARRAY_VERTEX] = vertices
+				var ramp_mesh := ArrayMesh.new()
+				ramp_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+				surface.mesh = ramp_mesh
+				material.set_shader_parameter("sea_level", 0.0)
+			else:
+				surface.mesh = mesh
+				material.set_shader_parameter("climate_field", _texture(Color(95.0 / 140.0, 100.0 / 6000.0, 0.5, 0.5)))
+				var margin := Image.create(129, 97, false, Image.FORMAT_RGBAF)
+				for y in range(97):
+					for x in range(129):
+						var mask: float = 1.0 if x >= 64 else 0.0
+						margin.set_pixel(x, y, Color(mask * 0.7, mask if contact == "wetland-margin" else 0.0, mask if contact == "woodland-margin" else 0.0, mask * 0.5))
+				material.set_shader_parameter("habitat_field", Materials.habitat_texture(margin))
+			material.set_shader_parameter("terrain_blending_enabled", false)
+			var before: Image = await _capture(contact + "-before")
+			material.set_shader_parameter("terrain_blending_enabled", true)
+			var after: Image = await _capture(contact + "-after")
+			# Inspect actual production coverage in black/white: interior grain cannot pass this check.
+			var debug_shader := Shader.new()
+			var production: String = material.shader.code
+			var channel: String = "beach" if contact == "beach" else ("habitat.g" if contact == "wetland-margin" else "habitat.b")
+			debug_shader.code = production.substr(0, production.rfind("}")) + "\nALBEDO = vec3(0.0); EMISSION = vec3(" + channel + ");\n}\n"
+			var production_shader: Shader = material.shader
+			material.shader = debug_shader
+			material.set_shader_parameter("terrain_blending_enabled", false)
+			var mask_before: Image = await _capture(contact + "-mask-before")
+			material.set_shader_parameter("terrain_blending_enabled", true)
+			var mask_after: Image = await _capture(contact + "-mask-after")
+			var old_boundary: Vector2 = _boundary_metrics(mask_before)
+			var patched_boundary: Vector2 = _boundary_metrics(mask_after)
+			print(contact, " coverage contour spread: ", old_boundary.x, " -> ", patched_boundary.x)
+			_check(patched_boundary.x > old_boundary.x + 2.0, contact + " must break its straight coverage boundary into visible patches.")
+			material.shader = production_shader
+
+		surface.mesh = mesh
+		material.set_shader_parameter("sea_level", -4.0)
+		material.set_shader_parameter("habitat_field", _texture(Color(0, 0, 0, 0.3)))
 		var gradient := Image.create(129, 97, false, Image.FORMAT_RGBAF)
 		for y in range(97):
 			for x in range(129):

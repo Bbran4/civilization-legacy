@@ -150,3 +150,14 @@ represented as completed simulation features.
 Presentation update: water is now depth tested; river surfaces animate, follow
 displayed terrain LODs and are clipped at actual lake/ocean shores. The original
 routing/flow facts above remain unchanged. See [implementation limits and checks](PRESENTATION_REFINEMENTS.md).
+
+## Point inspection at lake margins
+
+Lake surface picking now queries the indexed, clipped water polygons already
+used by the renderer and checks the terrain at the point. A native lake cell can
+contain dry ground outside that water footprint. Point inspection labels such a
+spot as land, derives local habitat from continuous climate and water support,
+and preserves the native cell classification separately. Native basin membership
+and saved terrain data are unchanged. The hydrology smoke test now exercises an
+exposed part of a lake cell, a downward ray click and the real inspector text,
+as well as the existing lake-water and dry-basin cases.

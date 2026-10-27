@@ -64,17 +64,24 @@ void fragment() {
 	vec4 appearance_climate = texture(climate_field, appearance_uv);
 	// Classify the continuously sampled climate through the domain-owned palette,
 	// rather than magnifying a blurred, low-resolution map of biome colours.
-	vec4 habitat = habitats_enabled ? texture(habitat_field, appearance_uv) : vec4(0.0);
+	bool ecotone = terrain_blending_enabled && surface_materials_enabled;
+	vec4 habitat = habitats_enabled ? (ecotone ? terrain_habitat(appearance_uv, map_size) : texture(habitat_field, appearance_uv)) : vec4(0.0);
+	// Water-fed colour overlays used to bypass the material masks entirely.
+	habitat.g = terrain_patch_edge(habitat.g, blend_signals.g);
+	habitat.b = terrain_patch_edge(habitat.b, blend_signals.r);
+	float growing = smoothstep(0.0, 4.0, appearance_climate.r * 140.0 - 80.0);
+	habitat.gb *= growing;
 	float demand = max(150.0, 400.0 + 45.0 * max(-5.0, appearance_climate.r * 140.0 - 80.0));
 	vec2 ecological_climate = vec2(appearance_climate.r + (blend_signals.a - 0.5) * 8.0 / 140.0, appearance_climate.g + habitat.r * demand * 1.2 / 6000.0 + (blend_signals.r - 0.5) * 1000.0 / 6000.0);
 	vec2 palette_size = vec2(textureSize(biome_palette, 0));
 	vec2 palette_uv = (clamp(ecological_climate, vec2(0.0), vec2(1.0)) * (palette_size - vec2(1.0)) + vec2(0.5)) / palette_size;
-	bool ecotone = terrain_blending_enabled && surface_materials_enabled;
 	vec3 cover_color = biomes_enabled ? (ecotone ? texture(transition_colors, palette_uv).rgb : texture(biome_palette, palette_uv).rgb) : grass_color.rgb;
 	cover_color = mix(cover_color, vec3(0.4, 0.52, 0.41), habitat.g);
 	cover_color = mix(cover_color, vec3(0.294, 0.502, 0.333), habitat.b);
 	vec3 grass = cover_color * mix(0.94, 1.06, variation);
-	float beach = terrain_patch_edge(1.0 - smoothstep(0.2, beach_width, altitude), blend_signals.a);
+	// A wider coverage zone admits sand/vegetation islands; the waterline stays sand.
+	float beach_extent = ecotone ? beach_width * 1.8 : beach_width;
+	float beach = terrain_patch_edge(1.0 - smoothstep(0.2, beach_extent, altitude), blend_signals.a);
 	vec3 color = mix(grass, sand_color.rgb, beach);
 	float rock = max(smoothstep(rock_slope, min(rock_slope + 0.25, 1.0), slope), smoothstep(height_scale * 0.55, height_scale * 0.8, altitude));
 	rock = terrain_patch_edge(rock, blend_signals.b);

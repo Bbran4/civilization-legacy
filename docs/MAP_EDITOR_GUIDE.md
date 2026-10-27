@@ -160,7 +160,9 @@ same when you generate a wider map. Zooming out fades fine texture into the broa
 biome colours. No extra settings are required. The diagnostic views still show
 their original data. Grass, soil and sand now mix through seeded patches at several sizes, with
 irregular contacts instead of only smooth colour bands. Forest and desert edges
-now share the same broader colour-and-texture transition zone. This happens automatically
+now share the same broader colour-and-texture transition zone. Beaches and
+water-fed green margins also use larger coverage patches, allowing sand and
+vegetation to break into each other along their edges. This happens automatically
 in Terrain; the same seed recreates the pattern, and wider maps keep the same
 patch size. It changes appearance only. See [terrain material notes](TERRAIN_MATERIALS.md).
 
@@ -196,3 +198,19 @@ Rivers now respect foreground terrain, animate downstream and stop at receiving
 water shores. Steep reaches have a cascade effect; detached waterfalls and carved
 channels remain future work. Terrain now also uses a fixed detailed macro-normal
 field. See [presentation status](PRESENTATION_REFINEMENTS.md).
+
+## Inspecting lake edges
+
+Clicking now reports the surface and biome at the clicked spot. A lake-labelled
+map cell can include exposed ground outside the visible water, so the inspector
+also shows the cell classification separately when it differs. Refreshing climate
+keeps inspecting the same position. Cell area, basin, tree count and cell height
+still describe the whole cell; the clicked position, temperature, rainfall,
+water support and biome describe the point. Surface picking follows the same
+clipped lake footprint used for drawing, instead of assuming the entire cell is
+underwater.
+
+Nearby freshwater can support greener ground even when the wider area is desert.
+Cold conditions still limit vegetation. Decorative patches can cross a biome
+boundary, so a texture colour is not an exact categorical biome map; choose
+**Biomes** to see the native cell classification.
