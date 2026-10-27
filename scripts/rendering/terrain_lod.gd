@@ -3,6 +3,7 @@ extends Node3D
 ## Orthographic projection gives all visible chunks the same screen-space scale.
 
 const Grid = preload("res://scripts/domain/heightmap_grid.gd")
+const Relief = preload("res://scripts/rendering/terrain_relief.gd")
 const Alea = preload("res://scripts/domain/alea.gd")
 var active: bool = false
 var chunks: Array[Dictionary] = []
@@ -56,13 +57,14 @@ func build() -> void:
 	var started: int = Time.get_ticks_usec()
 	high_cells = clampi(ceili(_terrain.close_detail_resolution / 8.0) * 8, 32, 256)
 	var longest: float = maxf(_terrain.map_size.x, _terrain.map_size.y)
-	var axis_chunks: int = clampi(ceili(longest / 256.0), 1, 8)
+	var axis_chunks: int = clampi(ceili(longest / 192.0), 1, 8)
 	chunk_count = Vector2i(maxi(1, roundi(_terrain.map_size.x / longest * axis_chunks)), maxi(1, roundi(_terrain.map_size.y / longest * axis_chunks)))
 	var source_size := chunk_count * high_cells + Vector2i.ONE
 	var source: PackedFloat32Array = _terrain.graph.rasterize(source_size, _terrain.surface_smoothing)
 	var random = Alea.new(_terrain.map_seed)
 	var noise := FastNoiseLite.new()
 	noise.seed = int(random.next() * 2147483647.0)
+	var relief = Relief.new(noise.seed)
 	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	noise.frequency = 0.65
 	noise.fractal_octaves = 3
@@ -74,7 +76,8 @@ func build() -> void:
 			var i: int = y * source_size.x + x
 			var height: float = (_terrain.height_offset + (source[i] - 0.2) * _terrain.elevation) * scale
 			var point: Vector2 = (Vector2(x, y) / Vector2(source_size - Vector2i.ONE) - Vector2(0.5, 0.5)) * _terrain.map_size
-			source[i] = height + noise.get_noise_2d(point.x, point.y) * _terrain.micro_detail_strength * smoothstep(sea + 0.2, sea + 2.0, height)
+			var mountain: float = relief.offset(point / scale, source[i]) * _terrain.elevation * scale
+			source[i] = height + mountain + noise.get_noise_2d(point.x, point.y) * _terrain.micro_detail_strength * smoothstep(sea + 0.2, sea + 2.0, height)
 			bounds.x = minf(bounds.x, source[i])
 			bounds.y = maxf(bounds.y, source[i])
 	# Normals belong to the whole field, so chunk edges share lighting as well
@@ -101,7 +104,10 @@ func build() -> void:
 	for row in range(source_size.y):
 		for col in range(source_size.x):
 			var n: Vector3 = fine_normals[row * source_size.x + col]
-			normal_image.set_pixel(col, row, Color(n.x * 0.5 + 0.5, n.y * 0.5 + 0.5, n.z * 0.5 + 0.5, 1))
+			var center: float = source[row * source_size.x + col]
+			var neighbors: float = (source[row * source_size.x + maxi(0, col - 2)] + source[row * source_size.x + mini(source_size.x - 1, col + 2)] + source[maxi(0, row - 2) * source_size.x + col] + source[mini(source_size.y - 1, row + 2) * source_size.x + col]) * 0.25
+			var cavity: float = 1.0 - clampf((neighbors - center) / maxf(scale * 0.5, 0.001), 0, 1) * 0.22
+			normal_image.set_pixel(col, row, Color(n.x * 0.5 + 0.5, n.y * 0.5 + 0.5, n.z * 0.5 + 0.5, cavity))
 	normal_image.generate_mipmaps(true)
 	macro_normal_texture = ImageTexture.create_from_image(normal_image)
 	_terrain._land_material.set_shader_parameter("macro_normal_field", macro_normal_texture)

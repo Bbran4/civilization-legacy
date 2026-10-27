@@ -177,7 +177,8 @@ func _run() -> void:
 	for key in ["auto_density", "close_detail_enabled", "close_detail_resolution", "micro_detail_strength"]:
 		old.settings.erase(key)
 	_check(Document.apply(terrain, old).is_empty() and not terrain.auto_density, "Version 3 saves must retain their explicit point count.")
-	var focus := Vector3(0, terrain.base_surface_height(Vector2(0.5, 0.5)), 0)
+	# Anchor to the actual displayed mountain surface, not the buried source height.
+	var focus := Vector3(0, terrain.visible_surface_height(Vector2(0.5, 0.5)), 0)
 	camera._reset_view()
 	var cursor: Vector2 = camera._camera.unproject_position(focus)
 	var wheel := InputEventMouseButton.new()

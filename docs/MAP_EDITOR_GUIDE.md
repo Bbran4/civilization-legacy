@@ -214,3 +214,13 @@ Nearby freshwater can support greener ground even when the wider area is desert.
 Cold conditions still limit vegetation. Decorative patches can cross a biome
 boundary, so a texture colour is not an exact categorical biome map; choose
 **Biomes** to see the native cell classification.
+
+## Mountain appearance
+
+Choose a mountainous heightmap such as **High Island**, leave the view on
+**Terrain**, then zoom and tilt to see ridges and exposed rock. **Elevation
+(relief)** makes the landforms taller or shorter. Mountains keep their climate
+and biome data, with rock overriding much of their visible surface. Cold peaks
+retain snow on gentler faces; warmer mountains expose more rock. The fully
+zoomed-out map retains relief shading. Existing saved worlds use this rendering
+automatically when loaded. See [mountain previews and details](MOUNTAIN_TERRAIN.md).

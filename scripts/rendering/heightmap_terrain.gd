@@ -666,6 +666,9 @@ func _update_material(surface: MeshInstance3D) -> void:
 	_land_material.set_shader_parameter("snow_color", snow_color)
 	_land_material.set_shader_parameter("beach_width", beach_width)
 	_land_material.set_shader_parameter("rock_slope", rock_slope)
+	var sun := get_parent().get_node_or_null("Sun") as DirectionalLight3D
+	if sun != null:
+		_land_material.set_shader_parameter("overview_light_direction", sun.global_basis.z.normalized())
 	_land_material.set_shader_parameter("snow_height", snow_height * relief_scale())
 	_land_material.set_shader_parameter("height_offset", (height_offset - elevation * 0.2 if generator_version >= 3 else height_offset) * relief_scale())
 	_land_material.set_shader_parameter("terrain_lod", false)

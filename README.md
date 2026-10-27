@@ -148,6 +148,10 @@ image, not the complete editable map. No distribution builds are configured yet.
 See [layered terrain materials](docs/TERRAIN_MATERIALS.md) for the new surface library,
 zoom behaviour and graphics verification.
 
+Mountain presentation now adds seeded ridge geometry, connected highland rock,
+fractured detail, exposed snowy faces and flat-overview hillshading. See
+[mountain implementation and inspected CK3 reference](docs/MOUNTAIN_TERRAIN.md).
+
 ## Source layout
 
 ```text
@@ -188,6 +192,7 @@ For optional rendered captures, run a visual check without `--headless`:
 ```text
 godot --path . --script res://tests/terrain_climate_smoke.gd
 godot --path . --script res://tests/terrain_materials_smoke.gd
+godot --path . --script res://tests/terrain_mountains_smoke.gd
 godot --path . --script res://tests/terrain_blending_smoke.gd
 godot --path . --script res://tests/terrain_coastline_smoke.gd
 godot --path . --script res://tests/terrain_vegetation_smoke.gd

@@ -187,3 +187,12 @@ and future political borders. Deterministic [biome-driven vegetation](VEGETATION
 
 A fixed high-detail macro-normal field now supplies per-pixel terrain relief
 shading across mesh LODs; see [presentation refinements](PRESENTATION_REFINEMENTS.md).
+
+## Mountain presentation
+
+The [mountain pass](MOUNTAIN_TERRAIN.md) adds geometry and fixed normals before
+surface materials. Highlands now expose connected rock using those normals;
+fractured rock detail replaces regular strata stripes. The macro-normal texture
+alpha holds a small concavity tint, and its sampling uses grid-aligned texel
+centres. Overview relief follows the scene sun; steep snow-covered faces expose
+rock. These appearance layers preserve biome diagnostics and source data.

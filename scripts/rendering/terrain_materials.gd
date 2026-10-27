@@ -31,6 +31,24 @@ static func _noise(uv: Vector2, cells: Vector2i, seed_value: int) -> float:
 	return lerpf(lerpf(_hash(posmod(x, cells.x), posmod(y, cells.y), seed_value), _hash(posmod(x + 1, cells.x), posmod(y, cells.y), seed_value), f.x), lerpf(_hash(posmod(x, cells.x), posmod(y + 1, cells.y), seed_value), _hash(posmod(x + 1, cells.x), posmod(y + 1, cells.y), seed_value), f.x), f.y)
 
 
+static func _rock_faces(uv: Vector2) -> float:
+	var point: Vector2 = uv * 4.0
+	var cell := Vector2i(point.floor())
+	var nearest: float = INF
+	var second: float = INF
+	for y in range(-1, 2):
+		for x in range(-1, 2):
+			var neighbor := cell + Vector2i(x, y)
+			var center := Vector2(neighbor) + Vector2(_hash(posmod(neighbor.x, 4), posmod(neighbor.y, 4), 271), _hash(posmod(neighbor.x, 4), posmod(neighbor.y, 4), 277))
+			var distance: float = point.distance_to(center)
+			if distance < nearest:
+				second = nearest
+				nearest = distance
+			elif distance < second:
+				second = distance
+	return clampf((second - nearest) * 2.5, 0, 1)
+
+
 static func relief(uv: Vector2, layer: int) -> float:
 	var broad: float = _noise(uv, Vector2i(8, 8), 19 + layer)
 	var grain: float = _noise(uv, Vector2i(64, 64), 47 + layer)
@@ -38,7 +56,9 @@ static func relief(uv: Vector2, layer: int) -> float:
 		0, 1: return 0.25 * broad + 0.4 * _noise(uv, Vector2i(48, 16), 81) + 0.35 * grain
 		2, 6: return 0.45 * broad + 0.55 * grain
 		3: return 0.5 + 0.12 * sin(uv.y * TAU * 16 + broad * 2.0) + 0.18 * (grain - 0.5)
-		4: return 0.65 * (1.0 - absf(broad * 2.0 - 1.0)) + 0.35 * grain
+		4:
+			var ridge: float = 1.0 - absf(_noise(uv, Vector2i(12, 6), 143) * 2.0 - 1.0)
+			return 0.55 * _rock_faces(uv) + 0.25 * broad + 0.15 * ridge + 0.05 * grain
 		_: return 0.5 + 0.15 * (broad - 0.5) + 0.08 * (grain - 0.5)
 
 
