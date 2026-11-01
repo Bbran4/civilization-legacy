@@ -31,14 +31,30 @@ several evenings. Suggested first-run length is 15–25 minutes and later runs
 
 ## Map and civilization layers
 
-The intended 3D grand strategy presentation combines readable terrain with future
-political overlays, settlements, roads and ruins. Heightfield geometry, geographic
-cells, province membership, ownership and civilization history have separate owners.
+The intended presentation combines an Age of History-style flat political map with a
+globe view at full zoom-out and shaded 3D terrain when close to the ground. The flat
+view is the primary province-editing and strategy view; the globe is a presentation
+and navigation view of the same data. Heightfield geometry, geographic cells,
+province membership, ownership and civilization history have separate owners.
+Elevation is still generated and saved because it drives mountain classification,
+drainage, climate, rivers and biomes. It is a world-data layer rather than a
+requirement that the strategy map surface be visibly raised.
 Changing a province's owner should not rebuild the landscape or erase its history.
 
-Future painting tools will edit a shared province-ID layer and authored terrain
-data. Borders and adjacency should derive from that layer. Geographic travel costs
-may eventually help seed provinces, but Voronoi cells are not provinces today.
+Province generation will use terrain, hydrology and connected regions as a starting
+point, then expose a manual province-ID painting workflow for corrections. Paint,
+fill, split and merge operations must preserve lossless province colours. Borders and
+adjacency derive from the edited province layer. Geographic travel costs may help
+seed provinces, but Voronoi cells are not provinces by themselves.
+
+The map pipeline must accept both authored real-world geography and seeded generated
+worlds. Neither is a lesser mode: they share the package format, editor, renderers
+and later scenario systems.
+
+Rivers follow a Paradox-style data model. Minor rivers are visual raster features that
+can add crossing modifiers; major rivers are ownerless water provinces connected to
+their banks by typed adjacency. River rendering should read those water shapes and
+their flow data, rather than drawing a decorative line over land.
 
 ## First gameplay milestone: two civilizations, one map
 

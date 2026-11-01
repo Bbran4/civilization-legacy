@@ -1,198 +1,125 @@
-# Layered terrain materials
+# Terrain material palette and coverage blending
 
-The Terrain view now combines biome colour, regional tint, repeating surface
-textures, fine normals and roughness. This implements the initial material step
-in chapter 6 of the presentation manual. It does not change source heights,
-climate, hydrology, biome identity, picking or the three fixed terrain LODs.
+The Terrain view now uses editable, authored surface choices. Each land biome
+has three texture/pattern slots; beach sand, mountain rock, snow cover and wet
+soil also have separate rows. A runtime brush can paint a biome mix or an
+individual slot without changing geography or ecology.
 
-## What is visible
+Start with the [plain-language texture and painting guide](GROUND_PAINTING.md).
 
-Seven original procedural surfaces are provided: grass, dry grass, soil, sand,
-rock, snow and wet ground. Biome climate selects a blend of the first four;
-canopy suitability adds forest-floor soil. Beaches expose sand, water availability
-adds darker wet ground, slopes/high relief expose rock and existing cold/slope
-rules provide snow coverage. Rock samples three projections to reduce stretching
-on cliffs. Grass/dry grass are surface patterns, not individual 3D blades.
+## Colour and coverage ownership
 
-The existing continuous biome palette supplies the broad land colour. A separate
-seeded regional RGB multiplier supplies restrained warm/cool variation. This is
-appearance data, never a second classification authority. Native biome IDs remain
-unchanged; the Biomes diagnostic still shows their categorical colours.
+- Colour images provide the actual ground colour. The old regional RGB
+  multipliers, cross-biome pigment ratios and broad colour-filter lookup are
+  removed. Starter colours apply only while generating a built-in texture;
+  imported albedo images are never multiplied by a biome palette colour.
+- Numeric black/white masks control texture coverage. Per-slot amount biases the
+  competing masks; a narrow normalized contact band feathers their edges. One
+  surface dominates most patches, rather than broadly mixing climate colours.
+- Seeded world-space sampling, slot repeat sizes and rotation determine patterns.
+  The same inputs reproduce the pattern, and zoom does not regenerate it. Colour
+  and normal textures have mipmaps and repeating sampling; only normal detail
+  fades at distant zoom. Authored coverage patterns remain separate numeric data.
+- Noisy climate lookup selects land-biome material identity through the
+  domain-owned classification rules. Nearby-water masks select wetland/riparian
+  surfaces. Beach, rock and snow masks use the existing coverage-shaped contacts.
+  These are appearance selectors; native biome IDs remain unchanged.
+- Manual paint overrides generated ground using the same authored surface path.
+  The painted row/slot and coverage are numeric image channels, never inferred
+  from display colours. Thin brush coverage remains visible; full coverage uses
+  the larger blotch masks. Normal and roughness blending follows the same weights.
+- Mountain rock uses three projections to reduce stretching on steep faces.
+  Fixed macro normals, ridge geometry, snow exposure, cavity tint and overview
+  hillshading remain in place. See [mountain terrain](MOUNTAIN_TERRAIN.md).
 
-Each texture repeats every **8 world units**, regardless of map dimensions.
-Albedo, micro-height, normal and roughness detail fade with projected pixel size
-and the overview blend. Fine detail fully fades when a pixel spans 0.4 world
-units; the fully zoomed-out map retains its readable regional colour. Mipmaps and
-anisotropic filtering reduce distant shimmer. These are fixed presentation
-choices, with no additional player-facing generation settings.
+## Assets and contracts
 
-Run the scene, keep the bottom-right view on **Terrain**, and zoom inland or near
-a wet bank. Zoom out to compare the clean flat overview. Temperature, Rainfall,
-Winds, Drainage basins, Biomes and Show heights bypass decorative tint/detail so
-their numeric or categorical meaning remains readable.
+`terrain_paint_variant.gd` owns the image choices, starter texture/colour, coverage
+pattern, tile size, rotation, amount, pattern repeat and roughness for one slot.
+`terrain_biome_paint.gd` groups three slots. `terrain_paint_catalog.gd` owns the
+19-row/three-slot data contract, validation and serialization. Native IDs 0–14
+retain their ordering; water IDs 0 and 12 are reserved/disabled in the ground UI.
+Rows 15–18 mean beach, rock, snow and wet soil. This fixed contract supplies 57
+layers and bounded shader sampling.
 
-## Seeded terrain transitions
+The editable default is `assets/terrain/default_ground_palette.tres`. Runtime
+changes use deep copies, keeping other maps and the default asset independent.
+The original seven procedural surfaces remain starter-art sources and a simple
+fallback; they no longer decide authored biome colour. Original art can be
+replaced with PNG/JPG/WebP files or readable saved Texture2D assets.
 
-The Terrain view now uses three scales of world-space noise to break up material
-contacts and add restrained grass, dry-ground and soil patches inside mixed
-habitats. Approximate patch spacings are 32, 8 and 2 world units; these are
-fixed presentation scales, independent of map width and height. A bounded warp
-(up to two units per axis) bends appearance sampling near contacts. Appearance-only climate offsets interrupt otherwise uniform colour bands.
+`terrain_palette_library.gd` resolves all image dependencies before replacing any
+live material. It caches one current palette using settings, paths and source
+modification times; explicit Apply reloads assets. Resized image copies bound
+retained working images. Base terrain and all LOD materials share the resulting
+resources, and geometry/climate edits reuse unchanged palette arrays.
 
-The colour lookup and material-weight lookup now share a broader transition band
-around climate classification thresholds. The previous narrow palette smoothing
-could leave an almost straight forest/dry-ground or desert edge even when material
-noise was active. Two sliding box passes per axis produce a triangular filter
-with support of +/-4 degrees C and +/-240 mm/year (plus the original small
-palette smoothing). This is a cached rendering lookup, separate from the original
-domain palette and categorical biome field. Uniform interiors stay unchanged
-when the filter footprint contains only their own biome.
+Each of the three arrays has 57 layers at 256 x 256:
 
-Seeded signals offset appearance lookup coordinates by `(signal - 0.5) * 8` C
-and `(signal - 0.5) * 1000` mm/year before material patch weighting. These are
-bounded visual variations, not edits to annual climate measurements. Broadening
-both lookups allows neighbouring ground materials to participate at the same
-contacts as the colour transition, rather than applying noise only inside an
-otherwise sharply coloured biome. The width of this colour band on the map
-depends on the local climate gradient; the noise patch spacing remains fixed in
-world units.
+| Array | RGB | Alpha |
+| --- | --- | --- |
+| Colour | Source colour, sampled with `source_color` | Reserved; imported alpha does not supply coverage |
+| Normal | Renormalized numeric tangent normal | Chosen roughness |
+| Coverage | Numeric placement mask, red channel sampled | Unused |
 
-Ground weights remain normalized. The same weights influence pigment, texture,
-roughness and fine normals; micro-height adds smaller contact detail. Wet ground,
-beach sand, rock and snow use the same coverage-threshold blend while pure
-mask interiors stay intact. These changes do not create different native biome
-IDs, temperature/rainfall measurements, terrain geometry or water routing.
+Starter micro-height alpha remains available in the fallback source library;
+authored placement is governed by coverage instead. Numeric patterns, normal data,
+material IDs and paint are not sampled with `source_color`. Rotation is applied
+to both image coordinates and decoded normal directions. The production shader
+declares 16 samplers including diagnostic/fallback inputs, staying within the
+OpenGL 3 fragment-sampler minimum; only the current Compatibility desktop device
+was executed, not other renderers or hardware.
 
-The map seed selects a stable offset into one shared, periodic RGBA noise texture.
-Base terrain and all three LODs use that same field. Zoom fades unresolved noise
-scales and texture detail without regenerating patterns or relocating the broad
-warp. Larger maps retain the same physical patch scale. This remains a periodic
-procedural starter material: authored textures and broader art tuning can improve
-it further, and it does not claim to reproduce CK3's shader.
+## Painting and persistence
 
-Blending is automatic in **Terrain**. There are no new generation controls. Height,
-climate and categorical diagnostic views bypass this decorative layer.
+`terrain_paint_layer.gd` owns capsule strokes, falloff/strength accumulation,
+erasing, clearing and bounded undo history. Its texture encodes material row in
+red, strength in green and optional individual slot in blue. IDs use exact texel
+fetches while strength is filtered separately. Strokes update one shared texture;
+no terrain mesh, climate, drainage or vegetation rebuild is involved.
 
-## Beach and water-fed coverage
+The layer allocates on first paint, targeting roughly half-unit texels and capping
+the longer edge at 2049 nodes. Undo stores compressed pre-stroke snapshots, capped
+at 16 entries and 32 MiB combined. History is not saved with the map.
 
-The October 27 shoreline screenshots revealed two additional paths that bypassed
-the earlier colour/weight lookup fix: narrow height-based beach coverage, and
-categorical wetland/woodland overlays sampled from a coarse native-cell field.
+Version 10 stores palette settings and the PNG paint layer. Source image files
+are linked, not embedded. The document owner validates configuration and resolves
+images/decodes paint before changing live state. PNG header dimensions are checked
+against the bounded layout before decoding; pixel material/slot IDs are validated.
+Missing files, invalid patterns/configuration and malformed paint return errors.
+Versions 1–9 gain the default palette with an empty paint layer.
 
-The shared noise now favours broad shapes (55% broad, 35% medium, 10% fine),
-with increased contrast. Contact masks are thresholded around that noise instead
-of receiving a small tint perturbation. A pure mask of zero or one stays pure;
-transition zones admit islands of each material. Beach coverage spans 1.8 times
-the existing beach-height range before thresholding; the waterline stays sand.
-The same sand coverage drives visible colour and material weights.
+`terrain_material_panel.gd` owns the runtime texture window; `terrain_brush.gd`
+routes brush input ahead of cell inspection, offers erase/undo/clear and shows a
+depth-tested brush footprint. The inspector distinguishes the paint layer from
+native facts. Painting is available in Terrain view and leaves other diagnostic
+views unchanged. New map generation clears paint; palette application does not.
 
-Wetland/woodland colour overlays now pass through those same noisy contact masks.
-Their numeric appearance texture has mipmaps generated on a copy; a fixed
-10-world-unit footprint prefilters categorical cell edges before thresholding.
-This avoids preserving a cell polygon under the noise. Freezing temperatures
-suppress green overlays. The original ecology image, native biome IDs, canopy
-and water support arrays remain unchanged. The shader-only prefilter also means
-some narrow habitat patches become less prominent; these are appearance masks,
-not changes to their native ecological classification.
+## Executed checks
 
-The following controlled beach ramp uses the production shader; white is sand
-coverage and black is the neighbouring ground. This demonstrates the actual
-coverage mask, with lighting and ground grain removed for inspection.
+Godot 4.7.2 Compatibility / OpenGL on the GTX 1050 Ti:
 
-![Production beach coverage on a controlled height ramp](images/terrain-beach-coverage.png)
+- `terrain_palette_smoke.gd`: default assets/deep-copy independence; live editor
+  cards and file selection; shared 57-layer resources; cached rebinding; invalid
+  mixes rejected before replacing textures; source-red/source-blue GPU colour
+  preservation and distinct coverage patches; a green brush through the editor
+  input handler; row/slot/strength encoding; erase/undo/clear; exact palette/paint
+  round trips; missing image and malformed PNG rejection; version 9 migration;
+  source heights/biome IDs unchanged. Captures include the real texture window.
+- `terrain_materials_smoke.gd`: starter texture periodicity, numeric normal and
+  roughness ranges, resource reuse, saved appearance, rendered detail and rainfall
+  diagnostic bypass. The neutral brightness check isolates the starter fallback;
+  authored image colour is checked separately by the controlled GPU test above.
+- `terrain_blending_smoke.gd`: world scale/seed stability, diagnostic preservation,
+  fixed native data, and actual production beach/wetland/woodland coverage masks
+  in black and white. The old colour-blur assertion is retired with that pipeline.
+- Existing editor/document, hydrology, mountain and fixed-LOD/camera regressions
+  cover their public workflows with the new material/save implementation.
 
-[The coloured view](images/terrain-beach-blending.png) uses the same ramp and seed.
-This is an isolated material fixture, not a full generated-map screenshot.
-
-## Data and ownership
-
-- `scripts/rendering/terrain_materials.gd` owns the original procedural library,
-  climate-to-material weight palette, matched appearance transition colour/weight
-  lookups, shared numeric transition noise, copied/mipmapped habitat appearance
-  textures and seeded regional multipliers.
-- `terrain_blending.gdshaderinc` owns world-space transition masks, appearance warp,
-  normalized patch weights and pigment variation.
-- `terrain_surface.gdshaderinc` owns the normalized texture blending and normal
-  composition; `terrain.gdshader` combines it with biome ground colour, beaches,
-  exposed rock, snow and diagnostic views.
-- The seven albedo layers share one Texture2DArray. Their RGB is colour data and
-  alpha explicitly means micro-height for transition weighting. A separate array
-  contains numeric tangent normals in RGB and roughness in alpha. Material
-  identity is the array layer, not an RGB colour.
-- All mip levels belong to their individual array layers, so adjacent surfaces
-  cannot bleed through atlas borders. Albedo uses `source_color`; numeric normals,
-  roughness, weight channels and regional multipliers do not.
-- Albedo is normalized around its encoded neutral value in Compatibility and its
-  linear neutral in Forward+/Mobile. Only Compatibility was executed and verified.
-  Detail gradients are decoded to terrain-local coordinates, cliff projections
-  are reoriented, the gradient is projected onto the macro tangent plane and the
-  resulting normal is transformed to view space. No mesh tangents are required.
-- Base and LOD materials share the cached library. It builds once per process.
-  Regional noise rebuilds only for a different seed/map extent. Climate edits use
-  the updated ecology field with existing textures and meshes; zoom never builds
-  materials or changes simulation data.
-
-The library is generated from original periodic noise at 128 by 128 texels per
-surface. There are no copied CK2 images/shaders, downloads or added packages.
-These are restrained starter textures; detailed authored art, seasonal variations,
-richer authored vegetation art and erosion are future work. The separate
-[vegetation pass](VEGETATION.md) now supplies original starter tree models. Repeating motifs can still become
-visible across large uniform regions. Normal detail changes lighting, not terrain
-silhouettes or water depth. River presentation is documented separately in
-[presentation refinements](PRESENTATION_REFINEMENTS.md).
-
-Version 9 stores the tree target and still derives material presentation: presentation is derived from the saved map seed,
-extent and current biome/climate facts rather than another persisted image cache.
-
-## Validation
-
-Executed on Godot 4.7.2 Compatibility / OpenGL with the GTX 1050 Ti:
-
-```text
-godot --path . --script res://tests/terrain_materials_smoke.gd
-godot --path . --script res://tests/terrain_blending_smoke.gd
-```
-
-The check verifies seven matching texture layers, periodic seams, mipmaps,
-normal-vector/roughness ranges, shared base/LOD resources, fixed world scale,
-climate updates retaining meshes/library, deterministic presentation after save
-application and no library rebuild on zoom. GPU captures compare layered versus
-plain close terrain and assert that toggling decoration does not alter rainfall
-diagnostic pixels. A brightness check guards the Compatibility neutral baseline with coverage
-blending disabled in both comparison images, isolating texture colour conversion
-from intentional changes to vegetation/sand coverage.
-Captures are written to `.godot/materials-*.png`. The climate regression was also
-run with graphics and passed. The blending GPU check compares enabled/disabled uniform-ground patches, fixed
-world scale after doubling map dimensions, different/repeated seeds, unchanged
-rainfall/height diagnostic pixels and unchanged native data and mesh identity
-across zooms. Dedicated forest/dry-ground and hot-desert gradient fixtures check
-that halfway colour contours gain noise variation. Neutral-noise captures isolate
-the underlying palette contact and verify a smaller strongest colour slope across
-four pixels, avoiding 8-bit capture quantization. Material weights remain normalized
-and deep desert interiors retain their colour. Beach, wetland and woodland
-fixtures additionally render their actual production coverage masks in black and
-white and require noisy halfway contours, so interior grain cannot satisfy the
-coverage check. The updated full-map close capture was also inspected. Captures are in `.godot/blending-*.png`; close terrain and the
-controlled transition comparison were inspected visually. No frame-rate or cross-renderer performance claim
-is made.
-
-Godot references: [spatial shader normal spaces and OUTPUT_IS_SRGB](https://docs.godotengine.org/en/4.7/tutorials/shaders/shader_reference/spatial_shader.html),
-[sampler colour hints and texture arrays](https://docs.godotengine.org/en/4.7/tutorials/shaders/shader_reference/shading_language.html).
-The original [presentation manual](CK2-map-to-Godot-implementation-manual.md)
-provides design context; its historical source findings are preserved.
-
-The next presentation step is now implemented: [width-controlled, depth-tested
-coast outlines](COASTLINE_RENDERING.md), separate from beach ground, water foam
-and future political borders. Deterministic [biome-driven vegetation](VEGETATION.md) is now implemented.
-
-A fixed high-detail macro-normal field now supplies per-pixel terrain relief
-shading across mesh LODs; see [presentation refinements](PRESENTATION_REFINEMENTS.md).
-
-## Mountain presentation
-
-The [mountain pass](MOUNTAIN_TERRAIN.md) adds geometry and fixed normals before
-surface materials. Highlands now expose connected rock using those normals;
-fractured rock detail replaces regular strata stripes. The macro-normal texture
-alpha holds a small concavity tint, and its sampling uses grid-aligned texel
-centres. Overview relief follows the scene sun; steep snow-covered faces expose
-rock. These appearance layers preserve biome diagnostics and source data.
+The original [presentation manual](CK2-map-to-Godot-implementation-manual.md),
+[coastline pass](COASTLINE_RENDERING.md) and [vegetation pass](VEGETATION.md) retain
+context. Images of earlier beach/material passes are historical; the current
+controls and painting previews are in the [new guide](GROUND_PAINTING.md).
+Material array construction and map generation are synchronous and may pause the
+editor while preparing assets. No frame-rate, isolated benchmark or cross-renderer
+performance guarantee is claimed.

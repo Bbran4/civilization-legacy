@@ -138,9 +138,12 @@ func _apply_zoom() -> void:
 
 func _apply_pose() -> void:
 	var overview: float = 1.0 - smoothstep(1.0, 3.0, _zoom)
+	var terrain = get_parent().get_node("Terrain")
+	if terrain.is_flat_map_mode():
+		overview = 1.0
 	var pitch: float = lerpf(_pitch, 90.0, overview)
 	rotation_degrees = Vector3(-pitch, _yaw * (1.0 - overview), 0.0)
-	get_parent().get_node("Terrain").set_overview_blend(overview)
+	terrain.set_overview_blend(overview)
 	var sun = get_parent().get_node_or_null("Sun")
 	if sun is DirectionalLight3D:
 		sun.shadow_opacity = _sun_shadow_opacity * (1.0 - overview)

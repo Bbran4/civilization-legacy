@@ -36,7 +36,6 @@ directional_shadow_mode = 0
 
 [node name="Terrain" type="Node3D" parent="." unique_id=492534778]
 script = ExtResource("1_terrain")
-map_size = Vector2(1024, 1024)
 land_noise = SubResource("Noise_land")
 mountain_noise = SubResource("Noise_mountains")
 

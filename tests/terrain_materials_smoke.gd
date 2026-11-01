@@ -58,7 +58,7 @@ func _run() -> void:
 	var rig = world.get_node("CameraRig")
 	rig._reset_view()
 	var texture_id: int = Materials.albedo.get_instance_id()
-	var tint_id: int = terrain._regional_tint.get_instance_id()
+	var paint_id: int = terrain._paint_data.albedo.get_instance_id()
 	var mesh_id: int = terrain.detail.chunks[0].meshes[0].get_instance_id()
 	var field: PackedFloat32Array = terrain.height_samples.duplicate()
 	var builds: int = Materials.build_count
@@ -71,10 +71,10 @@ func _run() -> void:
 	options.rainfall_scale = 1.7
 	terrain.apply_climate(options)
 	_check(terrain.height_samples == field and terrain.detail.chunks[0].meshes[0].get_instance_id() == mesh_id, "Climate-driven material updates must preserve geometry.")
-	_check(terrain._regional_tint.get_instance_id() == tint_id and Materials.build_count == builds, "Climate updates must reuse regional noise and texture assets.")
+	_check(terrain._paint_data.albedo.get_instance_id() == paint_id and Materials.build_count == builds, "Climate updates must reuse authored palette textures and starter assets.")
 	var saved: Dictionary = Document.capture(terrain)
-	var tint: PackedByteArray = terrain._regional_tint.get_image().get_data()
-	_check(Document.apply(terrain, saved).is_empty() and terrain._regional_tint.get_image().get_data() == tint, "Existing saves must reproduce presentation without another saved cache.")
+	var appearance: Dictionary = terrain.surface_catalog.snapshot()
+	_check(Document.apply(terrain, saved).is_empty() and terrain.surface_catalog.snapshot() == appearance, "Existing saves must reproduce presentation without another saved cache.")
 	if DisplayServer.get_name() != "headless":
 		await _capture("materials-overview")
 		var target: int = 0
@@ -97,6 +97,7 @@ func _run() -> void:
 		# Isolate texture colour-space conversion from the intentional coverage changes.
 		for material in [terrain._land_material, terrain.detail._material]:
 			material.set_shader_parameter("terrain_blending_enabled", false)
+			material.set_shader_parameter("paint_enabled", false)
 		var neutral_layered: Image = await _capture("materials-neutral-close")
 		_set_enabled(terrain, false)
 		var plain: Image = await _capture("materials-close-plain")
@@ -111,6 +112,7 @@ func _run() -> void:
 		_set_enabled(terrain, true)
 		for material in [terrain._land_material, terrain.detail._material]:
 			material.set_shader_parameter("terrain_blending_enabled", true)
+			material.set_shader_parameter("paint_enabled", true)
 		terrain.set_climate_view(2)
 		var climate_a: Image = await _capture("materials-rainfall")
 		_set_enabled(terrain, false)

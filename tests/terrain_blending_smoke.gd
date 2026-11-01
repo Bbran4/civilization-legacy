@@ -62,13 +62,6 @@ func _boundary_metrics(image: Image) -> Vector2:
 
 func _run() -> void:
 	_check(Materials.ensure_library() and Materials.transition_noise != null and Materials.transition_noise.get_image().has_mipmaps(), "Transition masks must use a shared mipmapped numeric noise field.")
-	var transition_weights: Image = Materials.transition_weights.get_image()
-	for y in range(0, transition_weights.get_height(), 13):
-		for x in range(0, transition_weights.get_width(), 7):
-			var w: Color = transition_weights.get_pixel(x, y)
-			_check(absf(w.r + w.g + w.b + w.a - 1.0) < 0.02, "Broader contacts must preserve normalized material weights.")
-	var interior: Color = Materials.transition_colors.get_image().get_pixel(220, 0)
-	_check(Vector3(interior.r - Biomes.COLORS[4].r, interior.g - Biomes.COLORS[4].g, interior.b - Biomes.COLORS[4].b).length() < 0.01, "Deep hot-desert interiors must keep their original colour.")
 	if DisplayServer.get_name() != "headless":
 		var fixture := Node3D.new()
 		root.add_child(fixture)
@@ -98,7 +91,6 @@ func _run() -> void:
 		material.set_shader_parameter("overview_blend", 1.0)
 		material.set_shader_parameter("biomes_enabled", true)
 		material.set_shader_parameter("biome_palette", ImageTexture.create_from_image(Biomes.palette_image()))
-		material.set_shader_parameter("regional_tint", _texture(Color(1, 1, 1, 1)))
 		material.set_shader_parameter("climate_field", _texture(Color(95.0 / 140.0, 1200.0 / 6000.0, 0.5, 0.5)))
 		material.set_shader_parameter("habitats_enabled", true)
 		material.set_shader_parameter("habitat_field", _texture(Color(0, 0, 0, 0.3)))
@@ -142,12 +134,7 @@ func _run() -> void:
 			var new_metrics: Vector2 = _boundary_metrics(after)
 			print(contact, " contour spread / strongest edge: ", old_metrics, " -> ", new_metrics)
 			_check(new_metrics.x > old_metrics.x + 2.0, contact + " must gain a visibly irregular colour boundary, not just interior grain.")
-			# Hold noise neutral to measure the underlying seam separately from intentional patches.
-			material.set_shader_parameter("transition_noise", _texture(Color(0.5, 0.5, 0.5, 0.5)))
-			var softened: Image = await _capture(contact + "-neutral-noise")
-			var smooth_metrics: Vector2 = _boundary_metrics(softened)
-			_check(smooth_metrics.y < old_metrics.y * 0.85, contact + " must broaden the palette contact before adding noisy patches.")
-			material.set_shader_parameter("transition_noise", Materials.transition_noise)
+
 		# Real shader regressions for the two bypass paths shown in the user's screenshots.
 		material.set_shader_parameter("climate_field", _texture(Color(95.0 / 140.0, 1200.0 / 6000.0, 0.5, 0.5)))
 		for contact in ["beach", "wetland-margin", "woodland-margin"]:

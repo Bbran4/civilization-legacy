@@ -2,13 +2,32 @@
 
 **A civilization shaped by what previous runs left behind.**
 
-Civilization Legacy is a working title for a 3D miniature grand strategy incremental
-built with Godot. The planned game follows successive civilizations: develop a
-skill tree, conclude an era through a prestige reset, then build a new civilization
-among the advantages, infrastructure and ruins its predecessors left behind.
+Civilization Legacy is a working title for a medieval grand strategy game built with
+Godot. The long-term game combines an Age of History-style flat political map with
+a globe view at full zoom-out, while preserving terrain detail at close range.
+Successive civilizations, skill trees, prestige and inherited world history remain
+the planned gameplay layer on top of that shared world.
 
-**Current prototype: a runnable terrain, climate and biome map editor.** Civilization
-simulation, provinces, skill trees and prestige are planned gameplay systems.
+**Current prototype: a runnable terrain, climate and biome map editor.** Provinces,
+political map modes, scenarios, civilization simulation, skill trees and prestige
+are planned gameplay systems.
+
+## World direction
+
+Real-world maps and seeded random maps are equally important. Both should produce the
+same portable world package and use the same province editor. Real geography can be
+imported and historically authored; generated geography can be shaped by terrain,
+then corrected by hand.
+
+The province workflow will support terrain-based generation followed by manual paint,
+fill, split and merge operations. Province identity, geometry and adjacency are map
+data; ownership, culture, religion and civilization history belong to dated scenario
+data.
+
+Rivers will follow the Paradox-style model: minor rivers are a visual raster that can
+mark crossings, while major rivers are thin ownerless water provinces with explicit
+bank connections. Rivers must join lakes or seas, remain downhill, and participate in
+movement and crossings rather than appearing as lines pasted over terrain.
 
 ![Terrain editor showing climate-driven biome colours](docs/images/terrain-editor.png)
 
@@ -29,11 +48,18 @@ simulation, provinces, skill trees and prestige are planned gameplay systems.
 - Climate-driven biome ground colours: deserts, steppe, grassland, savanna,
   forests, tundra and ice-covered land, with gently blended boundaries.
 - Seven original tiled ground materials, fine normals, wet-ground roughness and
-  seeded regional colour, fading into a clean overview.
+  editable biome texture mixes with mask-based blending and a paint/erase brush.
 - Deterministic biome-driven trees, clustered forests and clearings, with five
   editable scene families, a population target, chunked rendering and automatic detail/fading.
 - Three prebuilt terrain detail levels per chunk, deep zoom, pan, orbit and tilt.
-- An overhead, north-up map at full zoom-out, transitioning to shaded 3D up close.
+- An overhead, north-up political view at full zoom-out, transitioning through a
+  globe view and into shaded 3D terrain at close range.
+- A flat-map presentation mode is now the default runtime view. Elevation remains
+  internal map data for mountain relief, drainage, climate and biome classification;
+  it does not need to raise the strategy map surface.
+- A first terrain-derived province field is generated from the map cells and shown as
+  subtle colour regions with dark boundaries in flat mode. IDs are stable for the
+  generated graph; manual province painting and historical definitions come next.
 - Portable terrain save/load, embedded imported heightmaps, overwrite backups
   and grayscale PNG export.
 
@@ -84,7 +110,10 @@ The sidebar exposes **Minimum zoom**, **Maximum zoom** and **Closest view size**
 The first two set outward/inward magnification limits; lowering Closest view size
 allows a smaller patch of ground to fill the view. A readout explains which limit
 is active, and **Farthest view / Closest view** buttons let you try both endpoints.
-These are session viewing preferences, not saved map data.
+These are session viewing preferences, not saved map data. The default presentation
+is flat: elevation still drives mountains, rivers, lakes and biomes, but the strategy
+surface stays level. The future globe view will use the same generated data without
+changing the map package.
 
 ### Climate and biomes
 
@@ -115,18 +144,21 @@ and dynamic ecosystem growth remain future work.
 
 Reservoir candidates now have geometric spill levels, rainfall-fed inflow and
 open/closed outlet states. Lake surfaces use spill-capacity levels; underfed lakes
-do not yet shrink to equilibrium shorelines. Provinces, political borders, settlements, economy, skill trees,
-prestige, terrain painting and complete campaign saves are not implemented.
+do not yet shrink to equilibrium shorelines. Provinces, political borders,
+settlements, economy, skill trees, prestige and complete campaign saves are not
+implemented. Terrain texture palettes and ground painting are implemented in the
+prototype; province painting is a separate planned tool.
 
 See the [terrain roadmap](docs/TERRAIN_GENERATION_ROADMAP.md) and
 [game design direction](docs/GAME_DESIGN.md).
 
 ## Save format
 
-**Save terrain…** writes version **9** `*.terrain.json` documents containing the
+**Save terrain…** writes version **10** `*.terrain.json` documents containing the
 source graph, exact saved surface samples, imported image data, terrain settings,
-geographic metadata, applied climate parameters and hydrology/biome algorithm versions. Derived geography, climate
-biome cover and hydrology are rebuilt from saved source data. Versions **1–8** remain loadable.
+geographic metadata, applied climate parameters, editable ground palette and paint
+strokes. Derived geography, climate, biome cover and hydrology are rebuilt from saved
+source data. Versions **1–9** remain loadable.
 Older graphless surfaces need Generate before cell climate can be derived.
 
 Overwriting preserves a `.bak`; documents are bounded to 64 MiB. Pending map or
@@ -151,6 +183,12 @@ zoom behaviour and graphics verification.
 Mountain presentation now adds seeded ridge geometry, connected highland rock,
 fractured detail, exposed snowy faces and flat-overview hillshading. See
 [mountain implementation and inspected CK3 reference](docs/MOUNTAIN_TERRAIN.md).
+
+Scroll to **GROUND PAINTING** and open **Ground textures…** to choose three
+textures and coverage patterns per biome. Use **Paint ground** for individual
+areas, with erase, undo and clear. Texture colours now come from the selected
+images; the old hue-shifting multipliers are removed. **Save terrain…** keeps the
+palette and paint layer. See the [texture and painting guide](docs/GROUND_PAINTING.md).
 
 ## Source layout
 
@@ -192,6 +230,7 @@ For optional rendered captures, run a visual check without `--headless`:
 ```text
 godot --path . --script res://tests/terrain_climate_smoke.gd
 godot --path . --script res://tests/terrain_materials_smoke.gd
+godot --path . --script res://tests/terrain_palette_smoke.gd
 godot --path . --script res://tests/terrain_mountains_smoke.gd
 godot --path . --script res://tests/terrain_blending_smoke.gd
 godot --path . --script res://tests/terrain_coastline_smoke.gd

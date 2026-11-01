@@ -6,6 +6,9 @@ uniform float sea_level = 0.0;
 uniform float height_scale = 34.0;
 uniform float height_offset = -6.0;
 uniform float overview_blend = 0.0;
+uniform bool flat_map_mode = true;
+uniform bool provinces_enabled = false;
+uniform sampler2D province_field : filter_nearest_mipmap, repeat_disable;
 uniform bool terrain_lod = false;
 uniform float lod_blend = 1.0;
 uniform bool heightmap_view = false;
@@ -21,6 +24,7 @@ uniform vec4 rock_color : source_color = vec4(0.47, 0.48, 0.45, 1.0);
 uniform vec4 snow_color : source_color = vec4(0.89, 0.9, 0.86, 1.0);
 #include "res://scripts/rendering/climate.gdshaderinc"
 #include "res://scripts/rendering/terrain_surface.gdshaderinc"
+#include "res://scripts/rendering/terrain_palette.gdshaderinc"
 
 varying vec3 terrain_position;
 varying vec3 terrain_normal;
@@ -43,7 +47,13 @@ void vertex() {
 		VERTEX.y = mix(UV2.x, VERTEX.y, lod_blend);
 		NORMAL = normalize(mix(COLOR.rgb * 2.0 - 1.0, NORMAL, lod_blend));
 	}
-	terrain_position = VERTEX;
+	// Keep the generated elevation available to the fragment shader for biome,
+	// mountain and water classification, while presenting land as a flat map.
+	vec3 source_position = VERTEX;
+	if (flat_map_mode) {
+		VERTEX.y = max(VERTEX.y, sea_level + 0.02);
+	}
+	terrain_position = source_position;
 	terrain_normal = NORMAL;
 	terrain_to_view = mat3(VIEW_MATRIX) * MODEL_NORMAL_MATRIX;
 }
@@ -80,7 +90,7 @@ void fragment() {
 	vec2 ecological_climate = vec2(appearance_climate.r + (blend_signals.a - 0.5) * 8.0 / 140.0, appearance_climate.g + habitat.r * demand * 1.2 / 6000.0 + (blend_signals.r - 0.5) * 1000.0 / 6000.0);
 	vec2 palette_size = vec2(textureSize(biome_palette, 0));
 	vec2 palette_uv = (clamp(ecological_climate, vec2(0.0), vec2(1.0)) * (palette_size - vec2(1.0)) + vec2(0.5)) / palette_size;
-	vec3 cover_color = biomes_enabled ? (ecotone ? texture(transition_colors, palette_uv).rgb : texture(biome_palette, palette_uv).rgb) : grass_color.rgb;
+	vec3 cover_color = biomes_enabled ? texture(biome_palette, palette_uv).rgb : grass_color.rgb;
 	cover_color = mix(cover_color, vec3(0.4, 0.52, 0.41), habitat.g);
 	cover_color = mix(cover_color, vec3(0.294, 0.502, 0.333), habitat.b);
 	vec3 grass = cover_color * mix(0.94, 1.06, variation);
@@ -88,6 +98,18 @@ void fragment() {
 	float beach_extent = ecotone ? beach_width * 1.8 : beach_width;
 	float beach = terrain_patch_edge(1.0 - smoothstep(0.2, beach_extent, altitude), blend_signals.a);
 	vec3 color = mix(grass, sand_color.rgb, beach);
+	if (provinces_enabled && flat_map_mode) {
+		vec2 province_uv = clamp(uv + vec2(0.5), vec2(0.0), vec2(1.0));
+		vec4 province = texture(province_field, province_uv);
+		vec2 texel = 1.0 / vec2(textureSize(province_field, 0));
+		float edge = 0.0;
+		edge = max(edge, step(0.015, distance(province.rgb, texture(province_field, province_uv + vec2(texel.x, 0.0)).rgb)));
+		edge = max(edge, step(0.015, distance(province.rgb, texture(province_field, province_uv + vec2(0.0, texel.y)).rgb)));
+		edge = max(edge, step(0.015, distance(province.rgb, texture(province_field, province_uv - vec2(texel.x, 0.0)).rgb)));
+		edge = max(edge, step(0.015, distance(province.rgb, texture(province_field, province_uv - vec2(0.0, texel.y)).rgb)));
+		color = province.a > 0.5 ? mix(color, province.rgb, 0.38) : color;
+		color = mix(color, vec3(0.12, 0.10, 0.08), edge * province.a * 0.8);
+	}
 	float rock = max(smoothstep(rock_slope, min(rock_slope + 0.25, 1.0), slope), smoothstep(height_scale * 0.55, height_scale * 0.8, altitude));
 	float highland = smoothstep(height_scale * 0.28, height_scale * 0.62, altitude);
 	rock = max(rock, highland * mix(0.65, 1.0, smoothstep(0.05, 0.28, slope)));
@@ -102,16 +124,18 @@ void fragment() {
 	vec3 material_tint;
 	vec3 detail_normal;
 	float material_roughness;
-	vec4 ground_weights = surface_materials_enabled ? (ecotone ? texture(transition_weights, palette_uv) : texture(surface_weights, palette_uv)) : vec4(1.0, 0.0, 0.0, 0.0);
+	vec4 ground_weights = surface_materials_enabled ? texture(surface_weights, palette_uv) : vec4(1.0, 0.0, 0.0, 0.0);
 	ground_weights = mix(ground_weights, vec4(0.3, 0.05, 0.65, 0.0), habitat.a * 0.35);
 	ground_weights = mix(ground_weights, vec4(0.0, 0.0, 0.0, 1.0), beach);
 	float wet = terrain_patch_edge(clamp(max(habitat.g, habitat.r * 0.45) * (1.0 - rock), 0.0, 1.0), blend_signals.b);
 	ground_weights /= max(dot(ground_weights, vec4(1.0)), 0.0001);
 	vec4 patch_weights = terrain_patch_weights(ground_weights, blend_signals);
 
-	layered_surface(terrain_position, macro_normal, ground_weights, patch_weights, wet, rock, snow, material_detail, material_tint, detail_normal, material_roughness);
-	if (surface_materials_enabled) {
-		color *= texture(regional_tint, uv + vec2(0.5)).rgb * material_tint;
+	if (paint_enabled && surface_materials_enabled) {
+		painted_surface(terrain_position, macro_normal, ecological_climate, habitat, beach, wet, rock, snow, material_detail, map_size, blend_signals, color, detail_normal, material_roughness);
+	} else {
+		layered_surface(terrain_position, macro_normal, ground_weights, patch_weights, wet, rock, snow, material_detail, material_tint, detail_normal, material_roughness);
+		if (surface_materials_enabled) { color *= material_tint; }
 	}
 	color *= mix(1.0, relief_sample.a, highland);
 	float hillshade = mix(0.58, 1.12, max(0.0, dot(macro_normal, normalize(overview_light_direction))));

@@ -5,6 +5,14 @@ extends Node3D
 signal climate_changed
 signal vegetation_changed
 signal terrain_regenerated
+const PaintLayer = preload("res://scripts/rendering/terrain_paint_layer.gd")
+var paint_layer: RefCounted
+var _restore_paint: bool = false
+
+const PaintLibrary = preload("res://scripts/rendering/terrain_palette_library.gd")
+@export var surface_catalog: Resource = preload("res://assets/terrain/default_ground_palette.tres")
+var _paint_data: Dictionary = {}
+
 const SurfaceMaterials = preload("res://scripts/rendering/terrain_materials.gd")
 const VegetationView = preload("res://scripts/rendering/terrain_vegetation_view.gd")
 const Biomes = preload("res://scripts/domain/terrain_biomes.gd")
@@ -19,6 +27,7 @@ const Grid = preload("res://scripts/domain/heightmap_grid.gd")
 const TerrainLOD = preload("res://scripts/rendering/terrain_lod.gd")
 const Graph = preload("res://scripts/domain/terrain_graph.gd")
 const Recipe = preload("res://scripts/domain/heightmap_recipe.gd")
+const Provinces = preload("res://scripts/domain/terrain_provinces.gd")
 
 @export_tool_button("Regenerate terrain", "Reload") var regenerate_button: Callable = regenerate
 
@@ -150,6 +159,12 @@ var smoothing_passes: int = 1
 	set(value):
 		show_water = value
 		_request_rebuild()
+@export_group("Map Presentation")
+## Presents land as a flat strategy map while retaining elevation for classification.
+@export var flat_map_mode: bool = true:
+	set(value):
+		flat_map_mode = value
+		_request_rebuild()
 @export_range(-40.0, 80.0, 0.25) var sea_level: float = 0.0:
 	set(value):
 		sea_level = clampf(value, -40.0, 80.0)
@@ -193,9 +208,6 @@ var height_samples := PackedFloat32Array()
 var _dirty: bool = true
 var _delay: float = 0.0
 var _land_material: ShaderMaterial
-var _regional_tint: Texture2D
-var _regional_seed: String = ""
-var _regional_size := Vector2.ZERO
 var _recipe_samples := PackedFloat32Array()
 var graph: RefCounted
 var _graph_key: String = ""
@@ -213,6 +225,7 @@ var _habitat_texture: Texture2D
 var _biome_field_texture: Texture2D
 var hydrology: RefCounted
 var hydrology_view: Node3D
+var provinces: RefCounted
 var _hydrology_texture: Texture2D
 var climate: RefCounted
 var climate_settings: Dictionary = Climate.DEFAULTS.duplicate()
@@ -279,6 +292,8 @@ func regenerate() -> void:
 	elif geography == null or geography.source_hash != graph.source_fingerprint(surface_smoothing):
 		geography = Geography.new()
 		geography.generate(graph, surface_smoothing)
+	provinces = Provinces.new()
+	provinces.generate(graph, map_size, 512)
 	_build_mesh(surface)
 	_update_material(surface)
 	var water_mesh := PlaneMesh.new()
@@ -328,6 +343,26 @@ func apply_climate(options: Dictionary) -> String:
 	climate_settings = options.duplicate()
 	_refresh_climate()
 	return ""
+
+
+func apply_surface_catalog(catalog: Resource) -> String:
+	var data: Dictionary = PaintLibrary.build(catalog, true)
+	if not data.ok:
+		return data.error
+	surface_catalog = catalog
+	_paint_data = data
+	for material in [_land_material, detail._material if detail != null else null]:
+		if material != null:
+			PaintLibrary.bind(material, data)
+	return ""
+
+
+func update_painted_surface() -> void:
+	if paint_layer == null:
+		return
+	for material in [_land_material, detail._material if detail != null else null]:
+		if material != null:
+			paint_layer.bind(material)
 
 
 func apply_tree_population(amount: int) -> void:
@@ -418,6 +453,8 @@ func set_climate_view(mode: int) -> void:
 			material.set_shader_parameter("habitats_enabled", _habitat_texture != null)
 			material.set_shader_parameter("drainage_field", _hydrology_texture)
 			material.set_shader_parameter("hydrology_enabled", _hydrology_texture != null and is_equal_approx(sea_level, height_offset))
+			material.set_shader_parameter("province_field", provinces.texture if provinces != null else null)
+			material.set_shader_parameter("provinces_enabled", provinces != null)
 	if detail != null:
 		detail.set_climate_view(visible_mode, _climate_texture, _biome_texture)
 		detail.set_hydrology_field(_hydrology_texture)
@@ -588,6 +625,9 @@ func set_overview_blend(value: float) -> void:
 	if geography_view != null:
 		geography_view.set_overview_blend(overview_blend)
 
+func is_flat_map_mode() -> bool:
+	return flat_map_mode
+
 
 func set_heightmap_view(enabled: bool) -> void:
 	heightmap_view = enabled
@@ -651,12 +691,14 @@ func _update_material(surface: MeshInstance3D) -> void:
 	if _land_material == null:
 		_land_material = ShaderMaterial.new()
 		_land_material.shader = TERRAIN_SHADER
+	if not _restore_paint or paint_layer == null:
+		paint_layer = PaintLayer.new(map_size)
+	_restore_paint = false
 	SurfaceMaterials.bind_library(_land_material, map_seed)
-	if _regional_tint == null or _regional_seed != map_seed or _regional_size != map_size:
-		_regional_tint = SurfaceMaterials.regional_field(map_size, map_seed)
-		_regional_seed = map_seed
-		_regional_size = map_size
-	_land_material.set_shader_parameter("regional_tint", _regional_tint)
+	_paint_data = PaintLibrary.build(surface_catalog)
+	if _paint_data.ok:
+		PaintLibrary.bind(_land_material, _paint_data)
+	paint_layer.bind(_land_material)
 	_land_material.set_shader_parameter("map_size", display_size())
 	_land_material.set_shader_parameter("sea_level", sea_level * relief_scale())
 	_land_material.set_shader_parameter("height_scale", elevation * relief_scale())
@@ -674,6 +716,7 @@ func _update_material(surface: MeshInstance3D) -> void:
 	_land_material.set_shader_parameter("terrain_lod", false)
 	_land_material.set_shader_parameter("heightmap_view", heightmap_view)
 	_land_material.set_shader_parameter("overview_blend", overview_blend)
+	_land_material.set_shader_parameter("flat_map_mode", flat_map_mode)
 	surface.material_override = _land_material
 
 
@@ -743,6 +786,15 @@ func point_info(map_point: Vector2) -> Dictionary:
 	info.cell_surface_kind = info.get("surface_kind", "Land")
 	info.cell_biome = info.get("biome", "Unknown")
 	info.inspected_position = map_point
+	if paint_layer != null and paint_layer.image != null:
+		var paint_uv: Vector2 = (map_point / map_size).clamp(Vector2.ZERO, Vector2.ONE)
+		var pixel := Vector2i((paint_uv * Vector2(paint_layer.image.get_size() - Vector2i.ONE) + Vector2.ONE * 0.5).floor())
+		var paint: Color = paint_layer.image.get_pixelv(pixel)
+		if paint.g > 0.005:
+			var row: int = roundi(paint.r * 255)
+			var slot: int = roundi(paint.b * 255) - 1
+			info.painted_ground = surface_catalog.rows[row].label
+			info.painted_texture = "Biome mix" if slot < 0 else surface_catalog.rows[row].variants[slot].label
 	var uv: Vector2 = map_point / map_size
 	var bed: float = surface_height(uv)
 	var water: float = NAN

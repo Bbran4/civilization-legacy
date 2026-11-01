@@ -1,0 +1,788 @@
+[gd_resource type="Resource" load_steps=80 format=3]
+
+[ext_resource type="Script" path="res://scripts/rendering/terrain_paint_catalog.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/rendering/terrain_biome_paint.gd" id="2"]
+[ext_resource type="Script" path="res://scripts/rendering/terrain_paint_variant.gd" id="3"]
+
+[sub_resource type="Resource" id="Variant_0_0"]
+script = ExtResource("3")
+label = "Marine 1"
+starter_texture = 2
+base_color = Color(0.156863, 0.356863, 0.439216, 1)
+pattern = 0
+tile_size = 8.0
+rotation = 0.0
+patch_size = 32.0
+amount = 1
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_0_1"]
+script = ExtResource("3")
+label = "Marine 2"
+starter_texture = 2
+base_color = Color(0.141176, 0.321176, 0.395294, 1)
+pattern = 1
+tile_size = 11.0
+rotation = 47.0
+patch_size = 19.0
+amount = 0.65
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_0_2"]
+script = ExtResource("3")
+label = "Marine 3"
+starter_texture = 2
+base_color = Color(0.166275, 0.378275, 0.465569, 1)
+pattern = 0
+tile_size = 6.0
+rotation = 112.0
+patch_size = 12.0
+amount = 0.35
+roughness = 0.9
+
+[sub_resource type="Resource" id="Biome_0"]
+script = ExtResource("2")
+label = "Marine"
+variants = Array[Resource]([SubResource("Variant_0_0"), SubResource("Variant_0_1"), SubResource("Variant_0_2")])
+
+[sub_resource type="Resource" id="Variant_1_0"]
+script = ExtResource("3")
+label = "Ice 1"
+starter_texture = 5
+base_color = Color(0.776471, 0.823529, 0.835294, 1)
+pattern = 0
+tile_size = 8.0
+rotation = 0.0
+patch_size = 32.0
+amount = 1
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_1_1"]
+script = ExtResource("3")
+label = "Ice 2"
+starter_texture = 5
+base_color = Color(0.698824, 0.741176, 0.751765, 1)
+pattern = 1
+tile_size = 11.0
+rotation = 47.0
+patch_size = 19.0
+amount = 0.65
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_1_2"]
+script = ExtResource("3")
+label = "Ice 3"
+starter_texture = 5
+base_color = Color(0.823059, 0.872941, 0.885412, 1)
+pattern = 0
+tile_size = 6.0
+rotation = 112.0
+patch_size = 12.0
+amount = 0.35
+roughness = 0.9
+
+[sub_resource type="Resource" id="Biome_1"]
+script = ExtResource("2")
+label = "Ice"
+variants = Array[Resource]([SubResource("Variant_1_0"), SubResource("Variant_1_1"), SubResource("Variant_1_2")])
+
+[sub_resource type="Resource" id="Variant_2_0"]
+script = ExtResource("3")
+label = "Tundra 1"
+starter_texture = 2
+base_color = Color(0.576471, 0.592157, 0.501961, 1)
+pattern = 0
+tile_size = 8.0
+rotation = 0.0
+patch_size = 32.0
+amount = 1
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_2_1"]
+script = ExtResource("3")
+label = "Tundra 2"
+starter_texture = 2
+base_color = Color(0.518824, 0.532941, 0.451765, 1)
+pattern = 1
+tile_size = 11.0
+rotation = 47.0
+patch_size = 19.0
+amount = 0.65
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_2_2"]
+script = ExtResource("3")
+label = "Tundra 3"
+starter_texture = 2
+base_color = Color(0.611059, 0.627686, 0.532078, 1)
+pattern = 0
+tile_size = 6.0
+rotation = 112.0
+patch_size = 12.0
+amount = 0.35
+roughness = 0.9
+
+[sub_resource type="Resource" id="Biome_2"]
+script = ExtResource("2")
+label = "Tundra"
+variants = Array[Resource]([SubResource("Variant_2_0"), SubResource("Variant_2_1"), SubResource("Variant_2_2")])
+
+[sub_resource type="Resource" id="Variant_3_0"]
+script = ExtResource("3")
+label = "Cold desert 1"
+starter_texture = 3
+base_color = Color(0.721569, 0.647059, 0.509804, 1)
+pattern = 0
+tile_size = 8.0
+rotation = 0.0
+patch_size = 32.0
+amount = 1
+roughness = 0.97
+
+[sub_resource type="Resource" id="Variant_3_1"]
+script = ExtResource("3")
+label = "Cold desert 2"
+starter_texture = 2
+base_color = Color(0.649412, 0.582353, 0.458824, 1)
+pattern = 1
+tile_size = 11.0
+rotation = 47.0
+patch_size = 19.0
+amount = 0.65
+roughness = 0.97
+
+[sub_resource type="Resource" id="Variant_3_2"]
+script = ExtResource("3")
+label = "Cold desert 3"
+starter_texture = 4
+base_color = Color(0.764863, 0.685882, 0.540392, 1)
+pattern = 0
+tile_size = 6.0
+rotation = 112.0
+patch_size = 12.0
+amount = 0.35
+roughness = 0.97
+
+[sub_resource type="Resource" id="Biome_3"]
+script = ExtResource("2")
+label = "Cold desert"
+variants = Array[Resource]([SubResource("Variant_3_0"), SubResource("Variant_3_1"), SubResource("Variant_3_2")])
+
+[sub_resource type="Resource" id="Variant_4_0"]
+script = ExtResource("3")
+label = "Hot desert 1"
+starter_texture = 3
+base_color = Color(0.784314, 0.717647, 0.505882, 1)
+pattern = 0
+tile_size = 8.0
+rotation = 0.0
+patch_size = 32.0
+amount = 1
+roughness = 0.97
+
+[sub_resource type="Resource" id="Variant_4_1"]
+script = ExtResource("3")
+label = "Hot desert 2"
+starter_texture = 2
+base_color = Color(0.705882, 0.645882, 0.455294, 1)
+pattern = 1
+tile_size = 11.0
+rotation = 47.0
+patch_size = 19.0
+amount = 0.65
+roughness = 0.97
+
+[sub_resource type="Resource" id="Variant_4_2"]
+script = ExtResource("3")
+label = "Hot desert 3"
+starter_texture = 4
+base_color = Color(0.831373, 0.760706, 0.536235, 1)
+pattern = 0
+tile_size = 6.0
+rotation = 112.0
+patch_size = 12.0
+amount = 0.35
+roughness = 0.97
+
+[sub_resource type="Resource" id="Biome_4"]
+script = ExtResource("2")
+label = "Hot desert"
+variants = Array[Resource]([SubResource("Variant_4_0"), SubResource("Variant_4_1"), SubResource("Variant_4_2")])
+
+[sub_resource type="Resource" id="Variant_5_0"]
+script = ExtResource("3")
+label = "Steppe 1"
+starter_texture = 1
+base_color = Color(0.654902, 0.600000, 0.396078, 1)
+pattern = 0
+tile_size = 8.0
+rotation = 0.0
+patch_size = 32.0
+amount = 1
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_5_1"]
+script = ExtResource("3")
+label = "Steppe 2"
+starter_texture = 1
+base_color = Color(0.589412, 0.540000, 0.356471, 1)
+pattern = 1
+tile_size = 11.0
+rotation = 47.0
+patch_size = 19.0
+amount = 0.65
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_5_2"]
+script = ExtResource("3")
+label = "Steppe 3"
+starter_texture = 1
+base_color = Color(0.694196, 0.636000, 0.419843, 1)
+pattern = 0
+tile_size = 6.0
+rotation = 112.0
+patch_size = 12.0
+amount = 0.35
+roughness = 0.9
+
+[sub_resource type="Resource" id="Biome_5"]
+script = ExtResource("2")
+label = "Steppe"
+variants = Array[Resource]([SubResource("Variant_5_0"), SubResource("Variant_5_1"), SubResource("Variant_5_2")])
+
+[sub_resource type="Resource" id="Variant_6_0"]
+script = ExtResource("3")
+label = "Grassland 1"
+starter_texture = 0
+base_color = Color(0.486275, 0.549020, 0.313725, 1)
+pattern = 0
+tile_size = 8.0
+rotation = 0.0
+patch_size = 32.0
+amount = 1
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_6_1"]
+script = ExtResource("3")
+label = "Grassland 2"
+starter_texture = 0
+base_color = Color(0.437647, 0.494118, 0.282353, 1)
+pattern = 1
+tile_size = 11.0
+rotation = 47.0
+patch_size = 19.0
+amount = 0.65
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_6_2"]
+script = ExtResource("3")
+label = "Grassland 3"
+starter_texture = 0
+base_color = Color(0.515451, 0.581961, 0.332549, 1)
+pattern = 0
+tile_size = 6.0
+rotation = 112.0
+patch_size = 12.0
+amount = 0.35
+roughness = 0.9
+
+[sub_resource type="Resource" id="Biome_6"]
+script = ExtResource("2")
+label = "Grassland"
+variants = Array[Resource]([SubResource("Variant_6_0"), SubResource("Variant_6_1"), SubResource("Variant_6_2")])
+
+[sub_resource type="Resource" id="Variant_7_0"]
+script = ExtResource("3")
+label = "Savanna 1"
+starter_texture = 1
+base_color = Color(0.607843, 0.588235, 0.341176, 1)
+pattern = 0
+tile_size = 8.0
+rotation = 0.0
+patch_size = 32.0
+amount = 1
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_7_1"]
+script = ExtResource("3")
+label = "Savanna 2"
+starter_texture = 1
+base_color = Color(0.547059, 0.529412, 0.307059, 1)
+pattern = 1
+tile_size = 11.0
+rotation = 47.0
+patch_size = 19.0
+amount = 0.65
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_7_2"]
+script = ExtResource("3")
+label = "Savanna 3"
+starter_texture = 1
+base_color = Color(0.644314, 0.623529, 0.361647, 1)
+pattern = 0
+tile_size = 6.0
+rotation = 112.0
+patch_size = 12.0
+amount = 0.35
+roughness = 0.9
+
+[sub_resource type="Resource" id="Biome_7"]
+script = ExtResource("2")
+label = "Savanna"
+variants = Array[Resource]([SubResource("Variant_7_0"), SubResource("Variant_7_1"), SubResource("Variant_7_2")])
+
+[sub_resource type="Resource" id="Variant_8_0"]
+script = ExtResource("3")
+label = "Boreal forest 1"
+starter_texture = 2
+base_color = Color(0.337255, 0.392157, 0.305882, 1)
+pattern = 0
+tile_size = 8.0
+rotation = 0.0
+patch_size = 32.0
+amount = 1
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_8_1"]
+script = ExtResource("3")
+label = "Boreal forest 2"
+starter_texture = 2
+base_color = Color(0.303529, 0.352941, 0.275294, 1)
+pattern = 1
+tile_size = 11.0
+rotation = 47.0
+patch_size = 19.0
+amount = 0.65
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_8_2"]
+script = ExtResource("3")
+label = "Boreal forest 3"
+starter_texture = 2
+base_color = Color(0.357490, 0.415686, 0.324235, 1)
+pattern = 0
+tile_size = 6.0
+rotation = 112.0
+patch_size = 12.0
+amount = 0.35
+roughness = 0.9
+
+[sub_resource type="Resource" id="Biome_8"]
+script = ExtResource("2")
+label = "Boreal forest"
+variants = Array[Resource]([SubResource("Variant_8_0"), SubResource("Variant_8_1"), SubResource("Variant_8_2")])
+
+[sub_resource type="Resource" id="Variant_9_0"]
+script = ExtResource("3")
+label = "Temperate forest 1"
+starter_texture = 2
+base_color = Color(0.376471, 0.427451, 0.274510, 1)
+pattern = 0
+tile_size = 8.0
+rotation = 0.0
+patch_size = 32.0
+amount = 1
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_9_1"]
+script = ExtResource("3")
+label = "Temperate forest 2"
+starter_texture = 2
+base_color = Color(0.338824, 0.384706, 0.247059, 1)
+pattern = 1
+tile_size = 11.0
+rotation = 47.0
+patch_size = 19.0
+amount = 0.65
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_9_2"]
+script = ExtResource("3")
+label = "Temperate forest 3"
+starter_texture = 2
+base_color = Color(0.399059, 0.453098, 0.290980, 1)
+pattern = 0
+tile_size = 6.0
+rotation = 112.0
+patch_size = 12.0
+amount = 0.35
+roughness = 0.9
+
+[sub_resource type="Resource" id="Biome_9"]
+script = ExtResource("2")
+label = "Temperate forest"
+variants = Array[Resource]([SubResource("Variant_9_0"), SubResource("Variant_9_1"), SubResource("Variant_9_2")])
+
+[sub_resource type="Resource" id="Variant_10_0"]
+script = ExtResource("3")
+label = "Temperate rainforest 1"
+starter_texture = 2
+base_color = Color(0.321569, 0.403922, 0.278431, 1)
+pattern = 0
+tile_size = 8.0
+rotation = 0.0
+patch_size = 32.0
+amount = 1
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_10_1"]
+script = ExtResource("3")
+label = "Temperate rainforest 2"
+starter_texture = 2
+base_color = Color(0.289412, 0.363529, 0.250588, 1)
+pattern = 1
+tile_size = 11.0
+rotation = 47.0
+patch_size = 19.0
+amount = 0.65
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_10_2"]
+script = ExtResource("3")
+label = "Temperate rainforest 3"
+starter_texture = 2
+base_color = Color(0.340863, 0.428157, 0.295137, 1)
+pattern = 0
+tile_size = 6.0
+rotation = 112.0
+patch_size = 12.0
+amount = 0.35
+roughness = 0.9
+
+[sub_resource type="Resource" id="Biome_10"]
+script = ExtResource("2")
+label = "Temperate rainforest"
+variants = Array[Resource]([SubResource("Variant_10_0"), SubResource("Variant_10_1"), SubResource("Variant_10_2")])
+
+[sub_resource type="Resource" id="Variant_11_0"]
+script = ExtResource("3")
+label = "Tropical rainforest 1"
+starter_texture = 2
+base_color = Color(0.298039, 0.396078, 0.250980, 1)
+pattern = 0
+tile_size = 8.0
+rotation = 0.0
+patch_size = 32.0
+amount = 1
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_11_1"]
+script = ExtResource("3")
+label = "Tropical rainforest 2"
+starter_texture = 2
+base_color = Color(0.268235, 0.356471, 0.225882, 1)
+pattern = 1
+tile_size = 11.0
+rotation = 47.0
+patch_size = 19.0
+amount = 0.65
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_11_2"]
+script = ExtResource("3")
+label = "Tropical rainforest 3"
+starter_texture = 2
+base_color = Color(0.315922, 0.419843, 0.266039, 1)
+pattern = 0
+tile_size = 6.0
+rotation = 112.0
+patch_size = 12.0
+amount = 0.35
+roughness = 0.9
+
+[sub_resource type="Resource" id="Biome_11"]
+script = ExtResource("2")
+label = "Tropical rainforest"
+variants = Array[Resource]([SubResource("Variant_11_0"), SubResource("Variant_11_1"), SubResource("Variant_11_2")])
+
+[sub_resource type="Resource" id="Variant_12_0"]
+script = ExtResource("3")
+label = "Lake water 1"
+starter_texture = 2
+base_color = Color(0.223529, 0.498039, 0.596078, 1)
+pattern = 0
+tile_size = 8.0
+rotation = 0.0
+patch_size = 32.0
+amount = 1
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_12_1"]
+script = ExtResource("3")
+label = "Lake water 2"
+starter_texture = 2
+base_color = Color(0.201176, 0.448235, 0.536471, 1)
+pattern = 1
+tile_size = 11.0
+rotation = 47.0
+patch_size = 19.0
+amount = 0.65
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_12_2"]
+script = ExtResource("3")
+label = "Lake water 3"
+starter_texture = 2
+base_color = Color(0.236941, 0.527922, 0.631843, 1)
+pattern = 0
+tile_size = 6.0
+rotation = 112.0
+patch_size = 12.0
+amount = 0.35
+roughness = 0.9
+
+[sub_resource type="Resource" id="Biome_12"]
+script = ExtResource("2")
+label = "Lake water"
+variants = Array[Resource]([SubResource("Variant_12_0"), SubResource("Variant_12_1"), SubResource("Variant_12_2")])
+
+[sub_resource type="Resource" id="Variant_13_0"]
+script = ExtResource("3")
+label = "Wetland 1"
+starter_texture = 6
+base_color = Color(0.407843, 0.466667, 0.352941, 1)
+pattern = 0
+tile_size = 8.0
+rotation = 0.0
+patch_size = 32.0
+amount = 1
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_13_1"]
+script = ExtResource("3")
+label = "Wetland 2"
+starter_texture = 6
+base_color = Color(0.367059, 0.420000, 0.317647, 1)
+pattern = 1
+tile_size = 11.0
+rotation = 47.0
+patch_size = 19.0
+amount = 0.65
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_13_2"]
+script = ExtResource("3")
+label = "Wetland 3"
+starter_texture = 6
+base_color = Color(0.432314, 0.494667, 0.374118, 1)
+pattern = 0
+tile_size = 6.0
+rotation = 112.0
+patch_size = 12.0
+amount = 0.35
+roughness = 0.9
+
+[sub_resource type="Resource" id="Biome_13"]
+script = ExtResource("2")
+label = "Wetland"
+variants = Array[Resource]([SubResource("Variant_13_0"), SubResource("Variant_13_1"), SubResource("Variant_13_2")])
+
+[sub_resource type="Resource" id="Variant_14_0"]
+script = ExtResource("3")
+label = "Riparian woodland 1"
+starter_texture = 2
+base_color = Color(0.396078, 0.447059, 0.301961, 1)
+pattern = 0
+tile_size = 8.0
+rotation = 0.0
+patch_size = 32.0
+amount = 1
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_14_1"]
+script = ExtResource("3")
+label = "Riparian woodland 2"
+starter_texture = 2
+base_color = Color(0.356471, 0.402353, 0.271765, 1)
+pattern = 1
+tile_size = 11.0
+rotation = 47.0
+patch_size = 19.0
+amount = 0.65
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_14_2"]
+script = ExtResource("3")
+label = "Riparian woodland 3"
+starter_texture = 2
+base_color = Color(0.419843, 0.473882, 0.320078, 1)
+pattern = 0
+tile_size = 6.0
+rotation = 112.0
+patch_size = 12.0
+amount = 0.35
+roughness = 0.9
+
+[sub_resource type="Resource" id="Biome_14"]
+script = ExtResource("2")
+label = "Riparian woodland"
+variants = Array[Resource]([SubResource("Variant_14_0"), SubResource("Variant_14_1"), SubResource("Variant_14_2")])
+
+[sub_resource type="Resource" id="Variant_15_0"]
+script = ExtResource("3")
+label = "Beach sand 1"
+starter_texture = 3
+base_color = Color(0.784314, 0.717647, 0.505882, 1)
+pattern = 0
+tile_size = 8.0
+rotation = 0.0
+patch_size = 32.0
+amount = 1
+roughness = 0.97
+
+[sub_resource type="Resource" id="Variant_15_1"]
+script = ExtResource("3")
+label = "Beach sand 2"
+starter_texture = 2
+base_color = Color(0.705882, 0.645882, 0.455294, 1)
+pattern = 1
+tile_size = 11.0
+rotation = 47.0
+patch_size = 19.0
+amount = 0.65
+roughness = 0.97
+
+[sub_resource type="Resource" id="Variant_15_2"]
+script = ExtResource("3")
+label = "Beach sand 3"
+starter_texture = 4
+base_color = Color(0.831373, 0.760706, 0.536235, 1)
+pattern = 0
+tile_size = 6.0
+rotation = 112.0
+patch_size = 12.0
+amount = 0.35
+roughness = 0.97
+
+[sub_resource type="Resource" id="Biome_15"]
+script = ExtResource("2")
+label = "Beach sand"
+variants = Array[Resource]([SubResource("Variant_15_0"), SubResource("Variant_15_1"), SubResource("Variant_15_2")])
+
+[sub_resource type="Resource" id="Variant_16_0"]
+script = ExtResource("3")
+label = "Mountain rock 1"
+starter_texture = 4
+base_color = Color(0.521569, 0.517647, 0.478431, 1)
+pattern = 0
+tile_size = 8.0
+rotation = 0.0
+patch_size = 32.0
+amount = 1
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_16_1"]
+script = ExtResource("3")
+label = "Mountain rock 2"
+starter_texture = 4
+base_color = Color(0.469412, 0.465882, 0.430588, 1)
+pattern = 1
+tile_size = 11.0
+rotation = 47.0
+patch_size = 19.0
+amount = 0.65
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_16_2"]
+script = ExtResource("3")
+label = "Mountain rock 3"
+starter_texture = 4
+base_color = Color(0.552863, 0.548706, 0.507137, 1)
+pattern = 0
+tile_size = 6.0
+rotation = 112.0
+patch_size = 12.0
+amount = 0.35
+roughness = 0.9
+
+[sub_resource type="Resource" id="Biome_16"]
+script = ExtResource("2")
+label = "Mountain rock"
+variants = Array[Resource]([SubResource("Variant_16_0"), SubResource("Variant_16_1"), SubResource("Variant_16_2")])
+
+[sub_resource type="Resource" id="Variant_17_0"]
+script = ExtResource("3")
+label = "Snow cover 1"
+starter_texture = 5
+base_color = Color(0.796078, 0.815686, 0.803922, 1)
+pattern = 0
+tile_size = 8.0
+rotation = 0.0
+patch_size = 32.0
+amount = 1
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_17_1"]
+script = ExtResource("3")
+label = "Snow cover 2"
+starter_texture = 5
+base_color = Color(0.716471, 0.734118, 0.723529, 1)
+pattern = 1
+tile_size = 11.0
+rotation = 47.0
+patch_size = 19.0
+amount = 0.65
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_17_2"]
+script = ExtResource("3")
+label = "Snow cover 3"
+starter_texture = 5
+base_color = Color(0.843843, 0.864627, 0.852157, 1)
+pattern = 0
+tile_size = 6.0
+rotation = 112.0
+patch_size = 12.0
+amount = 0.35
+roughness = 0.9
+
+[sub_resource type="Resource" id="Biome_17"]
+script = ExtResource("2")
+label = "Snow cover"
+variants = Array[Resource]([SubResource("Variant_17_0"), SubResource("Variant_17_1"), SubResource("Variant_17_2")])
+
+[sub_resource type="Resource" id="Variant_18_0"]
+script = ExtResource("3")
+label = "Wet soil 1"
+starter_texture = 6
+base_color = Color(0.400000, 0.376471, 0.298039, 1)
+pattern = 0
+tile_size = 8.0
+rotation = 0.0
+patch_size = 32.0
+amount = 1
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_18_1"]
+script = ExtResource("3")
+label = "Wet soil 2"
+starter_texture = 6
+base_color = Color(0.360000, 0.338824, 0.268235, 1)
+pattern = 1
+tile_size = 11.0
+rotation = 47.0
+patch_size = 19.0
+amount = 0.65
+roughness = 0.9
+
+[sub_resource type="Resource" id="Variant_18_2"]
+script = ExtResource("3")
+label = "Wet soil 3"
+starter_texture = 6
+base_color = Color(0.424000, 0.399059, 0.315922, 1)
+pattern = 0
+tile_size = 6.0
+rotation = 112.0
+patch_size = 12.0
+amount = 0.35
+roughness = 0.9
+
+[sub_resource type="Resource" id="Biome_18"]
+script = ExtResource("2")
+label = "Wet soil"
+variants = Array[Resource]([SubResource("Variant_18_0"), SubResource("Variant_18_1"), SubResource("Variant_18_2")])
+
+[resource]
+script = ExtResource("1")
+rows = Array[Resource]([SubResource("Biome_0"), SubResource("Biome_1"), SubResource("Biome_2"), SubResource("Biome_3"), SubResource("Biome_4"), SubResource("Biome_5"), SubResource("Biome_6"), SubResource("Biome_7"), SubResource("Biome_8"), SubResource("Biome_9"), SubResource("Biome_10"), SubResource("Biome_11"), SubResource("Biome_12"), SubResource("Biome_13"), SubResource("Biome_14"), SubResource("Biome_15"), SubResource("Biome_16"), SubResource("Biome_17"), SubResource("Biome_18")])

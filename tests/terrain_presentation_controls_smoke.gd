@@ -37,7 +37,7 @@ func _run() -> void:
 	_check(editor._tree_status.text.contains("requested 6000"), "The UI must show the requested count separately from actual planting.")
 	_check(terrain.height_samples == heights and terrain.detail.chunks[0].meshes[0].get_instance_id() == mesh_id, "Apply trees must not rebuild terrain geometry.")
 	var saved: Dictionary = Document.capture(terrain)
-	_check(saved.version == 9 and saved.settings.tree_population == 6000 and Document.validate(saved).is_empty(), "Tree population must be stored in current map files.")
+	_check(saved.version == Document.VERSION and saved.settings.tree_population == 6000 and Document.validate(saved).is_empty(), "Tree population must be stored in current map files.")
 	var bad: Dictionary = saved.duplicate(true)
 	bad.settings.tree_population = 250001
 	_check(not Document.validate(bad).is_empty(), "Tree counts above the supported bound must be rejected before mutation.")

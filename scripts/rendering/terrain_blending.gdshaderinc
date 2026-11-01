@@ -1,7 +1,5 @@
 // Seeded, world-space appearance masks. Native biome and climate data stay unchanged.
 uniform sampler2D transition_noise : filter_linear_mipmap_anisotropic, repeat_enable;
-uniform sampler2D transition_colors : source_color, filter_linear, repeat_disable;
-uniform sampler2D transition_weights : filter_linear, repeat_disable;
 uniform bool terrain_blending_enabled = true;
 uniform vec2 blend_seed_offset = vec2(0.0);
 
@@ -38,16 +36,6 @@ float terrain_patch_edge(float mask, float signal) {
 	// The material owns coverage, not just tint. Keep pure interiors and break up contacts.
 	float coverage = mask + (signal - 0.5) * 1.4 * (4.0 * mask * (1.0 - mask));
 	return smoothstep(0.28, 0.72, coverage);
-}
-
-vec3 terrain_pigment(vec4 weights) {
-	return vec3(0.85, 1.05, 0.85) * weights.r + vec3(1.12, 1.0, 0.78) * weights.g + vec3(1.12, 0.79, 0.57) * weights.b + vec3(1.10, 1.05, 0.91) * weights.a;
-}
-
-vec3 terrain_patch_tint(vec4 weights, vec4 reference, float wet, float rock, float snow) {
-	if (!terrain_blending_enabled || !surface_materials_enabled) { return vec3(1.0); }
-	vec3 ratio = terrain_pigment(weights) / max(terrain_pigment(reference), vec3(0.01));
-	return mix(vec3(1.0), ratio, (1.0 - rock) * (1.0 - snow) * (1.0 - wet * 0.6));
 }
 
 vec4 terrain_habitat(vec2 uv, vec2 extent) {

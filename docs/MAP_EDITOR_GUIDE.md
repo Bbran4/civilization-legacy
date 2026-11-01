@@ -139,7 +139,7 @@ or land to see its basin, river-flow strength, lake level and outlet information
 while preserving the ocean and original terrain. **Show heights** hides water
 presentation for inspecting the source heightmap.
 
-Maps save in version 9; earlier files still load. See the
+Maps save in version 10, including texture choices and ground paint; earlier files still load. See the
 [hydrology model and verification](HYDROLOGY_REFERENCE.md) for details and limits.
 
 ## Biomes and tree suitability
@@ -224,3 +224,20 @@ and biome data, with rock overriding much of their visible surface. Cold peaks
 retain snow on gentler faces; warmer mountains expose more rock. The fully
 zoomed-out map retains relief shading. Existing saved worlds use this rendering
 automatically when loaded. See [mountain previews and details](MOUNTAIN_TERRAIN.md).
+
+## Choose and paint ground textures
+
+Scroll the left panel to **GROUND PAINTING** and open **Ground textures…**.
+Choose three textures per land biome, including separate colour, normal and
+black/white coverage images. Adjust their repeat size, pattern, rotation, amount
+and roughness, then **Apply textures**. **Paint this biome mix** or **Paint this
+texture** turns on the brush. Drag with the left mouse button in Terrain view;
+use radius/strength, **Erase paint**, **Undo paint stroke** (Ctrl+Z), or
+**Clear ground paint**. Turn off **Paint ground** to inspect cells again.
+
+Texture images now own their colours; the previous regional/pigment colour
+shifts and broad colour-filter lookups are removed. Lighting still changes
+brightness. Painting does not edit biomes, heights, rivers or tree placement.
+**Save terrain…** retains the palette and painted layer; keep linked texture
+files at their selected paths. The [full guide with pictures](GROUND_PAINTING.md)
+explains every option, asset editing and save/load behaviour.

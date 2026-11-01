@@ -2,6 +2,9 @@ extends RefCounted
 ## Plain-language help for the map editor.
 
 const HINTS: Dictionary = {
+	"Ground textures…": "Choose up to three ground textures and coverage patterns for each biome or surface.",
+	"Undo paint stroke": "Undo your last ground-painting stroke with this button or Ctrl+Z.",
+	"Clear ground paint": "Remove all painted ground and reveal the generated materials; Undo can restore the paint.",
 	"Apply trees": "Replant trees using this count and reload your saved tree scenes without rebuilding the map.",
 	"terrain_template": "Choose a world shape or supplied heightmap, or import an image of your own.",
 	"map_size.x": "Make the world wider from left to right without changing your window size.",
@@ -16,7 +19,7 @@ const HINTS: Dictionary = {
 	"Closest view": "Move the camera straight to the closest zoom allowed by Maximum zoom and Closest view size.",
 	"Save terrain…": "Save the map you can currently see so you can load it again later.",
 	"Load terrain…": "Open a saved map and replace the map you can currently see.",
-	"Generate": "Build a new map from your chosen map settings and choose the remaining settings automatically.",
+	"Generate": "Build a new map from your chosen settings and clear its painted ground, so save your current map first.",
 	"New seed": "Pick a new random seed and immediately build another map with your chosen heightmap and size.",
 	"Import heightmap image…": "Choose an image with bright areas for high ground and dark areas for low ground, then press Generate.",
 	"Export grayscale PNG…": "Save a black-and-white picture of the current map heights rather than a complete editable map.",

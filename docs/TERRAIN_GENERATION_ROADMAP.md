@@ -94,8 +94,9 @@ ecological simulation remains future work.
 See [biome rules and limitations](BIOMES_REFERENCE.md).
 
 The first material step of the [CK2-inspired implementation manual](CK2-map-to-Godot-implementation-manual.md)
-is implemented: seven original tiled surfaces, fine normals, roughness and regional
-colour. See [material implementation](TERRAIN_MATERIALS.md). Depth-tested
+is implemented: original tiled starter surfaces, fine normals, roughness and now editable
+per-biome texture/pattern choices with a manual paint layer. Old regional colour
+shifts have been replaced by authored texture colour and coverage masks. See [material implementation](TERRAIN_MATERIALS.md). Depth-tested
 [coast ribbons with controlled width](COASTLINE_RENDERING.md) are now implemented
 in both overview and angled views. Deterministic [biome-driven vegetation](VEGETATION.md)
 is now implemented with an editable scene/catalog asset library, a runtime
@@ -153,3 +154,6 @@ as **deferred until natural terrain is finished**. A future Compatibility-friend
 visual pass could share a moving cloud-coverage field between cloud geometry and
 projected ground shadows. Weather simulation and feedback into hydrology need
 separate time/units and water-balance decisions. No weather code is implemented.
+
+The runtime [ground texture palette and brush](GROUND_PAINTING.md) are implemented;
+version 10 maps save their settings and painted coverage without changing ecology.

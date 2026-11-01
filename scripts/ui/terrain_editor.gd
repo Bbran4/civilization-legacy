@@ -1,6 +1,11 @@
 extends Control
 ## Runtime controls stage generation settings; save/load operate on the visible map.
 
+const MaterialPanel = preload("res://scripts/ui/terrain_material_panel.gd")
+const GroundBrush = preload("res://scripts/ui/terrain_brush.gd")
+var _material_panel: Window
+var _brush: Node
+
 const ClimatePanel = preload("res://scripts/ui/climate_panel.gd")
 const Help = preload("res://scripts/ui/terrain_editor_help.gd")
 const GenerationProfile = preload("res://scripts/domain/terrain_generation_profile.gd")
@@ -146,6 +151,9 @@ func _build_interface() -> void:
 	_button("Apply trees", _apply_trees, null, "ApplyTrees")
 	_tree_status = _label("", 12, Color("a9bdc8"))
 	_tree_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_brush = GroundBrush.new()
+	add_child(_brush)
+	_brush.configure(self)
 	_section("VIEW")
 	_number("Minimum zoom (×)", "min_zoom", 0.1, 1, 0.1, true)
 	_number("Maximum zoom (×)", "max_zoom", 1, 8192, 1, true)
@@ -449,6 +457,15 @@ func _build_cell_inspector() -> void:
 	_reset_cell_inspector()
 
 
+func _open_ground_palette() -> void:
+	if _material_panel == null:
+		_material_panel = MaterialPanel.new()
+		_material_panel.visible = false
+		add_child(_material_panel)
+	_material_panel.configure(_terrain, self)
+	_material_panel.popup_centered()
+
+
 func _reset_cell_inspector() -> void:
 	_selected_cell = -1
 	_selected_point = Vector2.INF
@@ -459,6 +476,8 @@ func _reset_cell_inspector() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _brush != null and _brush.handle_input(event):
+		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		var camera: Camera3D = get_parent().get_parent().get_node("CameraRig/Camera3D")
 		var info: Dictionary = _terrain.pick_cell(camera.project_ray_origin(event.position), camera.project_ray_normal(event.position))
@@ -483,6 +502,8 @@ func _show_cell_info(info: Dictionary) -> void:
 		_cell_label.text += "\nClicked at %.2f, %.2f · %s" % [info.inspected_position.x, info.inspected_position.y, info.surface_kind]
 		if info.cell_biome != info.biome or info.cell_surface_kind != info.surface_kind:
 			_cell_label.text += "\nCell classification: %s · %s" % [info.cell_surface_kind, info.cell_biome]
+	if info.has("painted_ground"):
+		_cell_label.text += "\nPaint layer: %s · %s" % [info.painted_ground, info.painted_texture]
 	if info.has("basin_id"):
 		if info.basin_id >= 0:
 			var basin: Dictionary = _terrain.hydrology.basins[info.basin_id]
