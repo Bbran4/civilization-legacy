@@ -52,11 +52,8 @@ func _trace(pair: Vector2i,edges: Array,adjacency: Dictionary,used: PackedByteAr
 				edge = candidate
 				break
 	if points.size() < 2: return
-	var closed := points[0] == points[-1]
-	var simplified := simplify(points,1.1)
-	# Preserve tiny closed islands that would otherwise collapse to a doubled line.
-	if not closed or simplified.size() >= 4: points = simplified
-	for _i in range(2): points = smooth(points,closed)
+	# Remove only collinear vertices; retain every generated turn exactly.
+	points = simplify(points,0.0)
 	paths.append({"a":pair.x,"b":pair.y,"points":points})
 static func simplify(points: PackedVector2Array,tolerance: float) -> PackedVector2Array:
 	if points.size() < 3: return points
@@ -84,13 +81,4 @@ static func simplify(points: PackedVector2Array,tolerance: float) -> PackedVecto
 	var result := PackedVector2Array()
 	for i in range(points.size()):
 		if keep[i] != 0: result.append(points[i])
-	return result
-static func smooth(points: PackedVector2Array,closed: bool) -> PackedVector2Array:
-	if points.size() < 3: return points
-	var result := PackedVector2Array()
-	if not closed: result.append(points[0])
-	for i in range(points.size()-1):
-		result.append(points[i].lerp(points[i+1],0.25))
-		result.append(points[i].lerp(points[i+1],0.75))
-	result.append(result[0] if closed else points[-1])
 	return result

@@ -13,9 +13,13 @@ uniform int selected_province = 0;
 uniform int merge_ids[32];
 uniform int merge_count = 0;
 uniform sampler2D province_field : filter_nearest, repeat_disable;
+uniform sampler2D nation_colors : source_color, filter_nearest, repeat_disable;
 float province_id(vec2 uv) {
-	vec2 c = round(texture(province_field, uv).rg * 255.0);
-	return c.r + c.g * 256.0;
+    vec2 c = round(texture(province_field, uv).rg * 255.0);
+    return c.r + c.g * 256.0;
+}
+vec3 province_tint(float id) {
+    return 0.3 + 0.6 * fract(sin(vec3(id,id+17.0,id+43.0))*43758.5453);
 }
 void fragment() {
 	float h = texture(height_field, UV).r;
@@ -36,12 +40,15 @@ void fragment() {
 		if (id < 0.5 && zone == 3) color = vec3(value * 0.45);
 		if (id > 0.5) {
 			bool ocean = texture(province_field, UV).b > 0.001;
-			vec3 tint = 0.3 + 0.6 * fract(sin(vec3(id, id + 17.0, id + 43.0)) * 43758.5453);
-			color = ocean ? vec3(0.27, 0.42, 0.61) : (province_fill ? mix(color, tint * (0.45 + value * 0.7), 0.62) : color);
+			vec4 nation = texelFetch(nation_colors,ivec2(int(id)%256,int(id)/256),0);
+			vec3 tint = nation.a > 0.5 ? nation.rgb : province_tint(id);
+			color = ocean ? vec3(0.27, 0.42, 0.61) : (province_fill ? mix(color, tint * (0.65 + value * 0.35), nation.a > 0.5 ? 0.82 : 0.62) : color);
+			if (!vector_borders) {
 			vec2 border_step = max(texel_size, fwidth(UV) * 1.25);
 			bool edge = province_id(UV + vec2(border_step.x, 0.0)) != id || province_id(UV + vec2(0.0, border_step.y)) != id;
 			if (ocean) edge = edge || province_id(UV - vec2(border_step.x, 0.0)) != id || province_id(UV - vec2(0.0, border_step.y)) != id;
-			if (edge && !vector_borders) color = ocean ? vec3(0.055, 0.08, 0.12) : color * 0.35;
+			if (edge) color = ocean ? vec3(0.055, 0.08, 0.12) : color * 0.35;
+			}
 			bool selected = int(id) == selected_province;
 			for (int i = 0; i < 32; i++) {
 				if (i >= merge_count) break;

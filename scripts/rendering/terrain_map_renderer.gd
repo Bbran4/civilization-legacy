@@ -8,6 +8,9 @@ var surface: MeshInstance3D
 var material := ShaderMaterial.new()
 var shaded_relief := true
 var provinces_visible := false
+var _nation_colors: ImageTexture
+var _nation_source: RefCounted
+var _nation_revision := -1
 var _base_texture: ImageTexture
 var rendered_heights := PackedFloat32Array()
 var normalized_heights := PackedFloat32Array()
@@ -53,8 +56,24 @@ func set_terrain_surface(layer: RefCounted, enabled: bool) -> void:
 	material.set_shader_parameter("height_field", layer.texture() if enabled and layer != null else _base_texture)
 
 func set_provinces(layer: RefCounted, enabled: bool, preview: bool = false) -> void:
+	if enabled and layer != null:
+		_update_nation_colors(layer)
 	provinces_visible = enabled and layer != null and not preview
 	borders.update(layer,map_extent,provinces_visible and shaded_relief)
 	material.set_shader_parameter("vector_borders",enabled and layer != null and not preview)
 	material.set_shader_parameter("provinces_enabled", enabled)
 	material.set_shader_parameter("province_field", layer.texture() if enabled else null)
+
+func _update_nation_colors(layer: RefCounted) -> void:
+	if _nation_source == layer and _nation_revision == layer.border_revision: return
+	var image := Image.create(256,256,false,Image.FORMAT_RGBA8)
+	image.fill(Color(0,0,0,0))
+	for record in layer.records:
+		if record.kind != "land": continue
+		var color: Color = layer.nation_color(int(record.get("nation_id",0)))
+		if color.a > 0.0: image.set_pixel(record.id % 256,record.id / 256,color)
+	if _nation_colors == null: _nation_colors = ImageTexture.create_from_image(image)
+	else: _nation_colors.update(image)
+	_nation_source = layer
+	_nation_revision = layer.border_revision
+	material.set_shader_parameter("nation_colors",_nation_colors)

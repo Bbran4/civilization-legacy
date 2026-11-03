@@ -38,6 +38,11 @@ func _run() -> void:
 	var paths := Paths.new()
 	paths.build(layer.ids,layer.size)
 	check(paths.paths.size() == 3 and layer.ids == original,"Shared borders are traced once without changing authoritative pixels.")
+	for path in paths.paths:
+		for i in range(path.points.size()-1):
+			var a: Vector2 = path.points[i]
+			var b: Vector2 = path.points[i+1]
+			check(a == a.round() and (a.x == b.x or a.y == b.y),"Generated border turns remain on exact raster edges.")
 	var tiny := PackedInt32Array([0,0,0,0,1,0,0,0,0])
 	var island_paths := Paths.new()
 	island_paths.build(tiny,Vector2i(3,3))
@@ -64,9 +69,9 @@ func _run() -> void:
 	for y in range(129):
 		for x in range(129): heights[y*129+x] = 0.5+0.1*sin(x*0.12)*cos(y*0.15)
 	renderer.set_heightfield(heights,layer.size,Vector2(100,100),0,1,2)
-	renderer.material.set_shader_parameter("province_fill",false)
+	renderer.material.set_shader_parameter("province_fill",true)
 	renderer.set_provinces(layer,true)
-	check(renderer.borders.root.get_child_count() == 2,"Renderer groups dotted internal lines and two-sided national borders.")
+	check(renderer.borders.root.get_child_count() == 2,"Renderer groups dashed province lines and solid nation lines.")
 	var cached = layer.border_geometry
 	renderer.set_provinces(layer,true)
 	check(layer.border_geometry == cached,"Unchanged border geometry is cached.")
@@ -94,7 +99,7 @@ func _run() -> void:
 				if c.r > c.g*1.4 and c.r > c.b*1.4: reds += 1
 				if c.b > c.r*1.4 and c.b > c.g*1.4: blues += 1
 				if c.r < 0.15 and c.g < 0.15 and c.b < 0.15: darks += 1
-		check(reds > 200 and blues > 200 and darks > 100,"GPU renders both national colors and dark border cores.")
+		check(reds > 200 and blues > 200 and darks > 100,"GPU renders nation-colored province fills and dark borders.")
 		var left_red := 0
 		var right_blue := 0
 		for y in range(10,119,4):
@@ -102,12 +107,12 @@ func _run() -> void:
 			var center := camera.unproject_position(Vector3((float(x)/129-0.5)*100,0.06,(float(y)/129-0.5)*100))
 			center *= Vector2(image.get_size())/root.get_visible_rect().size
 			if center.y < 2 or center.y >= image.get_height()-2: continue
-			for offset in range(1,4):
+			for offset in range(6,10):
 				var left := image.get_pixelv(Vector2i(center+Vector2(-offset,0)))
 				var right := image.get_pixelv(Vector2i(center+Vector2(offset,0)))
 				if left.r > left.b*1.4: left_red += 1
 				if right.b > right.r*1.4: right_blue += 1
-		check(left_red > 20 and right_blue > 20,"Nation colors lie inside their own sides of the shared boundary.")
+		check(left_red > 20 and right_blue > 20,"Province fills retain their nation colors on the correct side.")
 		var output := OS.get_environment("BORDER_OUTPUT")
 		if not output.is_empty(): image.save_png(output.path_join("smooth-nation-borders.png"))
 	surface.queue_free()

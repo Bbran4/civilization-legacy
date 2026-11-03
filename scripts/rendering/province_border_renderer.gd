@@ -31,9 +31,9 @@ func update(layer: RefCounted,world_extent: Vector2,enabled: bool) -> void:
 		var owner_a: int = layer.records[a-1].get("nation_id",0) if land_a else 0
 		var owner_b: int = layer.records[b-1].get("nation_id",0) if land_b else 0
 		var style := 0 if land_a and land_b else 1
-		if owner_a != owner_b and (owner_a > 0 or owner_b > 0): style = 2
-		var key := "%d/%d/%d" % [style,owner_a if style == 2 else 0,owner_b if style == 2 else 0]
-		if not groups.has(key): groups[key] = {"style":style,"a":owner_a,"b":owner_b,"vertices":PackedVector3Array(),"uv":PackedVector2Array(),"colors":PackedColorArray()}
+		if land_a and land_b and owner_a != owner_b and (owner_a > 0 or owner_b > 0): style = 2
+		var key := str(style)
+		if not groups.has(key): groups[key] = {"style":style,"vertices":PackedVector3Array(),"uv":PackedVector2Array(),"colors":PackedColorArray()}
 		_append(groups[key],path.points,layer.size)
 	for key in groups:
 		var group: Dictionary = groups[key]
@@ -47,10 +47,8 @@ func update(layer: RefCounted,world_extent: Vector2,enabled: bool) -> void:
 		var material := ShaderMaterial.new()
 		material.shader = Ribbon
 		material.set_shader_parameter("border_style",group.style)
-		material.set_shader_parameter("width_pixels",8.0 if group.style == 2 else (1.35 if group.style == 0 else 1.2))
-		material.set_shader_parameter("dash_length",maxf(extent.x,extent.y)*6.5/1025.0)
-		material.set_shader_parameter("side_a",layer.nation_color(group.a))
-		material.set_shader_parameter("side_b",layer.nation_color(group.b))
+		material.set_shader_parameter("width_pixels",3.5 if group.style == 2 else (2.4 if group.style == 0 else 4.5))
+		material.set_shader_parameter("dash_length",maxf(extent.x,extent.y)*2.4/1025.0)
 		var instance := MeshInstance3D.new()
 		instance.name = "Border_" + key.replace("/","_")
 		instance.mesh = mesh
@@ -62,24 +60,24 @@ func _append(group: Dictionary,pixels: PackedVector2Array,size: Vector2i) -> voi
 	for p in pixels: points.append((p/Vector2(size)-Vector2.ONE*0.5)*extent)
 	if points.size() < 2: return
 	var closed := points[0].is_equal_approx(points[-1])
-	var offsets := PackedVector2Array()
-	var miters := PackedFloat32Array()
 	var arcs := PackedFloat32Array([0.0])
-	for i in range(points.size()):
-		var previous := points[i]-points[i-1] if i > 0 else (points[0]-points[-2] if closed else points[1]-points[0])
-		var next := points[i+1]-points[i] if i+1 < points.size() else (points[1]-points[0] if closed else previous)
-		previous = previous.normalized()
-		next = next.normalized()
-		var a := Vector2(-previous.y,previous.x)
-		var b := Vector2(-next.y,next.x)
-		var normal := (a+b).normalized()
-		if normal.length_squared() < 0.1: normal = b
-		offsets.append(normal)
-		miters.append(minf(2.5,1.0/maxf(0.4,normal.dot(b))))
-		if i > 0: arcs.append(arcs[-1]+points[i].distance_to(points[i-1]))
+	for i in range(1,points.size()): arcs.append(arcs[-1]+points[i].distance_to(points[i-1]))
+	var normals := PackedVector2Array()
 	for i in range(points.size()-1):
-		for vertex in [Vector2i(i,-1),Vector2i(i,1),Vector2i(i+1,-1),Vector2i(i+1,-1),Vector2i(i,1),Vector2i(i+1,1)]:
-			var j: int = vertex.x
-			group.vertices.append(Vector3(points[j].x,0.06,points[j].y))
-			group.uv.append(Vector2(arcs[j],vertex.y))
-			group.colors.append(Color(offsets[j].x*0.5+0.5,offsets[j].y*0.5+0.5,miters[j]/3.0,1))
+		var tangent := (points[i+1]-points[i]).normalized()
+		normals.append(Vector2(-tangent.y,tangent.x))
+		for corner in [Vector2i(i,-1),Vector2i(i,1),Vector2i(i+1,-1),Vector2i(i+1,-1),Vector2i(i,1),Vector2i(i+1,1)]:
+			_vertex(group,points[corner.x],normals[-1],arcs[corner.x],corner.y)
+	# Fill each corner with a bevel; no unbounded miter extrusion at sharp turns.
+	for i in range(points.size()-1):
+		if i == 0 and not closed: continue
+		var before: Vector2 = normals[i-1] if i > 0 else normals[-1]
+		var after: Vector2 = normals[i]
+		for side in [-1.0,1.0]:
+			_vertex(group,points[i],Vector2.ZERO,arcs[i],0.0)
+			_vertex(group,points[i],before,arcs[i],side)
+			_vertex(group,points[i],after,arcs[i],side)
+func _vertex(group: Dictionary,point: Vector2,normal: Vector2,arc: float,side: float) -> void:
+	group.vertices.append(Vector3(point.x,0.06,point.y))
+	group.uv.append(Vector2(arc,side))
+	group.colors.append(Color(normal.x*0.5+0.5,normal.y*0.5+0.5,1.0/3.0,1.0))
