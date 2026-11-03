@@ -59,11 +59,22 @@ func _run() -> void:
 	var repeated_edit := edits.redo(restored_edit.layer)
 	terrain.install_province_layer(repeated_edit.layer)
 	check(terrain.province_layer.records[created_id-1].active, "Maximum-resolution split Redo preserves the allocated ID.")
+	edits.begin_erase(terrain.province_layer)
+	edits.stroke(c,c,0.5)
+	var erased := edits.finish()
+	terrain.install_province_layer(erased.layer)
+	var blocked_pixel: int = center.y*terrain.sample_size().x+center.x
+	check(terrain.province_layer.blocked(blocked_pixel) and terrain.province_layer.ids[blocked_pixel] == 0, "Impassable erasure installs at maximum resolution.")
+	var unerased := edits.undo(terrain.province_layer)
+	check(unerased.layer.ids[blocked_pixel] == created_id and not unerased.layer.blocked(blocked_pixel), "Maximum erasure Undo restores ID and passability.")
+	var re_erased := edits.redo(unerased.layer)
+	terrain.install_province_layer(re_erased.layer)
 	var path := "user://maximum-water.terrain.json"
 	check(Document.save_file(path, terrain).is_empty(), "Maximum-size height and water data fit the expanded bounded save format.")
 	var result := Document.load_file(path)
 	check(result.ok and Document.apply(terrain, result.document).is_empty() and terrain.water_layer_current() and terrain.terrain_surface_current() and terrain.province_layer_current(), "Maximum-resolution water and terrain restore together.")
 	check(terrain.province_layer.records[created_id-1].active and terrain.province_layer.records[created_id-1].kind == "land", "Appended land province restores after ocean records.")
+	check(terrain.province_layer.blocked(blocked_pixel) and terrain.province_layer.ids[blocked_pixel] == 0, "Maximum map restores the impassable mask exactly.")
 	# Race protection: reject an in-flight result if the source changes.
 	var previous_layer = terrain.water_layer
 	editor.generate_water_layer()

@@ -89,3 +89,7 @@ cross-kind protection, screen-to-map gestures, document replacement, locks,
 background-job replacement/shutdown and real graphics/gameplay output. The maximum
 resolution test also generates/restores oceans at 2050 square. Manual visual/zoom
 and performance approval remains with the user.
+
+The [impassable land eraser](impassable-land.md) adds unassigned mountain/land zones
+and painting restores them. Ocean regeneration preserves those authored masks.
+Province snapshots now use v6, reading v1-v5.

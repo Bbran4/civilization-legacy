@@ -66,3 +66,10 @@ disk restoration, selection, locks and stale model guards. The 2050-pixel suite
 also performs split/Undo/Redo and restores an appended land ID after sea records.
 GPU checks inspect real merge selection and tool controls. Manual aesthetics, zoom
 and performance review remains with the user.
+
+## Impassable land
+
+The fourth [province tool](impassable-land.md) erases assigned land into saved
+impassable zones. Paint restores coverage, and the shared history restores IDs,
+passability and authored land parts. Province v6 retains the v5 stable-ID behavior
+and reads all earlier snapshots.

@@ -77,3 +77,8 @@ retaining the finite coastal sea band and deep-ocean
 background, retaining archived IDs and land/ocean kinds. V1-v4 maps remain readable.
 See [Coastal seas](coastal-seas.md). Accepted painted borders preserve IDs/names and
 save exactly. Ocean generation preserves authored land borders.
+
+[Impassable land](impassable-land.md) can now be erased out of province coverage
+and painted back with Undo/Redo. Province v6 stores that separate mask and authored
+part policy while reading v1-v5. Current land coverage can be assigned or explicitly
+marked impassable; water remains protected.

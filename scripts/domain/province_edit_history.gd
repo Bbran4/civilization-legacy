@@ -35,24 +35,35 @@ func finish() -> Dictionary:
 	var error: String = draft._index_regions(true)
 	if not error.is_empty():
 		cancel()
-		return {"error": "Stroke cancelled: it would split a region on the same island or disconnect an ocean region.", "layer": null}
+		return {"error": "Stroke cancelled: it would disconnect an unmarked land province or a sea region.", "layer": null}
 	var indices := PackedInt32Array()
 	var before := PackedInt32Array()
+	var before_mask := PackedByteArray()
+	var after_mask := PackedByteArray()
 	for pixel in changes:
 		indices.append(pixel)
 		before.append(changes[pixel])
-	for entry in redo_stack: history_bytes -= entry.indices.size() * 8
+		before_mask.append(1 if current.blocked(pixel) else 0)
+		after_mask.append(1 if draft.blocked(pixel) else 0)
+	for entry in redo_stack: history_bytes -= entry.indices.size() * 10
 	redo_stack.clear()
+	var policy_before: Dictionary = {}
+	var policy_after: Dictionary = {}
 	var retired: Array[int] = []
 	for i in range(current.records.size()):
+		if current.records[i].get("allow_fragments",false) != draft.records[i].get("allow_fragments",false):
+			policy_before[i] = current.records[i].get("allow_fragments",false)
+			policy_after[i] = draft.records[i].get("allow_fragments",false)
 		if current.records[i].get("active", true) and not draft.records[i].active: retired.append(i)
-	undo_stack.append({"indices": indices, "before": before, "target": target, "retired": retired, "created": range(current.records.size(), draft.records.size())})
-	history_bytes += indices.size() * 8
+	undo_stack.append({"indices": indices, "before": before, "policy_before":policy_before,"policy_after":policy_after,"before_mask": before_mask, "after_mask": after_mask, "target": target, "retired": retired, "created": range(current.records.size(), draft.records.size())})
+	history_bytes += indices.size() * 10
 	while undo_stack.size() > 50 or history_bytes > MAX_BYTES:
-		history_bytes -= undo_stack.pop_front().indices.size() * 8
+		history_bytes -= undo_stack.pop_front().indices.size() * 10
 	current = draft
 	cancel()
-	return {"error": "", "layer": current}
+	var result := {"error": "", "layer": current}
+	if not undo_stack[-1].created.is_empty(): result.new_id = target
+	return result
 func undo(layer: RefCounted) -> Dictionary:
 	sync(layer)
 	return _apply(false)
@@ -65,10 +76,14 @@ func _apply(forward: bool) -> Dictionary:
 	if stack.is_empty(): return {"error": "Nothing to redo." if forward else "Nothing to undo.", "layer": null}
 	var entry: Dictionary = stack[-1]
 	var next: RefCounted = current.editable_copy()
+	if not next.impassable.is_empty() or entry.before_mask.has(1) or entry.after_mask.has(1): next.impassable.resize(next.ids.size())
 	for j in range(entry.indices.size()):
 		next.ids[entry.indices[j]] = entry.target if forward else entry.before[j]
+		if not next.impassable.is_empty(): next.impassable[entry.indices[j]] = entry.after_mask[j] if forward else entry.before_mask[j]
 	for id in entry.get("retired", []): next.records[id].active = not forward
 	for id in entry.get("created", []): next.records[id].active = forward
+	var policy: Dictionary = entry.policy_after if forward else entry.policy_before
+	for id in policy: next.records[id].allow_fragments = policy[id]
 	var error: String = next._index_regions()
 	if not error.is_empty(): return {"error": error, "layer": null}
 	stack.pop_back()
@@ -106,5 +121,23 @@ func merge(layer: RefCounted, keep: int, selected: Array[int]) -> Dictionary:
 			changes[pixel] = draft.ids[pixel]
 			draft.ids[pixel] = keep
 	for id in unique:
+		if layer.records[id-1].get("allow_fragments",false): draft.records[keep-1].allow_fragments = true
 		if id != keep: draft.records[id - 1].active = false
 	return finish()
+
+func begin_erase(layer: RefCounted) -> bool:
+	sync(layer)
+	if layer == null: return false
+	target = 0
+	draft = layer.editable_copy()
+	changes.clear()
+	return true
+
+func begin_new_land(layer: RefCounted, pixel: int) -> bool:
+	sync(layer)
+	if layer == null or layer.records.size() >= 65535 or pixel < 0 or pixel >= layer.ids.size() or not layer.blocked(pixel): return false
+	draft = layer.editable_copy()
+	target = draft.records.size() + 1
+	draft.records.append({"id":target,"name":"Province " + str(target),"kind":"land","active":true,"landmasses":[layer._land_components[pixel]]})
+	changes.clear()
+	return true

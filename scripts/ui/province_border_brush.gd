@@ -23,7 +23,7 @@ func configure(owner_editor: Node) -> void:
 	editor = owner_editor
 	editor._label("Province tool", 13)
 	mode = OptionButton.new()
-	for label in ["Paint borders", "Draw split border", "Merge provinces"]: mode.add_item(label)
+	for label in ["Paint borders", "Draw split border", "Merge provinces", "Erase to impassable land"]: mode.add_item(label)
 	mode.item_selected.connect(_set_mode)
 	editor._form.add_child(mode)
 	enabled = CheckBox.new()
@@ -31,7 +31,7 @@ func configure(owner_editor: Node) -> void:
 	enabled.toggled.connect(func(value: bool):
 		if not value: cancel())
 	editor._form.add_child(enabled)
-	tool_help = editor._label("Pick a region, then paint to expand it or absorb an island. Alt-click picks another region. Land and ocean cannot overwrite each other.", 12)
+	tool_help = editor._label("Pick a region to paint or restore erased land. With no selection, painting erased land creates a new province. Alt-click changes target.", 12)
 	tool_help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	attach_islands = CheckBox.new()
 	attach_islands.text = "Attach whole separate islands"
@@ -114,7 +114,7 @@ func handle_input(event: InputEvent) -> bool:
 					split_source = layer
 					split_points = PackedVector2Array([point])
 					painting = true
-			elif history.begin(editor._terrain.province_layer, editor._province_selected):
+			elif _begin_paint(point):
 				painting = true
 				last = point
 				_paint(point)
@@ -157,7 +157,7 @@ func finish() -> void:
 		_apply_result(result, "Province split. The original keeps its ID and name.")
 		if result.get("new_id", 0) > 0: editor._select_province(result.new_id)
 	else:
-		_apply_result(history.finish(), "Border stroke applied.")
+		_apply_result(history.finish(), "Land marked impassable." if mode.selected == 3 else "Border stroke applied.")
 func _apply_result(result: Dictionary, success: String) -> void:
 	editor._terrain.refresh_water_layer()
 	if not result.error.is_empty():
@@ -167,6 +167,8 @@ func _apply_result(result: Dictionary, success: String) -> void:
 		var error: String = editor._terrain.install_province_layer(result.layer)
 		status.text = success if error.is_empty() else error
 		editor._refresh_selected_cell()
+		editor._select_province(editor._province_selected)
+		if result.get("new_id", 0) > 0: editor._select_province(result.new_id)
 		if result.get("select_id", 0) > 0: editor._select_province(result.select_id)
 func undo() -> void:
 	if not allowed(): return
@@ -220,9 +222,11 @@ func _process(_delta: float) -> void:
 func _set_mode(_index: int) -> void:
 	cancel()
 	enabled.set_pressed_no_signal(false)
-	enabled.text = ["Paint region borders", "Draw split border", "Pick provinces to merge"][mode.selected]
-	tool_help.text = ["Pick a region, then paint to expand it. Alt-click picks another region.", "Select a province, enable the tool, then drag a line across it or draw a closed loop. Alt-click changes the selected province. Release to split; Escape cancels.", "Select the province whose ID/name you want to keep. Enable the tool and click additional provinces. Alt-click changes the kept province. Then Merge selected provinces."][mode.selected]
-	for control in [attach_islands, island_help, radius, radius_label]: control.visible = mode.selected == 0
+	enabled.text = ["Paint region borders", "Draw split border", "Pick provinces to merge", "Erase to impassable land"][mode.selected]
+	tool_help.text = ["Pick a region to expand it or restore erased land. With no selection, painting erased land creates a new province. Alt-click picks a region.", "Select a province, enable the tool, then drag a line across it or draw a closed loop. Alt-click changes the selected province. Release to split; Escape cancels.", "Select the province whose ID/name you want to keep. Enable the tool and click additional provinces. Alt-click changes the kept province. Then Merge selected provinces.", "Drag over land to remove its province coverage and mark it impassable. Paint borders restores erased land into a selected land province. Water is protected."][mode.selected]
+	for control in [attach_islands, island_help]: control.visible = mode.selected == 0
+	for control in [radius, radius_label]: control.visible = mode.selected in [0,3]
+	preview.material_override.albedo_color = Color(1,0.3,0.2) if mode.selected == 3 else Color(1,0.9,0.3)
 	merge_info.visible = mode.selected == 2
 	merge_action.visible = mode.selected == 2
 
@@ -287,3 +291,10 @@ func _draw_split() -> void:
 		mesh.surface_add_vertex(Vector3(local.x, 0.06, local.y))
 	mesh.surface_end()
 	preview.mesh = mesh
+
+func _begin_paint(point: Vector2) -> bool:
+	var layer: RefCounted = editor._terrain.province_layer
+	if mode.selected == 3: return history.begin_erase(layer)
+	if editor._province_selected > 0: return history.begin(layer,editor._province_selected)
+	var p := Vector2i(point.round()).clamp(Vector2i.ZERO,layer.size-Vector2i.ONE)
+	return history.begin_new_land(layer,p.y*layer.size.x+p.x)

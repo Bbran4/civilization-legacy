@@ -11,6 +11,7 @@ var requested_oceans := 24
 var ocean_style := "coastal_band"
 var coastal_reach := 64.0
 var sea_mask := PackedByteArray()
+var impassable := PackedByteArray()
 var _image: Image
 var _land_components := PackedInt32Array()
 var _heap: Array[Vector2i] = []
@@ -28,6 +29,7 @@ func generate(base: PackedFloat32Array, surface: RefCounted, water: RefCounted, 
 	ids.fill(0)
 	ocean_generated = false
 	sea_mask.clear()
+	impassable.clear()
 	records.clear()
 	_texture = null
 	_image = null
@@ -132,6 +134,9 @@ func _pop() -> Vector2i:
 	return result
 
 func _index_regions(allow_absorption: bool = false) -> String:
+	if not impassable.is_empty() and impassable.size() != ids.size(): return "Invalid impassable dimensions."
+	for i in range(impassable.size()):
+		if impassable[i] > 1 or (impassable[i] != 0 and ids[i] != 0): return "Impassable land cannot own province pixels."
 	var counts := PackedInt32Array()
 	counts.resize(records.size())
 	var edges: Dictionary = {}
@@ -156,7 +161,7 @@ func _index_regions(allow_absorption: bool = false) -> String:
 				if ids[next] > 0 and ids[next] <= records.size() and records[ids[next] - 1].get("kind", "land") == "land" and land_components[next] == 0:
 					land_components[next] = component
 					queue.append(next)
-	_land_components = land_components
+	_land_components = _physical_land_labels() if impassable.has(1) else land_components
 	var mass_lists: Array = []
 	for _record in records: mass_lists.append([])
 	var part_counts := PackedInt32Array()
@@ -171,10 +176,10 @@ func _index_regions(allow_absorption: bool = false) -> String:
 				edges[Vector2i(mini(id, ids[next]), maxi(id, ids[next]))] = true
 		if visited[i] == 0:
 			var key := Vector2i(id, land_components[i])
-			if regions.has(key): return "A region contains disconnected pieces on the same landmass or ocean."
+			if regions.has(key) and not (records[id-1].get("kind","land") == "land" and records[id-1].get("allow_fragments",false)): return "A region contains disconnected pieces on the same landmass or ocean."
 			regions[key] = true
 			part_counts[id - 1] += 1
-			if land_components[i] > 0: mass_lists[id - 1].append(land_components[i])
+			if land_components[i] > 0 and _land_components[i] not in mass_lists[id - 1]: mass_lists[id - 1].append(_land_components[i])
 			var queue := PackedInt32Array([i])
 			visited[i] = 1
 			var cursor := 0
@@ -190,6 +195,7 @@ func _index_regions(allow_absorption: bool = false) -> String:
 			if allow_absorption and records[i].get("kind", "land") == "land": records[i].active = false
 			else: return "A region has no pixels."
 		if counts[i] > 0 and not records[i].get("active", true): return "An absorbed province still owns pixels."
+		records[i].allow_fragments = records[i].get("allow_fragments",false)
 		records[i].active = records[i].get("active", true)
 		records[i].parts = part_counts[i]
 		records[i].landmasses = mass_lists[i]
@@ -211,7 +217,7 @@ func texture() -> ImageTexture:
 		for i in range(ids.size()):
 			bytes[i * 4] = ids[i] & 255
 			bytes[i * 4 + 1] = (ids[i] >> 8) & 255
-			bytes[i * 4 + 2] = 2 if ids[i] == 0 and sea_mask.size() == ids.size() and sea_mask[i] != 0 else (1 if ids[i] > 0 and records[ids[i] - 1].get("kind", "land") == "ocean" else 0)
+			bytes[i * 4 + 2] = 3 if blocked(i) else (2 if ids[i] == 0 and sea_mask.size() == ids.size() and sea_mask[i] != 0 else (1 if ids[i] > 0 and records[ids[i] - 1].get("kind", "land") == "ocean" else 0))
 			bytes[i * 4 + 3] = 255
 		_image = Image.create_from_data(size.x, size.y, false, Image.FORMAT_RGBA8, bytes)
 		_texture = ImageTexture.create_from_image(_image)
@@ -223,10 +229,13 @@ func snapshot() -> Dictionary:
 	var sea_values := PackedFloat32Array()
 	sea_values.resize(sea_mask.size())
 	for i in range(sea_mask.size()): sea_values[i] = sea_mask[i]
-	return {"version": 5, "coastal_reach": coastal_reach, "sea_mask": Payload.encode(sea_values) if not sea_values.is_empty() else null, "ocean_style": ocean_style, "ocean_generated": ocean_generated, "requested_oceans": requested_oceans, "source_hash": source_hash, "size": [size.x, size.y], "requested_count": requested_count, "ids": Payload.encode(values), "records": records.duplicate(true)}
+	var blocked_values := PackedFloat32Array()
+	blocked_values.resize(impassable.size())
+	for i in range(impassable.size()): blocked_values[i] = impassable[i]
+	return {"version": 6, "impassable": Payload.encode(blocked_values) if not blocked_values.is_empty() else null, "coastal_reach": coastal_reach, "sea_mask": Payload.encode(sea_values) if not sea_values.is_empty() else null, "ocean_style": ocean_style, "ocean_generated": ocean_generated, "requested_oceans": requested_oceans, "source_hash": source_hash, "size": [size.x, size.y], "requested_count": requested_count, "ids": Payload.encode(values), "records": records.duplicate(true)}
 static func decode(data: Variant) -> Dictionary:
 	if data == null: return {"error": "", "layer": null}
-	if not data is Dictionary or data.get("version") not in [1, 1.0, 2, 2.0, 3, 3.0, 4, 4.0, 5, 5.0] or not data.get("source_hash") is String or data.source_hash.length() != 64 or not data.get("size") is Array or data.size.size() != 2 or not data.get("records") is Array or data.records.size() > 65535:
+	if not data is Dictionary or data.get("version") not in [1, 1.0, 2, 2.0, 3, 3.0, 4, 4.0, 5, 5.0, 6, 6.0] or not data.get("source_hash") is String or data.source_hash.length() != 64 or not data.get("size") is Array or data.size.size() != 2 or not data.get("records") is Array or data.records.size() > 65535:
 		return {"error": "Invalid province document."}
 	for v in data.size:
 		if not (v is int or v is float) or not is_finite(float(v)) or v != int(v) or v < 3 or v > 2050: return {"error": "Invalid province dimensions."}
@@ -262,6 +271,13 @@ static func decode(data: Variant) -> Dictionary:
 	for i in range(layer.ids.size()):
 		layer.ids[i] = int(payload.values[i])
 		if payload.values[i] != layer.ids[i]: return {"error": "Province IDs must be whole numbers."}
+	if int(data.version) >= 6 and data.get("impassable") != null:
+		var blocked_data := Payload.decode(data.impassable, layer.ids.size(), 0, 1)
+		if not blocked_data.error.is_empty(): return {"error": blocked_data.error}
+		layer.impassable.resize(layer.ids.size())
+		for i in range(layer.ids.size()):
+			if blocked_data.values[i] != int(blocked_data.values[i]): return {"error": "Invalid impassable mask."}
+			layer.impassable[i] = int(blocked_data.values[i])
 	var ocean_seen := false
 	for i in range(data.records.size()):
 		var record: Variant = data.records[i]
@@ -271,7 +287,8 @@ static func decode(data: Variant) -> Dictionary:
 		if kind not in ["land", "ocean"] or (kind == "land" and ocean_seen and int(data.version) < 5) or (kind == "ocean" and not layer.ocean_generated): return {"error": "Invalid land/ocean region order."}
 		ocean_seen = ocean_seen or kind == "ocean"
 		if int(data.version) >= 3 and not record.get("active") is bool: return {"error": "Invalid absorbed province state."}
-		layer.records.append({"id": i + 1, "name": record.name, "pixels": 0, "neighbors": [], "kind": kind, "active": record.get("active", true) if int(data.version) >= 3 else true})
+		if int(data.version) >= 6 and not record.get("allow_fragments",false) is bool: return {"error": "Invalid land part policy."}
+		layer.records.append({"allow_fragments":record.get("allow_fragments",false) if int(data.version) >= 6 else false,"id": i + 1, "name": record.name, "pixels": 0, "neighbors": [], "kind": kind, "active": record.get("active", true) if int(data.version) >= 3 else true})
 	var error: String = layer._index_regions()
 	return {"error": error, "layer": layer}
 
@@ -282,6 +299,9 @@ func validate_coverage(samples: PackedFloat32Array, land_datum: float, water: Re
 	var band := coastal_band(classes, size, coastal_reach) if ocean_generated and ocean_style == "coastal_band" else PackedByteArray()
 	for i in range(ids.size()):
 		var expected: int = classes[i]
+		if blocked(i):
+			if expected != 1 or ids[i] != 0: return "Impassable zones must remain unassigned land."
+			expected = 0
 		if ocean_generated and ocean_style == "coastal_band":
 			if sea_mask.size() != ids.size() or (sea_mask[i] != 0) != (classes[i] == 2): return "Open ocean mask does not match sea coverage."
 			if expected == 2 and band[i] == 0: expected = 0
@@ -324,6 +344,7 @@ func editable_copy() -> RefCounted:
 	copy.ocean_style = ocean_style
 	copy.coastal_reach = coastal_reach
 	copy.sea_mask = sea_mask.duplicate()
+	copy.impassable = impassable.duplicate()
 	return copy
 
 func generate_oceans(base: PackedFloat32Array, water: RefCounted, count: int = 24, style: String = "coastal_band", reach: float = 64.0) -> String:
@@ -398,7 +419,7 @@ func _ocean_seed(pixel: int, distances: PackedInt32Array) -> void:
 	records[-1].name = "Ocean " + str(records[-1].id)
 
 func paint_segment(a: Vector2, b: Vector2, radius: float, target: int, changes: Dictionary, attach_islands: bool = false) -> void:
-	if target < 1 or target > records.size() or not a.is_finite() or not b.is_finite() or not is_finite(radius) or radius <= 0: return
+	if target < 0 or target > records.size() or not a.is_finite() or not b.is_finite() or not is_finite(radius) or radius <= 0: return
 	var low := Vector2i((a.min(b) - Vector2.ONE * radius).floor()).max(Vector2i.ZERO)
 	var high := Vector2i((a.max(b) + Vector2.ONE * radius).ceil()).min(size - Vector2i.ONE)
 	var delta := b - a
@@ -410,21 +431,34 @@ func paint_segment(a: Vector2, b: Vector2, radius: float, target: int, changes: 
 			if p.distance_to(a + delta * t) > radius: continue
 			var i := y * size.x + x
 			var previous := ids[i]
-			if previous == 0 or previous == target or records[previous - 1].kind != records[target - 1].kind: continue
-			if attach_islands and records[target - 1].kind == "land" and _land_components.size() == ids.size() and _land_components[i] not in records[target - 1].get("landmasses", []):
+			if target == 0:
+				if previous == 0 or records[previous - 1].kind != "land": continue
+				if impassable.is_empty(): impassable.resize(ids.size())
+				records[previous-1].allow_fragments = true
+				impassable[i] = 1
+			else:
+				if previous == target: continue
+				if previous == 0:
+					if not blocked(i) or records[target - 1].kind != "land": continue
+				elif records[previous - 1].kind != records[target - 1].kind: continue
+				if blocked(i):
+					records[target-1].allow_fragments = true
+					impassable[i] = 0
+			if target > 0 and previous > 0 and attach_islands and records[target - 1].kind == "land" and _land_components.size() == ids.size() and _land_components[i] not in records[target - 1].get("landmasses", []):
 				islands[_land_components[i]] = true
 			if not changes.has(i): changes[i] = previous
 			ids[i] = target
-			if _image != null: _image.set_pixel(x, y, _id_color(target))
+			if _image != null: _image.set_pixel(x, y, _id_color(target, i))
 	if not islands.is_empty():
 		for i in range(ids.size()):
-			if islands.has(_land_components[i]) and ids[i] != target:
+			if ids[i] > 0 and islands.has(_land_components[i]) and ids[i] != target:
 				if not changes.has(i): changes[i] = ids[i]
 				ids[i] = target
-				if _image != null: _image.set_pixel(i % size.x, i / size.x, _id_color(target))
+				if _image != null: _image.set_pixel(i % size.x, i / size.x, _id_color(target, i))
 	if _texture != null: _texture.update(_image)
 
-func _id_color(id: int) -> Color:
+func _id_color(id: int, pixel: int = -1) -> Color:
+	if id == 0: return Color8(0,0,3 if pixel >= 0 and blocked(pixel) else 0,255)
 	return Color8(id & 255, (id >> 8) & 255, 1 if records[id - 1].kind == "ocean" else 0, 255)
 
 static func coastal_band(classes: PackedByteArray, dimensions: Vector2i, reach: float) -> PackedByteArray:
@@ -496,7 +530,7 @@ func split_region(id: int, points: PackedVector2Array) -> Dictionary:
 				part[next] = 1
 				queue.append(next)
 	for pixel in barrier:
-		if part[pixel] == 0: return {"error": "Split one island part at a time."}
+		if part[pixel] == 0: return {"error": "Split one connected land/sea part at a time."}
 	var labels := PackedByteArray()
 	labels.resize(ids.size())
 	var groups: Array[PackedInt32Array] = []
@@ -543,3 +577,27 @@ func split_region(id: int, points: PackedVector2Array) -> Dictionary:
 	_texture = null
 	_image = null
 	return {"error": "", "changes": changes, "new_id": new_id}
+
+func blocked(pixel: int) -> bool:
+	return impassable.size() == ids.size() and impassable[pixel] != 0
+func is_impassable(uv: Vector2) -> bool:
+	var p := Vector2i((uv.clamp(Vector2.ZERO,Vector2.ONE) * Vector2(size-Vector2i.ONE)).round())
+	return blocked(p.y*size.x+p.x)
+func _physical_land_labels() -> PackedInt32Array:
+	var labels := PackedInt32Array()
+	labels.resize(ids.size())
+	var component := 0
+	for i in range(ids.size()):
+		if labels[i] != 0 or not (blocked(i) or (ids[i] > 0 and records[ids[i]-1].kind == "land")): continue
+		component += 1
+		var queue := PackedInt32Array([i])
+		labels[i] = component
+		var cursor := 0
+		while cursor < queue.size():
+			var pixel := queue[cursor]
+			cursor += 1
+			for next in _neighbors(pixel):
+				if labels[next] == 0 and (blocked(next) or (ids[next] > 0 and records[ids[next]-1].kind == "land")):
+					labels[next] = component
+					queue.append(next)
+	return labels

@@ -9,7 +9,7 @@ Successive civilizations, skill trees, prestige and inherited world history rema
 the planned gameplay layer on top of that shared world.
 
 **Current prototype: a layered terrain, ocean and province map editor with manual
-border painting, split/merge tools and Undo/Redo.** Scenarios, civilization simulation, skill trees
+border painting, split/merge, impassable-land erasing and Undo/Redo.** Scenarios, civilization simulation, skill trees
 and prestige are planned gameplay systems.
 
 ## Current focus: terrain, water and provinces
@@ -34,7 +34,8 @@ Old saves stay readable. Older water layers need explicit regeneration to supply
 water elevations before a surface can be built. Trees, climate, biomes and painting
 remain disabled in this focused workspace. Province IDs/names survive saving;
 regenerating provinces replaces them.
-See [province split/merge](docs/province-split-merge.md),
+See [impassable land and repainting](docs/impassable-land.md),
+[province split/merge](docs/province-split-merge.md),
 [coastal seas and open ocean](docs/coastal-seas.md),
 [island attachment and maritime regions](docs/islands-and-maritime.md),
 [ocean borders and painting](docs/ocean-borders-and-paint.md),

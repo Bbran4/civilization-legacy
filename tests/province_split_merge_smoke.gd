@@ -108,7 +108,7 @@ func _run() -> void:
 	await editor.generate_provinces()
 	await editor.generate_ocean_borders()
 	var brush = editor._province_brush
-	check(brush.mode.item_count == 3, "Editor exposes paint, split and merge tools.")
+	check(brush.mode.item_count == 4, "Editor exposes paint, split and merge tools.")
 	# Choose an actual land province and search a simple cut that yields two valid pieces.
 	var source: RefCounted = terrain.province_layer
 	var target := 1

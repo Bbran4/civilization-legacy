@@ -29,7 +29,9 @@ void fragment() {
 	vec3 color = height_enabled ? vec3(value) : vec3(0.02);
 	if (provinces_enabled && shaded_relief) {
 		float id = province_id(UV);
-		if (id < 0.5 && texture(province_field, UV).b > 0.005) color = vec3(0.16, 0.21, 0.27);
+		int zone = int(round(texture(province_field, UV).b * 255.0));
+		if (id < 0.5 && zone == 2) color = vec3(0.16, 0.21, 0.27);
+		if (id < 0.5 && zone == 3) color = vec3(value * 0.45);
 		if (id > 0.5) {
 			bool ocean = texture(province_field, UV).b > 0.001;
 			vec3 tint = 0.3 + 0.6 * fract(sin(vec3(id, id + 17.0, id + 43.0)) * 43758.5453);

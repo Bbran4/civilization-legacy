@@ -677,10 +677,11 @@ func _show_cell_info(info: Dictionary) -> void:
 		_cell_label.text = "HEIGHTMAP SAMPLE\nX %.2f · Y %.2f\nHeight %.3f / 1.0\n%s" % [point.x, point.y, h, "Below sea datum" if h < 0.2 else "Land"]
 		if _terrain.province_layer_current():
 			_select_province(_terrain.province_layer.id_at(point / _terrain.map_size))
+			if _terrain.province_layer.is_impassable(point / _terrain.map_size): _cell_label.text += "\nImpassable land (unassigned)"
 			if _province_selected > 0:
 				var record: Dictionary = _terrain.province_layer.records[_province_selected - 1]
 				_cell_label.text += "\n%s (ID %d)\n%d land pixels, %d neighbors" % [record.name, record.id, record.pixels, record.neighbors.size()]
-				if record.kind == "land" and record.parts > 1: _cell_label.text += "\n%d island parts" % record.parts
+				if record.kind == "land" and record.parts > 1: _cell_label.text += "\n%d land parts" % record.parts
 				_cell_panel.offset_bottom = 620
 		return
 	_cell_panel.anchor_bottom = 1.0
