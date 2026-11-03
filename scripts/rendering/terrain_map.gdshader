@@ -6,6 +6,13 @@ uniform bool shaded_relief = true;
 uniform bool height_enabled = true;
 uniform bool water_enabled = false;
 uniform sampler2D water_field : filter_linear, repeat_disable;
+uniform bool provinces_enabled = false;
+uniform int selected_province = 0;
+uniform sampler2D province_field : filter_nearest, repeat_disable;
+float province_id(vec2 uv) {
+	vec2 c = round(texture(province_field, uv).rg * 255.0);
+	return c.r + c.g * 256.0;
+}
 void fragment() {
 	float h = texture(height_field, UV).r;
 	float value = h;
@@ -18,6 +25,16 @@ void fragment() {
 		value = h < 0.2 ? h * 0.35 : clamp(0.25 + h * 0.7, 0.0, 1.0) * light;
 	}
 	vec3 color = height_enabled ? vec3(value) : vec3(0.02);
+	if (provinces_enabled && shaded_relief) {
+		float id = province_id(UV);
+		if (id > 0.5) {
+			vec3 tint = 0.3 + 0.6 * fract(sin(vec3(id, id + 17.0, id + 43.0)) * 43758.5453);
+			color = mix(color, tint * (0.45 + value * 0.7), 0.62);
+			bool edge = province_id(UV + vec2(texel_size.x, 0.0)) != id || province_id(UV + vec2(0.0, texel_size.y)) != id;
+			if (edge) color *= 0.35;
+			if (int(id) == selected_province) color = mix(color, vec3(1.0, 0.8, 0.3), 0.45);
+		}
+	}
 	if (water_enabled && (shaded_relief || !height_enabled)) {
 		vec2 water = texture(water_field, UV).rg;
 		color = mix(color, vec3(0.223529, 0.498039, 0.658824), water.r);

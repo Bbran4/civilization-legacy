@@ -66,6 +66,7 @@ func _run() -> void:
 	check(not Surface.decode(corrupt).error.is_empty(), "Corrupt surface payloads are rejected.")
 	var old_manifest := Manifest.capture(Manifest.default_layers(), "old.terrain.json", "heightmap")
 	old_manifest.version = 1
+	old_manifest.layers.remove_at(3)
 	old_manifest.layers.remove_at(2)
 	old_manifest.layers[0].locked = true
 	var file := FileAccess.open("user://legacy.world.json", FileAccess.WRITE)
@@ -73,7 +74,7 @@ func _run() -> void:
 	file.close()
 	var bytes := FileAccess.get_file_as_bytes("user://legacy.world.json")
 	var migrated := Manifest.load_file("user://legacy.world.json")
-	check(migrated.error.is_empty() and migrated.document.layers.size() == 6 and migrated.document.layers[0].locked and bytes == FileAccess.get_file_as_bytes("user://legacy.world.json"), "Old manifest gains surface state in memory without rewriting old saves.")
+	check(migrated.error.is_empty() and migrated.document.layers.size() == 7 and migrated.document.layers[0].locked and bytes == FileAccess.get_file_as_bytes("user://legacy.world.json"), "Old manifest gains surface state in memory without rewriting old saves.")
 	var world := (load("res://scenes/main.tscn") as PackedScene).instantiate()
 	root.add_child(world)
 	await process_frame

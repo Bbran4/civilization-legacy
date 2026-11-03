@@ -1,6 +1,7 @@
 extends RefCounted
 ## Versioned terrain-only documents. Parse and validate completely before applying.
 
+const WorldProvinces = preload("res://scripts/domain/world_provinces.gd")
 const TerrainSurface = preload("res://scripts/domain/terrain_surface.gd")
 const WaterLayer = preload("res://scripts/domain/terrain_water_layer.gd")
 const PaintCatalog = preload("res://scripts/rendering/terrain_paint_catalog.gd")
@@ -67,6 +68,7 @@ static func capture(terrain: Node) -> Dictionary:
 	if source.has("error"):
 		return {}
 	return {"format": "civilization-legacy-terrain", "version": VERSION,
+		"province_layer": terrain.province_layer.snapshot() if terrain.province_layer != null else null,
 		"terrain_surface": terrain.terrain_surface.snapshot() if terrain.terrain_surface != null else null,
 		"water_layer": terrain.water_layer.snapshot() if terrain.water_layer != null else null,
 		"heightmap_detail": {"version": 1, "coast": terrain.coast_detail, "mountains": terrain.mountain_detail},
@@ -87,6 +89,9 @@ static func validate(document: Variant) -> String:
 		var detail: Variant = document.heightmap_detail
 		if not detail is Dictionary or not _within(detail.get("version", 1), [1, 1, true]) or not _within(detail.get("coast"), [0, 1]) or not _within(detail.get("mountains"), [0, 1]):
 			return "Invalid heightmap refinement settings."
+	var province_cache: Dictionary = WorldProvinces.decode(document.get("province_layer"))
+	if not province_cache.error.is_empty():
+		return province_cache.error
 	var surface_cache: Dictionary = TerrainSurface.decode(document.get("terrain_surface"))
 	if not surface_cache.error.is_empty():
 		return surface_cache.error
@@ -181,6 +186,13 @@ static func validate(document: Variant) -> String:
 		var hydrology: Variant = document.get("hydrology")
 		if not hydrology is Dictionary or not _within(hydrology.get("version"), [Hydrology.VERSION, Hydrology.VERSION, true]):
 			return "Unsupported hydrology data."
+	if province_cache.layer != null and surface_cache.layer != null and water.layer != null:
+		var samples := PackedFloat32Array(document.heights)
+		var actual_hash := WaterLayer.fingerprint(samples, size, Vector2(settings.map_size[0], settings.map_size[1]), settings.height_offset, settings.elevation, int(document.generator_version))
+		if actual_hash == surface_cache.layer.source_hash and surface_cache.layer.water_hash == water.layer.hydraulic_fingerprint() and province_cache.layer.source_hash == surface_cache.layer.fingerprint():
+			var datum: float = settings.height_offset + (0.0 if document.generator_version >= 3 else 0.2 * settings.elevation)
+			var coverage: String = province_cache.layer.validate_coverage(samples, datum, water.layer)
+			if not coverage.is_empty(): return coverage
 	return ""
 
 
@@ -190,6 +202,9 @@ static func apply(terrain: Node, document: Dictionary) -> String:
 		return error
 	if not terrain.heightmap_only and int(document.settings.resolution) > 1024:
 		return "High-resolution maps require the focused terrain renderer."
+	var province_cache: Dictionary = WorldProvinces.decode(document.get("province_layer"))
+	if not province_cache.error.is_empty():
+		return province_cache.error
 	var surface_cache: Dictionary = TerrainSurface.decode(document.get("terrain_surface"))
 	if not surface_cache.error.is_empty():
 		return surface_cache.error
@@ -204,6 +219,7 @@ static func apply(terrain: Node, document: Dictionary) -> String:
 		return layer.error
 	# Dependencies and paint are valid before changing the live map.
 	var detail: Dictionary = document.get("heightmap_detail", {"coast": 0.75, "mountains": 0.8})
+	terrain.province_layer = province_cache.layer
 	terrain.terrain_surface = surface_cache.layer
 	terrain.water_layer = water.layer
 	terrain.coast_detail = detail.coast

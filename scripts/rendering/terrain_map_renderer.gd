@@ -44,3 +44,7 @@ func set_height_layer_visible(enabled: bool) -> void:
 func set_terrain_surface(layer: RefCounted, enabled: bool) -> void:
 	rendered_heights = layer.heights if enabled and layer != null else normalized_heights
 	material.set_shader_parameter("height_field", layer.texture() if enabled and layer != null else _base_texture)
+
+func set_provinces(layer: RefCounted, enabled: bool) -> void:
+	material.set_shader_parameter("provinces_enabled", enabled)
+	material.set_shader_parameter("province_field", layer.texture() if enabled else null)

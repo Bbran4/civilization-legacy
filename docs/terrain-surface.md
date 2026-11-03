@@ -78,3 +78,10 @@ remain below the carved channel. Water names/flow/IDs are a data foundation, not
 naming UI, crossings/combat implementation or province integration. Manual visual,
 zoom and performance approval remains separate. Next: review bank/depth settings
 on approved templates, then use this final ground and water data for provinces.
+
+## Province follow-on
+
+The optional [Provinces layer](provinces.md) now reads this finished field. World
+manifest v3 adds its state and reads both v1 and v2 worlds without rewriting them.
+Province generation, inspection/naming and neighbor records are implemented;
+manual border editing, crossings/combat and ownership/scenarios remain future work.

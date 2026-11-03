@@ -21,7 +21,8 @@
 
 Water generation is explicit. Creating/loading a heightmap with no water layer
 never automatically generates rivers or lakes. Trees, climate/biomes, ground
-painting and provinces remain disabled.
+painting remain disabled. Provinces are now available after the surface build;
+see [Province foundation](provinces.md).
 
 ## Water controls
 

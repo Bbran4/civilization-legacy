@@ -8,6 +8,7 @@ var size := Vector2i.ZERO
 var heights := PackedFloat32Array()
 var settings := DEFAULTS.duplicate()
 var modified_pixels := 0
+var _fingerprint := ""
 var _texture: ImageTexture
 
 func build(base: PackedFloat32Array, dimensions: Vector2i, fingerprint: String, water: RefCounted, choices: Dictionary = {}) -> String:
@@ -29,6 +30,7 @@ func build(base: PackedFloat32Array, dimensions: Vector2i, fingerprint: String, 
 	heights = base.duplicate()
 	modified_pixels = 0
 	_texture = null
+	_fingerprint = ""
 	var radius := maxf(1.5, float(settings.bank_width) * maxi(size.x, size.y) / 1025.0)
 	var distance := PackedFloat32Array()
 	var levels: PackedFloat32Array = water.surface_levels.duplicate()
@@ -132,3 +134,12 @@ func validate_water(water: RefCounted) -> String:
 		if water.surface_levels[i] >= 0 and heights[i] >= water.surface_levels[i]:
 			return "Terrain surface contains an exposed water bed. Rebuild it."
 	return ""
+
+func fingerprint() -> String:
+	if _fingerprint.is_empty():
+		var context := HashingContext.new()
+		context.start(HashingContext.HASH_SHA256)
+		context.update((source_hash + water_hash).to_utf8_buffer())
+		context.update(heights.to_byte_array())
+		_fingerprint = context.finish().hex_encode()
+	return _fingerprint

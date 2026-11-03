@@ -17,6 +17,11 @@ func _ready() -> void:
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	toolbar.add_child(title)
+	if $Terrain.province_layer_current():
+		var provinces := CheckButton.new()
+		provinces.text = "Provinces"
+		provinces.toggled.connect($Terrain.set_province_layer_visible)
+		toolbar.add_child(provinces)
 	var back := Button.new()
 	back.name = "ReturnToEditor"
 	back.text = "Return to editor" if not return_requested.get_connections().is_empty() else "Exit map"

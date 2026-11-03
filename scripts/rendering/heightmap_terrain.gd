@@ -4,6 +4,9 @@ extends Node3D
 
 signal climate_changed
 signal vegetation_changed
+signal province_layer_changed
+var province_layer: RefCounted
+var province_layer_visible := false
 signal terrain_surface_changed
 signal water_layer_changed
 signal terrain_regenerated
@@ -977,6 +980,7 @@ func refresh_water_layer() -> void:
 	if heightmap_only and map_renderer != null:
 		var derived := terrain_surface_current() and surface_layer_visible and shaded_relief
 		map_renderer.set_terrain_surface(terrain_surface, derived)
+		map_renderer.set_provinces(province_layer, province_layer_visible and province_layer_current() and shaded_relief)
 		map_renderer.set_height_layer_visible(height_layer_visible or derived)
 		map_renderer.set_water_layer(water_layer, water_layer_visible and water_layer_current())
 
@@ -1012,4 +1016,17 @@ func install_terrain_surface(layer: RefCounted) -> String:
 
 func set_surface_layer_visible(enabled: bool) -> void:
 	surface_layer_visible = enabled
+	refresh_water_layer()
+
+func province_layer_current() -> bool:
+	return province_layer != null and terrain_surface_current() and province_layer.source_hash == terrain_surface.fingerprint() and province_layer.size == sample_size()
+func install_province_layer(layer: RefCounted) -> String:
+	if layer == null or not terrain_surface_current() or layer.source_hash != terrain_surface.fingerprint() or layer.size != sample_size():
+		return "The terrain surface changed. Generate provinces again."
+	province_layer = layer
+	refresh_water_layer()
+	province_layer_changed.emit()
+	return ""
+func set_province_layer_visible(enabled: bool) -> void:
+	province_layer_visible = enabled
 	refresh_water_layer()

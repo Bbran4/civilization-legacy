@@ -5,12 +5,20 @@ const MaterialPanel = preload("res://scripts/ui/terrain_material_panel.gd")
 const GroundBrush = preload("res://scripts/ui/terrain_brush.gd")
 const WorldProject = preload("res://scripts/storage/world_project.gd")
 const LayerGraph = preload("res://scripts/domain/map_layer_graph.gd")
+const WorldProvinces = preload("res://scripts/domain/world_provinces.gd")
 const TerrainSurface = preload("res://scripts/domain/terrain_surface.gd")
 const WaterLayer = preload("res://scripts/domain/terrain_water_layer.gd")
 const Manifest = preload("res://scripts/storage/world_manifest.gd")
 var layers: Array = Manifest.default_layers()
 var selected_layer := "heightmap"
 var _terrain_path := ""
+var _province_count: SpinBox
+var _province_status: Label
+var _province_name: LineEdit
+var _province_selected := 0
+var _province_thread: Thread
+var _province_busy := false
+var _province_generate: Button
 var _surface_status: Label
 var _surface_controls: Dictionary = {}
 var _surface_thread: Thread
@@ -258,6 +266,12 @@ func _build_interface() -> void:
 		_build_surface_controls()
 	else:
 		_label("Available in the focused terrain workspace.")
+	_context("provinces")
+	_label("Provinces", 22)
+	if _terrain.heightmap_only:
+		_build_province_controls()
+	else:
+		_label("Available in the focused terrain workspace.")
 	_context("climate")
 	_form = _contexts["heightmap"]
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("user://maps"))
@@ -336,6 +350,9 @@ func _sync_from_terrain() -> void:
 	_tree_population.set_value_no_signal(_terrain.tree_population)
 	_update_tree_status()
 	if _terrain.heightmap_only:
+		if _province_count != null and _terrain.province_layer != null:
+			_province_count.set_value_no_signal(_terrain.province_layer.requested_count)
+			_select_province(0)
 		_controls["coast_detail"].set_value_no_signal(_terrain.coast_detail)
 		_controls["mountain_detail"].set_value_no_signal(_terrain.mountain_detail)
 		_controls["heightmap_resolution"].set_value_no_signal(_terrain.resolution + 1)
@@ -581,7 +598,7 @@ func _build_cell_inspector() -> void:
 	panel.anchor_right = 0.0
 	panel.offset_left = 14
 	panel.offset_right = 240
-	panel.offset_top = 420
+	panel.offset_top = 455
 	panel.anchor_bottom = 1.0
 	panel.offset_bottom = -470
 	panel.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -620,7 +637,7 @@ func _reset_cell_inspector() -> void:
 	_selected_point = Vector2.INF
 	_cell_label.text = "CELL DATA\nClick the map to inspect its terrain." if _terrain.graph != null else "LEGACY TERRAIN\nGenerate to create cell data."
 	_cell_panel.anchor_bottom = 0.0
-	_cell_panel.offset_bottom = 520
+	_cell_panel.offset_bottom = 555
 
 
 
@@ -648,6 +665,12 @@ func _show_cell_info(info: Dictionary) -> void:
 		var point: Vector2 = info.get("inspected_position", info.position)
 		var h: float = (_terrain.base_surface_height(point / _terrain.map_size) / _terrain.relief_scale() - _terrain.height_offset) / _terrain.elevation + (0.2 if _terrain.generator_version >= 3 else 0.0)
 		_cell_label.text = "HEIGHTMAP SAMPLE\nX %.2f · Y %.2f\nHeight %.3f / 1.0\n%s" % [point.x, point.y, h, "Below sea datum" if h < 0.2 else "Land"]
+		if _terrain.province_layer_current():
+			_select_province(_terrain.province_layer.id_at(point / _terrain.map_size))
+			if _province_selected > 0:
+				var record: Dictionary = _terrain.province_layer.records[_province_selected - 1]
+				_cell_label.text += "\n%s (ID %d)\n%d land pixels, %d neighbors" % [record.name, record.id, record.pixels, record.neighbors.size()]
+				_cell_panel.offset_bottom = 620
 		return
 	_cell_panel.anchor_bottom = 1.0
 	_cell_panel.offset_bottom = -14
@@ -743,7 +766,7 @@ func _build_shell() -> void:
 		lock.toggled.connect(func(value: bool): layer.locked = value; _stop_brush(); _update_dependency_status(); mark_dirty())
 		row.add_child(lock)
 		_layer_buttons[layer.id] = [eye, lock]
-		if _terrain.heightmap_only and layer.id not in ["heightmap", "rivers", "surface"]:
+		if _terrain.heightmap_only and layer.id not in ["heightmap", "rivers", "surface", "provinces"]:
 			layer.visible = false
 			eye.set_pressed_no_signal(false)
 			eye.disabled = true
@@ -772,12 +795,12 @@ func _context(key: String) -> void:
 	_form = box
 
 func _select_layer(key: String) -> void:
-	if _terrain.heightmap_only and key not in ["heightmap", "rivers", "surface", "view"]:
+	if _terrain.heightmap_only and key not in ["heightmap", "rivers", "surface", "provinces", "view"]:
 		key = "heightmap"
 	if selected_layer != key:
 		mark_dirty()
 	selected_layer = key
-	if key in ["rivers", "surface"] and _terrain.heightmap_only:
+	if key in ["rivers", "surface", "provinces"] and _terrain.heightmap_only:
 		find_child("RawHeightView", true, false).button_pressed = false
 	for id in _layer_selectors:
 		_layer_selectors[id].set_pressed_no_signal(id == key)
@@ -792,7 +815,7 @@ func _stop_brush() -> void:
 		_brush.enabled.button_pressed = false
 
 func can_edit(key: String) -> bool:
-	if _terrain.heightmap_only and key not in ["heightmap", "rivers", "surface"]:
+	if _terrain.heightmap_only and key not in ["heightmap", "rivers", "surface", "provinces"]:
 		return false
 	for layer in layers:
 		if layer.id == key:
@@ -801,8 +824,12 @@ func can_edit(key: String) -> bool:
 
 func regeneration_error(key: String) -> String:
 	if _terrain.heightmap_only:
-		if key not in ["heightmap", "rivers", "surface"] or not can_edit(key):
+		if key not in ["heightmap", "rivers", "surface", "provinces"] or not can_edit(key):
 			return "Show and unlock the selected layer before generating."
+		if key in ["heightmap", "rivers", "surface"]:
+			for layer in layers:
+				if layer.id == "provinces" and layer.locked:
+					return "Unlock Provinces before changing its source maps."
 		if key in ["heightmap", "rivers"]:
 			for layer in layers:
 				if layer.id == "surface" and layer.locked:
@@ -820,7 +847,7 @@ func _update_dependency_status() -> void:
 	if _dependency_status == null:
 		return
 	if _terrain.heightmap_only:
-		_dependency_status.text = "TERRAIN WORKFLOW\n1. Generate heightmap\n2. Generate rivers / lakes\n3. Build terrain surface"
+		_dependency_status.text = "TERRAIN WORKFLOW\n1. Generate heightmap\n2. Generate rivers / lakes\n3. Build terrain surface\n4. Generate provinces"
 		if _terrain.water_layer != null and not _terrain.water_layer_current():
 			_dependency_status.text += "\nWater needs regeneration."
 		return
@@ -840,9 +867,11 @@ func _apply_layer_visibility() -> void:
 		_terrain.visible = (layer_visible("surface") and _terrain.terrain_surface_current()) or layers[0].visible or (layer_visible("rivers") and _terrain.water_layer_current())
 		_terrain.set_height_layer_visible(layers[0].visible)
 		for layer in layers:
-			if layer.id not in ["heightmap", "rivers", "surface"]:
+			if layer.id not in ["heightmap", "rivers", "surface", "provinces"]:
 				layer.visible = false
 				_layer_buttons[layer.id][0].set_pressed_no_signal(false)
+		_terrain.set_province_layer_visible(layer_visible("provinces"))
+		_update_province_status()
 		_terrain.set_surface_layer_visible(layer_visible("surface"))
 		_terrain.set_water_layer_visible(layer_visible("rivers"))
 		_update_surface_status()
@@ -942,6 +971,8 @@ func _setup_document_tracking() -> void:
 	_terrain.terrain_regenerated.connect(mark_dirty)
 	_terrain.climate_changed.connect(mark_dirty)
 	_terrain.vegetation_changed.connect(mark_dirty)
+	_terrain.province_layer_changed.connect(mark_dirty)
+	_terrain.province_layer_changed.connect(_apply_layer_visibility)
 	_terrain.terrain_surface_changed.connect(mark_dirty)
 	_terrain.terrain_surface_changed.connect(_apply_layer_visibility)
 	_terrain.water_layer_changed.connect(mark_dirty)
@@ -984,7 +1015,7 @@ func _cancel_pending_action() -> void:
 
 
 func play_map() -> void:
-	if _water_busy or _surface_busy:
+	if _water_busy or _surface_busy or _province_busy:
 		_status.text = "Wait for map generation before opening Play map."
 		return
 	if _terrain.heightmap_only and _terrain.water_layer != null and not _terrain.terrain_surface_current():
@@ -1151,6 +1182,8 @@ func generate_water_layer() -> void:
 		_update_water_status()
 
 func _exit_tree() -> void:
+	if _province_thread != null and _province_thread.is_started():
+		_province_thread.wait_to_finish()
 	if _surface_thread != null and _surface_thread.is_started():
 		_surface_thread.wait_to_finish()
 	if _water_thread != null and _water_thread.is_started():
@@ -1193,7 +1226,7 @@ func _update_surface_status() -> void:
 	_surface_status.text = "Surface ready. Play map uses this ground and the water layer." if current else "Build after generating heightmap and water. Previous surfaces are retained but hidden when either source changes."
 
 func build_terrain_surface() -> void:
-	if _surface_busy or _water_busy:
+	if _surface_busy or _water_busy or _province_busy:
 		return
 	var error := regeneration_error("surface")
 	if not error.is_empty() or not _terrain.water_layer_current():
@@ -1240,3 +1273,96 @@ func build_terrain_surface() -> void:
 		_surface_status.text = error
 	else:
 		_update_surface_status()
+
+func _build_province_controls() -> void:
+	_label("Generate connected land regions from the finished surface. Lakes and sea stay unassigned. Rivers and steep slopes discourage crossings.").autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_label("Target mainland provinces")
+	_province_count = SpinBox.new()
+	_province_count.min_value = 1
+	_province_count.max_value = 512
+	_province_count.value = 64
+	_form.add_child(_province_count)
+	_button("Generate provinces", generate_provinces, null, "GenerateProvinces")
+	_province_generate = _form.get_child(_form.get_child_count() - 1)
+	_label("Click the map to inspect and name a province.").autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_province_name = LineEdit.new()
+	_province_name.max_length = 128
+	_province_name.placeholder_text = "Province name"
+	_form.add_child(_province_name)
+	_button("Apply province name", rename_province, null, "RenameProvince")
+	_province_status = _label("Build the terrain surface first.", 13)
+	_province_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+
+func _select_province(id: int) -> void:
+	_province_selected = id
+	if _terrain.map_renderer != null:
+		_terrain.map_renderer.material.set_shader_parameter("selected_province", id)
+	if _province_name != null:
+		_province_name.text = _terrain.province_layer.records[id - 1].name if id > 0 else ""
+
+func rename_province() -> void:
+	if not _terrain.province_layer_current() or not can_edit("provinces") or _province_busy or _province_selected <= 0 or _province_selected > _terrain.province_layer.records.size():
+		return
+	var value := _province_name.text.strip_edges()
+	if value.is_empty():
+		_province_status.text = "Enter a province name."
+		return
+	_terrain.province_layer.records[_province_selected - 1].name = value
+	mark_dirty()
+	_refresh_selected_cell()
+
+func _update_province_status() -> void:
+	if _province_status == null or _province_busy:
+		return
+	var current: bool = _terrain.province_layer_current()
+	_layer_selectors["provinces"].text = "Provinces *" if _terrain.province_layer != null and not current else "Provinces"
+	_province_status.text = "%d connected provinces. Small islands may add regions beyond the target. Regenerating replaces province names and IDs." % _terrain.province_layer.records.size() if current else "Build the terrain surface, then generate provinces. Old province data is retained but hidden when the terrain changes."
+	if not current:
+		_province_selected = 0
+		_province_name.text = ""
+
+func generate_provinces() -> void:
+	if _province_busy or _water_busy or _surface_busy:
+		return
+	var error := regeneration_error("provinces")
+	if not error.is_empty() or not _terrain.terrain_surface_current():
+		_province_status.text = error if not error.is_empty() else "Build the current terrain surface first."
+		return
+	var serial := _water_job_serial
+	var source: PackedFloat32Array = _terrain.map_renderer.normalized_heights.duplicate()
+	var surface: RefCounted = _terrain.terrain_surface
+	var water: RefCounted = _terrain.water_layer
+	surface.fingerprint()
+	_province_busy = true
+	_province_generate.disabled = true
+	_province_count.apply()
+	await get_tree().process_frame
+	var count := int(_province_count.value)
+	_province_status.text = "Growing connected provinces around terrain and water…"
+	_province_thread = Thread.new()
+	var started := _province_thread.start(func():
+		var layer := WorldProvinces.new()
+		return {"error": layer.generate(source, surface, water, count), "layer": layer})
+	if started != OK:
+		_province_thread = null
+		_province_busy = false
+		_province_generate.disabled = false
+		_province_status.text = "Could not start province generation."
+		return
+	while _province_thread.is_alive():
+		await get_tree().process_frame
+	var result: Dictionary = _province_thread.wait_to_finish()
+	_province_thread = null
+	_province_busy = false
+	_province_generate.disabled = false
+	if serial != _water_job_serial or not regeneration_error("provinces").is_empty():
+		_province_status.text = "The document or layer state changed. Generate again."
+		return
+	if not result.error.is_empty():
+		_province_status.text = result.error
+		return
+	error = _terrain.install_province_layer(result.layer)
+	_select_province(0)
+	_update_province_status()
+	if not error.is_empty():
+		_province_status.text = error

@@ -26,12 +26,12 @@ func _dismiss(dialog: ConfirmationDialog, discard: bool) -> void:
 
 func _run() -> void:
 	var layers := Manifest.default_layers()
-	check(Graph.affected(layers, "heightmap").size() == 6, "Height changes reach every dependent layer.")
-	check(Graph.affected(layers, "climate") == ["climate", "rivers", "trees", "surface"], "Climate affects water and trees, not authored ground.")
+	check(Graph.affected(layers, "heightmap").size() == 7, "Height changes reach every dependent layer.")
+	check(Graph.affected(layers, "climate") == ["climate", "rivers", "trees", "surface", "provinces"], "Climate affects water and trees, not authored ground.")
 	check(Graph.affected(layers, "ground") == ["ground"], "Ground edits do not invalidate terrain.")
 	check(Graph.affected(layers, "unknown").is_empty() and not Graph.lock_reason(layers, "unknown").is_empty(), "Unknown layer operations are rejected.")
 	layers[0].dependencies.append("trees")
-	check(Graph.affected(layers, "heightmap").size() == 6, "Traversal terminates even when extensions introduce cycles.")
+	check(Graph.affected(layers, "heightmap").size() == 7, "Traversal terminates even when extensions introduce cycles.")
 	var world := (load("res://scenes/main.tscn") as PackedScene).instantiate()
 	world.get_node("Terrain").heightmap_only = false
 	world.get_node("Terrain").terrain_template = "Noise"
