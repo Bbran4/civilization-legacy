@@ -195,6 +195,8 @@ func _apply() -> bool:
 	if not editor.can_edit("ground"):
 		return false
 	var error: String = terrain.apply_surface_catalog(catalog.duplicate(true))
+	if error.is_empty():
+		editor.mark_dirty()
 	status.text = "Textures applied. Save terrain to keep the palette and brush strokes." if error.is_empty() else error
 	return error.is_empty()
 

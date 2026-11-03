@@ -3,10 +3,20 @@ extends Control
 
 const MaterialPanel = preload("res://scripts/ui/terrain_material_panel.gd")
 const GroundBrush = preload("res://scripts/ui/terrain_brush.gd")
+const WorldProject = preload("res://scripts/storage/world_project.gd")
+const LayerGraph = preload("res://scripts/domain/map_layer_graph.gd")
 const Manifest = preload("res://scripts/storage/world_manifest.gd")
 var layers: Array = Manifest.default_layers()
 var selected_layer := "heightmap"
 var _terrain_path := ""
+var _world_path := ""
+var dirty := true
+var _tracking_changes := false
+var _world_status: Label
+var _dependency_status: Label
+var _unsaved_dialog: ConfirmationDialog
+var _pending_action: Callable
+var _resume_after_save := false
 var _contexts: Dictionary = {}
 var _layer_buttons: Dictionary = {}
 var _layer_selectors: Dictionary = {}
@@ -67,6 +77,7 @@ func _ready() -> void:
 	climate_panel.custom_minimum_size.y = 450
 	climate_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_select_layer("heightmap")
+	_setup_document_tracking()
 
 
 func _build_interface() -> void:
@@ -368,8 +379,9 @@ func _update_description() -> void:
 
 
 func apply_settings() -> void:
-	if not can_edit("heightmap") or _any_locked():
-		_status.text = "Unlock affected layers before generating terrain."
+	var error := regeneration_error("heightmap")
+	if not error.is_empty():
+		_status.text = error
 		return
 	var picker := _controls["terrain_template"] as OptionButton
 	_terrain.terrain_template = picker.get_item_metadata(picker.selected)
@@ -390,7 +402,8 @@ func apply_settings() -> void:
 
 
 func _new_seed() -> void:
-	if _any_locked():
+	if not regeneration_error("heightmap").is_empty():
+		_status.text = regeneration_error("heightmap")
 		return
 	(_controls["map_seed"] as LineEdit).text = str(randi_range(1, 2147483647))
 	apply_settings()
@@ -407,9 +420,11 @@ func _show_dialog(action: String) -> void:
 	_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE if action in ["load", "image", "load_world"] else FileDialog.FILE_MODE_SAVE_FILE
 	match action:
 		"save_world", "load_world":
-			_dialog.title = "World manifest (references the last saved terrain)"
+			_dialog.title = "Save current world" if action == "save_world" else "Open world"
 			_dialog.filters = PackedStringArray(["*.world.json ; World manifests"])
-			_dialog.current_file = "world.world.json"
+			_dialog.current_file = _world_path.get_file() if not _world_path.is_empty() else "world.world.json"
+			if not _world_path.is_empty():
+				_dialog.current_dir = ProjectSettings.globalize_path(_world_path.get_base_dir())
 		"save":
 			_dialog.title = "Save terrain and settings"
 			_dialog.filters = PackedStringArray(["*.terrain.json ; Terrain maps"])
@@ -430,21 +445,17 @@ func _show_dialog(action: String) -> void:
 func _file_selected(path: String) -> void:
 	match _dialog_action:
 		"save_world":
-			if _terrain_path.is_empty():
-				_status.text = "Save terrain first, then save its world manifest."
-				return
-			_status.text = Manifest.save_file(path, Manifest.capture(layers, _manifest_reference(path), selected_layer if selected_layer != "view" else "heightmap"))
-			if _status.text.is_empty():
-				_status.text = "World manifest saved. Terrain was not changed."
+			if save_world(path).is_empty() and _resume_after_save:
+				_resume_pending_action()
 		"load_world":
-			load_world(path)
+			request_action(func(): load_world(path))
 		"save":
 			var error: String = Document.save_file(path, _terrain)
 			if error.is_empty():
 				_terrain_path = path
 			_status.text = "Saved " + path.get_file() if error.is_empty() else error
 		"load":
-			load_terrain(path)
+			request_action(func(): load_terrain(path))
 		"image":
 			var image := Image.new()
 			if image.load(path) != OK or image.is_empty():
@@ -472,6 +483,8 @@ func load_terrain(path: String) -> String:
 	var error: String = Document.apply(_terrain, result.document)
 	if error.is_empty():
 		_terrain_path = path
+		_world_path = ""
+		mark_dirty()
 		_sync_from_terrain()
 		get_parent().get_parent().get_node("CameraRig")._reset_view()
 		_status.text = "Loaded " + path.get_file() + "\nSaved terrain samples restored exactly."
@@ -488,7 +501,7 @@ func _build_cell_inspector() -> void:
 	panel.anchor_right = 0.0
 	panel.offset_left = 14
 	panel.offset_right = 240
-	panel.offset_top = 310
+	panel.offset_top = 420
 	panel.anchor_bottom = 1.0
 	panel.offset_bottom = -470
 	panel.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -527,7 +540,7 @@ func _reset_cell_inspector() -> void:
 	_selected_point = Vector2.INF
 	_cell_label.text = "CELL DATA\nClick the map to inspect its terrain." if _terrain.graph != null else "LEGACY TERRAIN\nGenerate to create cell data."
 	_cell_panel.anchor_bottom = 0.0
-	_cell_panel.offset_bottom = 410
+	_cell_panel.offset_bottom = 520
 
 
 
@@ -611,8 +624,9 @@ func _build_shell() -> void:
 	_toolbar.offset_top = 10
 	_toolbar.offset_bottom = 50
 	add_child(_toolbar)
-	_button("Save world…", func(): _show_dialog("save_world"), _toolbar)
-	_button("Open world…", func(): _show_dialog("load_world"), _toolbar)
+	_button("Save world…", _save_current_world, _toolbar, "SaveWorld")
+	_button("Save as…", func(): _show_dialog("save_world"), _toolbar, "SaveWorldAs")
+	_button("Open world…", func(): _show_dialog("load_world"), _toolbar, "OpenWorld")
 	_button("View settings", func(): _select_layer("view"), _toolbar)
 	_button("Full map", func(): _camera_rig._reset_view(), _toolbar)
 	var stack := VBoxContainer.new()
@@ -634,14 +648,19 @@ func _build_shell() -> void:
 		eye.text = "V"
 		eye.tooltip_text = "Show layer (heightmap is the base world)"
 		eye.button_pressed = layer.visible
-		eye.toggled.connect(func(value: bool): layer.visible = value; _apply_layer_visibility())
+		eye.toggled.connect(func(value: bool): layer.visible = value; _apply_layer_visibility(); mark_dirty())
 		row.add_child(eye)
 		var lock := CheckBox.new()
 		lock.text = "L"
 		lock.tooltip_text = "Protect this layer from editor changes"
-		lock.toggled.connect(func(value: bool): layer.locked = value; _stop_brush())
+		lock.toggled.connect(func(value: bool): layer.locked = value; _stop_brush(); _update_dependency_status(); mark_dirty())
 		row.add_child(lock)
 		_layer_buttons[layer.id] = [eye, lock]
+	_dependency_status = Label.new()
+	_dependency_status.custom_minimum_size.x = 226
+	_dependency_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_dependency_status.add_theme_font_size_override("font_size", 12)
+	stack.add_child(_dependency_status)
 	# The central region stays transparent to the existing 3D camera and picking.
 	var viewport_label := Label.new()
 	viewport_label.name = "MapViewport"
@@ -658,11 +677,14 @@ func _context(key: String) -> void:
 	_form = box
 
 func _select_layer(key: String) -> void:
+	if selected_layer != key:
+		mark_dirty()
 	selected_layer = key
 	for id in _layer_selectors:
 		_layer_selectors[id].set_pressed_no_signal(id == key)
 	for id in _contexts:
 		_contexts[id].visible = id == key
+	_update_dependency_status()
 	_stop_brush()
 
 func _stop_brush() -> void:
@@ -676,11 +698,24 @@ func can_edit(key: String) -> bool:
 			return not layer.locked and layer.visible
 	return false
 
-func _any_locked() -> bool:
+func regeneration_error(key: String) -> String:
+	if not layer_visible(key):
+		return "Show the layer before editing it."
+	return LayerGraph.lock_reason(layers, key)
+
+func _update_dependency_status() -> void:
+	if _dependency_status == null:
+		return
+	var affected := LayerGraph.affected(layers, selected_layer)
+	var names: PackedStringArray = []
 	for layer in layers:
-		if layer.locked:
-			return true
-	return false
+		if layer.id in affected:
+			names.append(layer.title)
+	_dependency_status.text = "Changes affect: " + ", ".join(names) if not names.is_empty() else "Camera settings do not change map data."
+	var reason := LayerGraph.lock_reason(layers, selected_layer)
+	if not reason.is_empty() and not affected.is_empty():
+		_dependency_status.text += "\n" + reason
+
 
 func _apply_layer_visibility() -> void:
 	for layer in layers:
@@ -724,6 +759,8 @@ func load_world(path: String) -> String:
 				_layer_buttons[layer.id][1].set_pressed_no_signal(layer.locked)
 	_select_layer(data.selected_layer)
 	_apply_layer_visibility()
+	_world_path = path
+	_set_clean()
 	return ""
 
 func layer_visible(key: String) -> bool:
@@ -732,6 +769,81 @@ func layer_visible(key: String) -> bool:
 			return layer.visible
 	return false
 
-func _manifest_reference(path: String) -> String:
-	var absolute := ProjectSettings.globalize_path(_terrain_path)
-	return absolute.get_file() if path.get_base_dir() == absolute.get_base_dir() else absolute
+func save_world(path: String) -> String:
+	_stop_brush()
+	var result := WorldProject.save_file(path, _terrain, layers, selected_layer if selected_layer != "view" else "heightmap")
+	if not result.error.is_empty():
+		_status.text = result.error
+		_cancel_pending_action()
+		return result.error
+	_world_path = path
+	_terrain_path = result.terrain_path
+	_set_clean()
+	_status.text = "Saved current terrain and layers: " + path.get_file()
+	return ""
+
+func _save_current_world() -> void:
+	if _world_path.is_empty():
+		_show_dialog("save_world")
+	else:
+		if save_world(_world_path).is_empty() and _resume_after_save:
+			_resume_pending_action()
+
+func _setup_document_tracking() -> void:
+	_world_status = Label.new()
+	_world_status.name = "WorldStatus"
+	_world_status.position = Vector2(256, 87)
+	_world_status.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_world_status)
+	_unsaved_dialog = ConfirmationDialog.new()
+	_unsaved_dialog.title = "Unsaved world changes"
+	_unsaved_dialog.dialog_text = "Save this world before continuing?"
+	_unsaved_dialog.ok_button_text = "Discard changes"
+	_unsaved_dialog.add_button("Save world…", false, "save")
+	_unsaved_dialog.confirmed.connect(_resume_pending_action)
+	_unsaved_dialog.canceled.connect(_cancel_pending_action)
+	_unsaved_dialog.custom_action.connect(func(action: String):
+		if action == "save":
+			_unsaved_dialog.hide()
+			_resume_after_save = true
+			_save_current_world())
+	add_child(_unsaved_dialog)
+	_dialog.canceled.connect(_cancel_pending_action)
+	_terrain.terrain_regenerated.connect(mark_dirty)
+	_terrain.climate_changed.connect(mark_dirty)
+	_terrain.vegetation_changed.connect(mark_dirty)
+	get_tree().auto_accept_quit = false
+	get_tree().root.close_requested.connect(func(): request_action(func(): get_tree().quit()))
+	_tracking_changes = true
+	_update_world_status()
+
+func mark_dirty() -> void:
+	if not _tracking_changes:
+		return
+	dirty = true
+	_update_world_status()
+
+func _set_clean() -> void:
+	dirty = false
+	_update_world_status()
+
+func _update_world_status() -> void:
+	if _world_status != null:
+		_world_status.text = ("Unsaved changes" if dirty else "Saved") + (" · " + _world_path.get_file() if not _world_path.is_empty() else " · New world")
+
+func request_action(action: Callable) -> void:
+	if dirty:
+		_pending_action = action
+		_unsaved_dialog.popup_centered()
+	else:
+		action.call()
+
+func _resume_pending_action() -> void:
+	var action := _pending_action
+	_cancel_pending_action()
+	if action.is_valid():
+		action.call()
+
+func _cancel_pending_action() -> void:
+	_pending_action = Callable()
+	_resume_after_save = false

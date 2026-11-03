@@ -69,7 +69,7 @@ func _run() -> void:
 	editor._dialog_action = "save_world"
 	editor._file_selected(ProjectSettings.globalize_path("user://ui.world.json"))
 	var ui_world := Manifest.load_file("user://ui.world.json")
-	check(ui_world.error.is_empty() and ui_world.document.terrain == "phase1.terrain.json", "Toolbar saves a relative reference alongside terrain.")
+	check(ui_world.error.is_empty() and ui_world.document.terrain.ends_with(".terrain.json") and not ui_world.document.terrain.is_absolute_path() and ui_world.document.terrain != "phase1.terrain.json", "Toolbar saves the current terrain to a new snapshot with a relative reference.")
 	data = Manifest.capture(editor.layers, "phase1.terrain.json", "ground")
 	var path := "user://phase1.world.json"
 	check(Manifest.save_file(path, data).is_empty(), "World manifest saves independently.")

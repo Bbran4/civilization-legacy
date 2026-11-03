@@ -15,7 +15,9 @@ are planned gameplay systems.
 ## Map Editor 2.0
 
 Phase 1 introduces a layer stack, contextual properties, a central map view and
-a top toolbar while retaining terrain generation and saves. See the
+a top toolbar while retaining terrain generation and saves. World saves now capture
+current terrain and layers together, with unsaved-change prompts and dependency-aware
+locks. See the
 [Phase 1 guide](docs/map-editor-v2-phase1.md) for controls, world manifests,
 validation and remaining work.
 

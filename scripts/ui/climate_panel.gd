@@ -137,13 +137,15 @@ func _update_legend() -> void:
 
 
 func apply_settings() -> void:
-	if editor != null and (not editor.can_edit("climate") or editor._any_locked()):
+	if editor != null and not editor.regeneration_error("climate").is_empty():
+		status.text = editor.regeneration_error("climate")
 		return
 	for control in controls.values():
 		control.apply()
 	# SpinBox commits submitted text through deferred native signals.
 	await get_tree().process_frame
-	if editor != null and editor._any_locked():
+	if editor != null and not editor.regeneration_error("climate").is_empty():
+		status.text = editor.regeneration_error("climate")
 		return
 	var options: Dictionary = {"latitude_center": gizmo.latitude_center, "latitude_span": gizmo.latitude_span, "temperature_bias": controls.temperature_bias.value, "rainfall_scale": controls.rainfall_scale.value, "wind_rotation": gizmo.wind_rotation}
 	var error: String = terrain.apply_climate(options)

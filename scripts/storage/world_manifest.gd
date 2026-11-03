@@ -4,7 +4,7 @@ const Layer = preload("res://scripts/domain/map_layer.gd")
 const VERSION = 1
 
 static func default_layers() -> Array:
-	return [Layer.new("heightmap", "Heightmap"), Layer.new("rivers", "Rivers / lakes", ["heightmap", "climate"]), Layer.new("climate", "Climate", ["heightmap"]), Layer.new("ground", "Ground paint", ["heightmap"]), Layer.new("trees", "Trees", ["heightmap", "climate"])]
+	return [Layer.new("heightmap", "Heightmap"), Layer.new("rivers", "Rivers / lakes", ["heightmap", "climate"]), Layer.new("climate", "Climate", ["heightmap"]), Layer.new("ground", "Ground paint", ["heightmap"]), Layer.new("trees", "Trees", ["heightmap", "climate", "rivers"])]
 
 static func capture(layers: Array, terrain_path: String, selected: String) -> Dictionary:
 	var entries: Array = []
@@ -47,8 +47,14 @@ static func save_file(path: String, data: Dictionary) -> String:
 	if file == null:
 		return "Could not write world manifest."
 	file.store_string(JSON.stringify(data, "  "))
+	file.flush()
+	var write_error: Error = file.get_error()
 	file.close()
+	if write_error != OK:
+		DirAccess.remove_absolute(path + ".tmp")
+		return "Writing the world manifest failed; the previous save was kept."
 	if DirAccess.rename_absolute(path + ".tmp", path) != OK:
+		DirAccess.remove_absolute(path + ".tmp")
 		return "Could not replace world manifest."
 	return ""
 

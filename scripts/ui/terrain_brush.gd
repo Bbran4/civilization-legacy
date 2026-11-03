@@ -113,6 +113,7 @@ func _paint(point: Vector2) -> void:
 		return
 	terrain.paint_layer.stroke(last_point if last_point.is_finite() else point, point, radius.value, strength.value, row.selected, slot.selected - 1, eraser.button_pressed)
 	terrain.update_painted_surface()
+	editor.mark_dirty()
 	last_point = point
 	status.text = "Erasing ground paint…" if eraser.button_pressed else "Painting " + row.get_item_text(row.selected) + ". Save terrain to keep it."
 
@@ -151,6 +152,7 @@ func undo() -> void:
 	last_point = Vector2.INF
 	if terrain.paint_layer.undo():
 		terrain.update_painted_surface()
+		editor.mark_dirty()
 		status.text = "Undid the last paint stroke."
 	else:
 		status.text = "No paint strokes to undo."
@@ -165,4 +167,5 @@ func clear() -> void:
 	terrain.paint_layer.image = null
 	terrain.paint_layer.texture = null
 	terrain.update_painted_surface()
+	editor.mark_dirty()
 	status.text = "Ground paint cleared. Undo restores it."
