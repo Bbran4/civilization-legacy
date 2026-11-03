@@ -34,7 +34,8 @@ sea map remains continuous dark-blue open ocean with no generated coastal zones.
 
 A separate binary sea-background mask distinguishes unassigned deep ocean from
 unassigned lakes/inland water. The optional province section advances to v4,
-storing this mask losslessly and preserving coastal reach. V1-v3 snapshots remain
+storing this mask losslessly and preserving coastal reach. Province v5 now retains
+that data while supporting land splits after sea records. V1-v4 snapshots remain
 readable; main terrain v10 and world manifest v3 are unchanged. Draft copies own
 their mask data so regeneration cannot mutate the installed map in flight.
 
@@ -60,3 +61,7 @@ renderer suites provide regression coverage.
 This is a generated coastal-envelope/sea-zone model. Historical sea regions and
 country/naval ownership are not added. Manual visual, zoom and performance review
 remain with the user; the reach/count controls support further visual tuning.
+
+Coastal sea regions support the same [split/merge tools](province-split-merge.md)
+as land provinces, with connectivity and sea-kind validation. Open ocean remains
+unassigned. Regenerating oceans preserves appended land IDs.

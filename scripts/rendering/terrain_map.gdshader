@@ -8,6 +8,8 @@ uniform bool water_enabled = false;
 uniform sampler2D water_field : filter_linear, repeat_disable;
 uniform bool provinces_enabled = false;
 uniform int selected_province = 0;
+uniform int merge_ids[32];
+uniform int merge_count = 0;
 uniform sampler2D province_field : filter_nearest, repeat_disable;
 float province_id(vec2 uv) {
 	vec2 c = round(texture(province_field, uv).rg * 255.0);
@@ -36,7 +38,12 @@ void fragment() {
 			bool edge = province_id(UV + vec2(border_step.x, 0.0)) != id || province_id(UV + vec2(0.0, border_step.y)) != id;
 			if (ocean) edge = edge || province_id(UV - vec2(border_step.x, 0.0)) != id || province_id(UV - vec2(0.0, border_step.y)) != id;
 			if (edge) color = ocean ? vec3(0.055, 0.08, 0.12) : color * 0.35;
-			if (int(id) == selected_province) color = mix(color, vec3(1.0, 0.8, 0.3), 0.45);
+			bool selected = int(id) == selected_province;
+			for (int i = 0; i < 32; i++) {
+				if (i >= merge_count) break;
+				selected = selected || int(id) == merge_ids[i];
+			}
+			if (selected) color = mix(color, vec3(1.0, 0.8, 0.3), 0.45);
 		}
 	}
 	if (water_enabled && (shaded_relief || !height_enabled)) {

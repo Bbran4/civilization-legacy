@@ -1,6 +1,16 @@
 extends Node
 const History = preload("res://scripts/domain/province_edit_history.gd")
 var editor: Node
+var mode: OptionButton
+var tool_help: Label
+var merge_action: Button
+var merge_info: Label
+var merge_ids: Array[int] = []
+var merge_source: RefCounted
+var split_points := PackedVector2Array()
+var split_source: RefCounted
+var radius_label: Label
+var island_help: Label
 var enabled: CheckBox
 var attach_islands: CheckBox
 var radius: SpinBox
@@ -11,26 +21,40 @@ var last := Vector2.INF
 var preview: MeshInstance3D
 func configure(owner_editor: Node) -> void:
 	editor = owner_editor
+	editor._label("Province tool", 13)
+	mode = OptionButton.new()
+	for label in ["Paint borders", "Draw split border", "Merge provinces"]: mode.add_item(label)
+	mode.item_selected.connect(_set_mode)
+	editor._form.add_child(mode)
 	enabled = CheckBox.new()
 	enabled.text = "Paint region borders"
 	enabled.toggled.connect(func(value: bool):
 		if not value: cancel())
 	editor._form.add_child(enabled)
-	editor._label("Pick a region, then paint to expand it or absorb an island. Alt-click picks another region. Land and ocean cannot overwrite each other.", 12).autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tool_help = editor._label("Pick a region, then paint to expand it or absorb an island. Alt-click picks another region. Land and ocean cannot overwrite each other.", 12)
+	tool_help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	attach_islands = CheckBox.new()
 	attach_islands.text = "Attach whole separate islands"
 	attach_islands.button_pressed = true
 	editor._form.add_child(attach_islands)
-	editor._label("Touch a separate island to absorb it into the selected land province. Turn this off to paint island pixels individually.", 12).autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	editor._label("Brush radius (pixels at 1025)", 13)
+	island_help = editor._label("Touch a separate island to absorb it into the selected land province. Turn this off to paint island pixels individually.", 12)
+	island_help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	radius_label = editor._label("Brush radius (pixels at 1025)", 13)
 	radius = SpinBox.new()
 	radius.min_value = 0.5
 	radius.max_value = 64
 	radius.step = 0.5
 	radius.value = 6
 	editor._form.add_child(radius)
-	editor._button("Undo border stroke (Ctrl+Z)", undo, null, "UndoBorder")
-	editor._button("Redo border stroke (Ctrl+Y)", redo, null, "RedoBorder")
+	merge_info = editor._label("Pick the province to keep, then click additional regions.", 12)
+	merge_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	merge_info.visible = false
+	editor._button("Merge selected provinces", merge_selected, null, "MergeProvinces")
+	merge_action = editor._form.get_child(editor._form.get_child_count() - 1)
+	merge_action.visible = false
+	merge_action.disabled = true
+	editor._button("Undo province edit (Ctrl+Z)", undo, null, "UndoBorder")
+	editor._button("Redo province edit (Ctrl+Y)", redo, null, "RedoBorder")
 	status = editor._label("Land provinces can span islands. Painting over a whole land province absorbs it. Undo restores it.", 12)
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	preview = MeshInstance3D.new()
@@ -55,7 +79,7 @@ func handle_input(event: InputEvent) -> bool:
 	if not allowed(): return false
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE and painting:
 		cancel()
-		status.text = "Unfinished stroke cancelled."
+		status.text = "Unfinished province edit cancelled."
 		get_viewport().set_input_as_handled()
 		return true
 	if event is InputEventKey and event.pressed and not event.echo and event.ctrl_pressed:
@@ -75,9 +99,21 @@ func handle_input(event: InputEvent) -> bool:
 		else:
 			var point: Variant = _hit(event.position)
 			if point == null: return false
+			var id: int = editor._terrain.province_layer.id_at(point / Vector2(editor._terrain.province_layer.size - Vector2i.ONE))
 			if event.alt_pressed:
 				cancel()
-				editor._select_province(editor._terrain.province_layer.id_at(point / Vector2(editor._terrain.province_layer.size - Vector2i.ONE)))
+				editor._select_province(id)
+			elif mode.selected == 2:
+				_toggle_merge(id)
+			elif mode.selected == 1:
+				var layer: RefCounted = editor._terrain.province_layer
+				if editor._province_selected <= 0:
+					status.text = "Pick a province before drawing a split."
+				else:
+					history.sync(layer)
+					split_source = layer
+					split_points = PackedVector2Array([point])
+					painting = true
 			elif history.begin(editor._terrain.province_layer, editor._province_selected):
 				painting = true
 				last = point
@@ -87,7 +123,9 @@ func handle_input(event: InputEvent) -> bool:
 		return true
 	if event is InputEventMouseMotion and painting:
 		var point: Variant = _hit(event.position)
-		if point != null: _paint(point)
+		if mode.selected == 1:
+			if point != null and split_points[-1].distance_to(point) >= 0.5: split_points.append(point)
+		elif point != null: _paint(point)
 		else: last = Vector2.INF
 		get_viewport().set_input_as_handled()
 		return true
@@ -109,7 +147,17 @@ func finish() -> void:
 	if not allowed() or history.current != editor._terrain.province_layer:
 		cancel()
 		return
-	_apply_result(history.finish(), "Border stroke applied.")
+	if mode.selected == 1:
+		if split_source != editor._terrain.province_layer:
+			cancel()
+			return
+		var result := history.split(editor._terrain.province_layer, editor._province_selected, split_points)
+		split_points.clear()
+		split_source = null
+		_apply_result(result, "Province split. The original keeps its ID and name.")
+		if result.get("new_id", 0) > 0: editor._select_province(result.new_id)
+	else:
+		_apply_result(history.finish(), "Border stroke applied.")
 func _apply_result(result: Dictionary, success: String) -> void:
 	editor._terrain.refresh_water_layer()
 	if not result.error.is_empty():
@@ -119,28 +167,38 @@ func _apply_result(result: Dictionary, success: String) -> void:
 		var error: String = editor._terrain.install_province_layer(result.layer)
 		status.text = success if error.is_empty() else error
 		editor._refresh_selected_cell()
+		if result.get("select_id", 0) > 0: editor._select_province(result.select_id)
 func undo() -> void:
 	if not allowed(): return
 	cancel()
-	_apply_result(history.undo(editor._terrain.province_layer), "Undid border stroke.")
+	_apply_result(history.undo(editor._terrain.province_layer), "Undid province edit.")
 func redo() -> void:
 	if not allowed(): return
 	cancel()
-	_apply_result(history.redo(editor._terrain.province_layer), "Redid border stroke.")
+	_apply_result(history.redo(editor._terrain.province_layer), "Redid province edit.")
 func cancel() -> void:
 	painting = false
 	last = Vector2.INF
 	history.cancel()
+	split_points.clear()
+	split_source = null
+	_clear_merge()
 	if preview != null: preview.visible = false
 	if editor != null: editor._terrain.refresh_water_layer()
 func _process(_delta: float) -> void:
 	if not allowed():
-		if painting: cancel()
+		if painting or not merge_ids.is_empty(): cancel()
 		preview.visible = false
 		return
-	if painting and history.current != editor._terrain.province_layer: cancel()
+	if history.current != editor._terrain.province_layer and (painting or not merge_ids.is_empty()): cancel()
 	history.sync(editor._terrain.province_layer)
 	if painting and not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT): finish()
+	if painting and mode.selected == 1:
+		_draw_split()
+		return
+	if mode.selected == 2:
+		preview.visible = false
+		return
 	if not enabled.button_pressed or get_viewport().gui_get_hovered_control() != null:
 		preview.visible = false
 		if painting: last = Vector2.INF
@@ -156,5 +214,76 @@ func _process(_delta: float) -> void:
 		var edge: Vector2 = (point + Vector2(cos(j * TAU / 48), sin(j * TAU / 48)) * r) / Vector2(dimensions - Vector2i.ONE) - Vector2.ONE * 0.5
 		edge *= editor._terrain.display_size()
 		mesh.surface_add_vertex(Vector3(edge.x, 0.05, edge.y))
+	mesh.surface_end()
+	preview.mesh = mesh
+
+func _set_mode(_index: int) -> void:
+	cancel()
+	enabled.set_pressed_no_signal(false)
+	enabled.text = ["Paint region borders", "Draw split border", "Pick provinces to merge"][mode.selected]
+	tool_help.text = ["Pick a region, then paint to expand it. Alt-click picks another region.", "Select a province, enable the tool, then drag a line across it or draw a closed loop. Alt-click changes the selected province. Release to split; Escape cancels.", "Select the province whose ID/name you want to keep. Enable the tool and click additional provinces. Alt-click changes the kept province. Then Merge selected provinces."][mode.selected]
+	for control in [attach_islands, island_help, radius, radius_label]: control.visible = mode.selected == 0
+	merge_info.visible = mode.selected == 2
+	merge_action.visible = mode.selected == 2
+
+func _clear_merge() -> void:
+	merge_ids.clear()
+	merge_source = null
+	if merge_action != null: merge_action.disabled = true
+	if merge_info != null: merge_info.text = "Pick the province to keep, then click additional regions."
+	if editor != null and editor._terrain.map_renderer != null:
+		editor._terrain.map_renderer.material.set_shader_parameter("merge_count", 0)
+
+func _toggle_merge(id: int) -> void:
+	var layer: RefCounted = editor._terrain.province_layer
+	if id <= 0:
+		status.text = "Unassigned water has no province to merge."
+		return
+	if editor._province_selected <= 0: editor._select_province(id)
+	var keep: int = editor._province_selected
+	if layer.records[id - 1].kind != layer.records[keep - 1].kind:
+		status.text = "Select only land provinces or only coastal sea regions."
+		return
+	if merge_source != null and merge_source != layer: _clear_merge()
+	history.sync(layer)
+	merge_source = layer
+	if merge_ids.is_empty(): merge_ids.append(keep)
+	if id != keep:
+		if id in merge_ids: merge_ids.erase(id)
+		elif merge_ids.size() < 32: merge_ids.append(id)
+		else:
+			status.text = "Merge up to 32 regions at once."
+			return
+	var labels := PackedStringArray()
+	for selected in merge_ids: labels.append("%s (#%d)" % [layer.records[selected - 1].name, selected])
+	merge_info.text = "Keep %s (#%d).\nSelected: %s" % [layer.records[keep - 1].name, keep, ", ".join(labels)]
+	merge_action.disabled = merge_ids.size() < 2
+	var highlighted := PackedInt32Array()
+	highlighted.resize(32)
+	for i in range(merge_ids.size()): highlighted[i] = merge_ids[i]
+	layer = editor._terrain.province_layer
+	editor._terrain.map_renderer.material.set_shader_parameter("merge_ids", highlighted)
+	editor._terrain.map_renderer.material.set_shader_parameter("merge_count", merge_ids.size())
+
+func merge_selected() -> void:
+	if not allowed(): return
+	if merge_source != editor._terrain.province_layer:
+		_clear_merge()
+		status.text = "The region map changed. Select provinces again."
+		return
+	painting = false
+	var result := history.merge(editor._terrain.province_layer, editor._province_selected, merge_ids.duplicate())
+	_clear_merge()
+	_apply_result(result, "Provinces merged. The selected province keeps its ID and name.")
+
+func _draw_split() -> void:
+	preview.visible = split_points.size() > 1
+	if split_points.size() < 2: return
+	var dimensions: Vector2i = editor._terrain.province_layer.size
+	var mesh := ImmediateMesh.new()
+	mesh.surface_begin(Mesh.PRIMITIVE_LINE_STRIP)
+	for pixel in split_points:
+		var local: Vector2 = (pixel / Vector2(dimensions - Vector2i.ONE) - Vector2.ONE * 0.5) * editor._terrain.display_size()
+		mesh.surface_add_vertex(Vector3(local.x, 0.06, local.y))
 	mesh.surface_end()
 	preview.mesh = mesh

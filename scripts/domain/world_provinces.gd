@@ -223,10 +223,10 @@ func snapshot() -> Dictionary:
 	var sea_values := PackedFloat32Array()
 	sea_values.resize(sea_mask.size())
 	for i in range(sea_mask.size()): sea_values[i] = sea_mask[i]
-	return {"version": 4, "coastal_reach": coastal_reach, "sea_mask": Payload.encode(sea_values) if not sea_values.is_empty() else null, "ocean_style": ocean_style, "ocean_generated": ocean_generated, "requested_oceans": requested_oceans, "source_hash": source_hash, "size": [size.x, size.y], "requested_count": requested_count, "ids": Payload.encode(values), "records": records.duplicate(true)}
+	return {"version": 5, "coastal_reach": coastal_reach, "sea_mask": Payload.encode(sea_values) if not sea_values.is_empty() else null, "ocean_style": ocean_style, "ocean_generated": ocean_generated, "requested_oceans": requested_oceans, "source_hash": source_hash, "size": [size.x, size.y], "requested_count": requested_count, "ids": Payload.encode(values), "records": records.duplicate(true)}
 static func decode(data: Variant) -> Dictionary:
 	if data == null: return {"error": "", "layer": null}
-	if not data is Dictionary or data.get("version") not in [1, 1.0, 2, 2.0, 3, 3.0, 4, 4.0] or not data.get("source_hash") is String or data.source_hash.length() != 64 or not data.get("size") is Array or data.size.size() != 2 or not data.get("records") is Array or data.records.size() > 65535:
+	if not data is Dictionary or data.get("version") not in [1, 1.0, 2, 2.0, 3, 3.0, 4, 4.0, 5, 5.0] or not data.get("source_hash") is String or data.source_hash.length() != 64 or not data.get("size") is Array or data.size.size() != 2 or not data.get("records") is Array or data.records.size() > 65535:
 		return {"error": "Invalid province document."}
 	for v in data.size:
 		if not (v is int or v is float) or not is_finite(float(v)) or v != int(v) or v < 3 or v > 2050: return {"error": "Invalid province dimensions."}
@@ -268,7 +268,7 @@ static func decode(data: Variant) -> Dictionary:
 		if not record is Dictionary or record.get("id") != i + 1 or not record.get("name") is String or record.name.length() > 128: return {"error": "Invalid province identity."}
 		if int(data.version) >= 2 and not record.get("kind", "land") is String: return {"error": "Invalid region kind."}
 		var kind: String = record.get("kind", "land") if int(data.version) >= 2 else "land"
-		if kind not in ["land", "ocean"] or (kind == "land" and ocean_seen) or (kind == "ocean" and not layer.ocean_generated): return {"error": "Invalid land/ocean region order."}
+		if kind not in ["land", "ocean"] or (kind == "land" and ocean_seen and int(data.version) < 5) or (kind == "ocean" and not layer.ocean_generated): return {"error": "Invalid land/ocean region order."}
 		ocean_seen = ocean_seen or kind == "ocean"
 		if int(data.version) >= 3 and not record.get("active") is bool: return {"error": "Invalid absorbed province state."}
 		layer.records.append({"id": i + 1, "name": record.name, "pixels": 0, "neighbors": [], "kind": kind, "active": record.get("active", true) if int(data.version) >= 3 else true})
@@ -334,9 +334,10 @@ func generate_oceans(base: PackedFloat32Array, water: RefCounted, count: int = 2
 	if style == "coastal_band":
 		sea_mask.resize(ids.size())
 		for i in range(ids.size()): sea_mask[i] = 1 if classes[i] == 2 else 0
-	while not records.is_empty() and records[-1].kind == "ocean": records.pop_back()
+	for record in records:
+		if record.kind == "ocean": record.active = false
 	for i in range(ids.size()):
-		if ids[i] > records.size(): ids[i] = 0
+		if ids[i] > 0 and records[ids[i] - 1].kind == "ocean": ids[i] = 0
 	var allowed := PackedByteArray()
 	allowed.resize(ids.size())
 	var candidates := PackedInt32Array()
@@ -456,3 +457,89 @@ static func coastal_band(classes: PackedByteArray, dimensions: Vector2i, reach: 
 	result.resize(classes.size())
 	for i in range(classes.size()): result[i] = 1 if classes[i] == 2 and distance[i] <= limit else 0
 	return result
+
+func split_region(id: int, points: PackedVector2Array) -> Dictionary:
+	if id < 1 or id > records.size() or not records[id - 1].active or points.size() < 2: return {"error": "Select a province and draw a complete split line."}
+	if records.size() >= 65535: return {"error": "No unused province IDs remain."}
+	var barrier: Dictionary = {}
+	for j in range(points.size() - 1):
+		if not points[j].is_finite() or not points[j + 1].is_finite(): return {"error": "Invalid split line."}
+		var a := Vector2i(points[j].round()).clamp(Vector2i.ZERO, size - Vector2i.ONE)
+		var b := Vector2i(points[j + 1].round()).clamp(Vector2i.ZERO, size - Vector2i.ONE)
+		var dx := absi(b.x - a.x)
+		var dy := -absi(b.y - a.y)
+		var sx := 1 if a.x < b.x else -1
+		var sy := 1 if a.y < b.y else -1
+		var error := dx + dy
+		while true:
+			var pixel := a.y * size.x + a.x
+			if ids[pixel] == id: barrier[pixel] = true
+			if a == b: break
+			var twice := 2 * error
+			if twice >= dy:
+				error += dy
+				a.x += sx
+			if twice <= dx:
+				error += dx
+				a.y += sy
+	if barrier.is_empty(): return {"error": "Draw the line through the selected province."}
+	var part := PackedByteArray()
+	part.resize(ids.size())
+	var queue := PackedInt32Array([int(barrier.keys()[0])])
+	part[queue[0]] = 1
+	var cursor := 0
+	while cursor < queue.size():
+		var pixel := queue[cursor]
+		cursor += 1
+		for next in _neighbors(pixel):
+			if part[next] == 0 and ids[next] == id:
+				part[next] = 1
+				queue.append(next)
+	for pixel in barrier:
+		if part[pixel] == 0: return {"error": "Split one island part at a time."}
+	var labels := PackedByteArray()
+	labels.resize(ids.size())
+	var groups: Array[PackedInt32Array] = []
+	for pixel in queue:
+		if labels[pixel] != 0 or barrier.has(pixel): continue
+		if groups.size() == 2: return {"error": "This line creates more than two pieces. Draw a simpler split."}
+		var group := PackedInt32Array([pixel])
+		var label := groups.size() + 1
+		labels[pixel] = label
+		cursor = 0
+		while cursor < group.size():
+			var cell := group[cursor]
+			cursor += 1
+			for next in _neighbors(cell):
+				if part[next] != 0 and labels[next] == 0 and not barrier.has(next):
+					labels[next] = label
+					group.append(next)
+		groups.append(group)
+	if groups.size() != 2: return {"error": "Extend the line across the province, or close it into a loop."}
+	# Assign cut pixels from their adjacent side so no land/water holes are created.
+	var frontier := PackedInt32Array()
+	for pixel in barrier:
+		for next in _neighbors(pixel):
+			if labels[next] > 0:
+				labels[pixel] = labels[next]
+				frontier.append(pixel)
+				break
+	cursor = 0
+	while cursor < frontier.size():
+		var pixel := frontier[cursor]
+		cursor += 1
+		for next in _neighbors(pixel):
+			if barrier.has(next) and labels[next] == 0:
+				labels[next] = labels[pixel]
+				frontier.append(next)
+	var new_label := 1 if groups[0].size() <= groups[1].size() else 2
+	var new_id := records.size() + 1
+	var changes: Dictionary = {}
+	for pixel in queue:
+		if labels[pixel] == new_label:
+			changes[pixel] = id
+			ids[pixel] = new_id
+	records.append({"id": new_id, "name": records[id - 1].name.left(108) + " split " + str(new_id), "kind": records[id - 1].kind, "active": true})
+	_texture = null
+	_image = null
+	return {"error": "", "changes": changes, "new_id": new_id}

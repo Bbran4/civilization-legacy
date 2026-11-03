@@ -31,7 +31,7 @@ func finish() -> Dictionary:
 	if draft == null or changes.is_empty():
 		cancel()
 		return {"error": "", "layer": null}
-	for i in range(draft.records.size()): draft.records[i].name = current.records[i].name
+	for i in range(current.records.size()): draft.records[i].name = current.records[i].name
 	var error: String = draft._index_regions(true)
 	if not error.is_empty():
 		cancel()
@@ -44,9 +44,9 @@ func finish() -> Dictionary:
 	for entry in redo_stack: history_bytes -= entry.indices.size() * 8
 	redo_stack.clear()
 	var retired: Array[int] = []
-	for i in range(draft.records.size()):
+	for i in range(current.records.size()):
 		if current.records[i].get("active", true) and not draft.records[i].active: retired.append(i)
-	undo_stack.append({"indices": indices, "before": before, "target": target, "retired": retired})
+	undo_stack.append({"indices": indices, "before": before, "target": target, "retired": retired, "created": range(current.records.size(), draft.records.size())})
 	history_bytes += indices.size() * 8
 	while undo_stack.size() > 50 or history_bytes > MAX_BYTES:
 		history_bytes -= undo_stack.pop_front().indices.size() * 8
@@ -68,9 +68,43 @@ func _apply(forward: bool) -> Dictionary:
 	for j in range(entry.indices.size()):
 		next.ids[entry.indices[j]] = entry.target if forward else entry.before[j]
 	for id in entry.get("retired", []): next.records[id].active = not forward
+	for id in entry.get("created", []): next.records[id].active = forward
 	var error: String = next._index_regions()
 	if not error.is_empty(): return {"error": error, "layer": null}
 	stack.pop_back()
 	(undo_stack if forward else redo_stack).append(entry)
 	current = next
-	return {"error": "", "layer": current}
+	var result := {"error": "", "layer": current}
+	if not entry.get("created", []).is_empty(): result.select_id = entry.target if forward else entry.before[0]
+	return result
+
+func split(layer: RefCounted, id: int, points: PackedVector2Array) -> Dictionary:
+	if not begin(layer, id): return {"error": "Select an active province to split.", "layer": null}
+	var result: Dictionary = draft.split_region(id, points)
+	if not result.error.is_empty():
+		cancel()
+		return {"error": result.error, "layer": null}
+	changes = result.changes
+	target = result.new_id
+	var committed := finish()
+	if committed.layer != null: committed.new_id = target
+	return committed
+
+func merge(layer: RefCounted, keep: int, selected: Array[int]) -> Dictionary:
+	if not begin(layer, keep): return {"error": "Select the province to keep.", "layer": null}
+	var unique: Dictionary = {keep: true}
+	for id in selected:
+		if id < 1 or id > layer.records.size() or not layer.records[id - 1].active or layer.records[id - 1].kind != layer.records[keep - 1].kind:
+			cancel()
+			return {"error": "Merge only active provinces of the same land/ocean kind.", "layer": null}
+		unique[id] = true
+	if unique.size() < 2:
+		cancel()
+		return {"error": "Select at least two provinces to merge.", "layer": null}
+	for pixel in range(draft.ids.size()):
+		if draft.ids[pixel] != keep and unique.has(draft.ids[pixel]):
+			changes[pixel] = draft.ids[pixel]
+			draft.ids[pixel] = keep
+	for id in unique:
+		if id != keep: draft.records[id - 1].active = false
+	return finish()

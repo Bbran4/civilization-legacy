@@ -32,10 +32,38 @@ func _run() -> void:
 	check(terrain.province_layer_current() and terrain.province_layer.ids.size() == 2050 * 2050, "Province ownership matches the maximum output raster.")
 	await editor.generate_ocean_borders()
 	check(terrain.province_layer.ocean_generated, "Ocean regions generate at full 2050 resolution.")
+	# A closed cut within an interior land block exercises new IDs after sea IDs at maximum size.
+	var region_layer: RefCounted = terrain.province_layer
+	var center := Vector2i(-1,-1)
+	var split_id := 0
+	for y in range(5,region_layer.size.y-5,7):
+		if split_id > 0: break
+		for x in range(5,region_layer.size.x-5,7):
+			var id: int = region_layer.ids[y*region_layer.size.x+x]
+			if id == 0 or region_layer.records[id-1].kind != "land": continue
+			var interior := true
+			for dy in range(-4,5):
+				for dx in range(-4,5): interior = interior and region_layer.ids[(y+dy)*region_layer.size.x+x+dx] == id
+			if interior:
+				center = Vector2i(x,y)
+				split_id = id
+				break
+	check(split_id > 0, "Maximum map supplies an interior province split fixture.")
+	var edits := preload("res://scripts/domain/province_edit_history.gd").new()
+	var c := Vector2(center)
+	var split_result := edits.split(region_layer,split_id,PackedVector2Array([c+Vector2(-2,-2),c+Vector2(2,-2),c+Vector2(2,2),c+Vector2(-2,2),c+Vector2(-2,-2)]))
+	check(split_result.error.is_empty() and terrain.install_province_layer(split_result.layer).is_empty(), "Province split installs at full 2050 resolution.")
+	var created_id: int = split_result.new_id
+	var restored_edit := edits.undo(terrain.province_layer)
+	check(restored_edit.error.is_empty() and restored_edit.layer.ids == region_layer.ids, "Maximum-resolution split Undo is exact.")
+	var repeated_edit := edits.redo(restored_edit.layer)
+	terrain.install_province_layer(repeated_edit.layer)
+	check(terrain.province_layer.records[created_id-1].active, "Maximum-resolution split Redo preserves the allocated ID.")
 	var path := "user://maximum-water.terrain.json"
 	check(Document.save_file(path, terrain).is_empty(), "Maximum-size height and water data fit the expanded bounded save format.")
 	var result := Document.load_file(path)
 	check(result.ok and Document.apply(terrain, result.document).is_empty() and terrain.water_layer_current() and terrain.terrain_surface_current() and terrain.province_layer_current(), "Maximum-resolution water and terrain restore together.")
+	check(terrain.province_layer.records[created_id-1].active and terrain.province_layer.records[created_id-1].kind == "land", "Appended land province restores after ocean records.")
 	# Race protection: reject an in-flight result if the source changes.
 	var previous_layer = terrain.water_layer
 	editor.generate_water_layer()

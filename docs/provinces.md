@@ -19,8 +19,8 @@ same saved political regions over the same ground and water.
 The province lock protects names, direct regeneration and upstream height, water
 and surface edits through the editor. Source changes retain old province data but
 mark it stale and hide it. Generating again replaces IDs and names; this is an
-explicit rebuild rather than an automatic operation. Manual border painting with per-stroke Undo/Redo is available. Split/merge remains
-future work. Civilization ownership and dated scenarios are separate
+explicit rebuild rather than an automatic operation. Manual border painting with per-stroke Undo/Redo is available. Drawn-border split and multi-region merge tools are now available with Undo/Redo;
+see [Province split/merge](province-split-merge.md). Civilization ownership and dated scenarios are separate
 future systems, not province identity.
 
 ## Generation and storage
@@ -67,12 +67,13 @@ It runs headless and with actual graphics. The maximum-resolution water test now
 builds and restores all four layers at 2050 square. Editor/world/heightmap/surface/
 water and shared-renderer suites provide regression coverage.
 
-Next: dedicated split/merge commands and further stable-ID editing, water
+Next: deeper province inspection/labels and water
 crossing relationships, province selection/inspection in gameplay, and optional
 political labels. Biomes, painting and trees remain separate later layers. Manual
 visual/zoom/performance review remains with the user.
 
-Province snapshots now use version 4 for a finite coastal sea band and deep-ocean
-background, retaining archived IDs and land/ocean kinds. V1-v3 maps remain readable.
+Province snapshots now use version 5 for appended split IDs after sea records,
+retaining the finite coastal sea band and deep-ocean
+background, retaining archived IDs and land/ocean kinds. V1-v4 maps remain readable.
 See [Coastal seas](coastal-seas.md). Accepted painted borders preserve IDs/names and
 save exactly. Ocean generation preserves authored land borders.

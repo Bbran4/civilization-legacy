@@ -54,9 +54,9 @@ limit or country ownership to the generated sea regions.
 
 ## Storage and validation
 
-The optional province section now uses version 4, retaining active/inactive
+The optional province section now uses version 5, retaining active/inactive
 records and ocean style while adding coastal reach and the deep-ocean background
-mask. Existing v1/v2/v3 province sections remain readable. Main terrain v10 and world manifest v3 are unchanged; snapshot-first
+mask. Existing v1-v4 province sections remain readable. Main terrain v10 and world manifest v3 are unchanged; snapshot-first
 world saving still preserves previous source documents.
 
 Landmass labels and per-region part lists are derived from the authoritative
@@ -73,3 +73,6 @@ anchors/determinism, the legacy open-zone option and unassigned lake/inland wate
 It also attaches an actual template island through the editor, saves/restores it
 with maritime regions and captures real GPU output. Existing border, province,
 world and maximum-resolution suites cover integration and compatibility.
+
+Dedicated [split/merge tools](province-split-merge.md) are now implemented, sharing
+the island/border editing history and preserving stable IDs.

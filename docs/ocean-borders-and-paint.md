@@ -42,7 +42,7 @@ Separate islands can share one land ID. Attach whole separate islands (on by
 default) transfers a touched separate landmass to the selected province. A fully
 painted-over land province is archived, with Undo restoring its ID/name. Invalid
 same-island splits or ocean disconnections reject the whole stroke. Dedicated
-split/merge commands remain future tools. See [Island attachment](islands-and-maritime.md). Region IDs and
+[split/merge commands](province-split-merge.md) are now available. See [Island attachment](islands-and-maritime.md). Region IDs and
 names remain stable during painting; areas and neighbors update after each edit.
 
 Draft strokes are separate from the installed world. Saving or inspecting the
@@ -60,7 +60,7 @@ names and recomputed adjacency. Renaming does not overwrite border history.
 ## Implementation and compatibility
 
 - `world_provinces.gd`: typed land/ocean records, boundary-connected ocean flood,
-  deterministic coastal/offshore sea partition, kind-safe capsule edits, exact v4 region snapshots,
+  deterministic coastal/offshore sea partition, kind-safe capsule edits, exact v5 region snapshots,
   complete typed coverage and connected-region validation. V1 land-only and v2 land/ocean province
   snapshots still load. V3 archived IDs remain supported; V4 adds coastal reach
   and the borderless open-ocean background mask. Main terrain v10/world manifest v3 stay unchanged.
