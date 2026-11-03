@@ -2,7 +2,7 @@ shader_type spatial;
 render_mode unshaded, cull_disabled;
 uniform sampler2D height_field : filter_linear, repeat_disable;
 uniform vec2 texel_size = vec2(0.001);
-uniform bool shaded_relief = false;
+uniform bool shaded_relief = true;
 void fragment() {
 	float h = texture(height_field, UV).r;
 	float value = h;

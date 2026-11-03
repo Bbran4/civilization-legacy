@@ -9,6 +9,8 @@ const Manifest = preload("res://scripts/storage/world_manifest.gd")
 var layers: Array = Manifest.default_layers()
 var selected_layer := "heightmap"
 var _terrain_path := ""
+var _gameplay_map: Node3D
+var _editor_process_mode: ProcessMode
 var _world_path := ""
 var dirty := true
 var _tracking_changes := false
@@ -171,11 +173,12 @@ func _build_interface() -> void:
 		output.item_selected.connect(func(_index: int): _settings_changed())
 		_controls["heightmap_resolution"] = output
 		_form.add_child(output)
-		var relief := CheckBox.new()
-		relief.text = "Shaded relief preview"
-		relief.tooltip_text = "Grayscale lighting to inspect ridges. The saved heightmap and exported values do not change."
-		relief.toggled.connect(_terrain.set_relief_preview)
-		_form.add_child(relief)
+		var raw := CheckBox.new()
+		raw.name = "RawHeightView"
+		raw.text = "Raw height values (editor only)"
+		raw.tooltip_text = "Inspect unshaded height values. Play map always uses the shared shaded-relief presentation. Exports remain raw height data."
+		raw.toggled.connect(_terrain.set_raw_height_view)
+		_form.add_child(raw)
 		_button("Export grayscale PNG…", func(): _show_dialog("export"))
 	var actions := HBoxContainer.new()
 	_form.add_child(actions)
@@ -673,6 +676,8 @@ func _build_shell() -> void:
 	_button("Open world…", func(): _show_dialog("load_world"), _toolbar, "OpenWorld")
 	_button("View settings", func(): _select_layer("view"), _toolbar)
 	_button("Full map", func(): _camera_rig._reset_view(), _toolbar)
+	if _terrain.heightmap_only:
+		_button("Play map", play_map, _toolbar, "PlayMap")
 	var stack := VBoxContainer.new()
 	stack.name = "LayerStack"
 	stack.position = Vector2(14, 60)
@@ -881,7 +886,7 @@ func _setup_document_tracking() -> void:
 	_terrain.climate_changed.connect(mark_dirty)
 	_terrain.vegetation_changed.connect(mark_dirty)
 	get_tree().auto_accept_quit = false
-	get_tree().root.close_requested.connect(func(): request_action(func(): get_tree().quit()))
+	get_tree().root.close_requested.connect(_request_app_close)
 	_tracking_changes = true
 	_update_world_status()
 
@@ -915,3 +920,39 @@ func _resume_pending_action() -> void:
 func _cancel_pending_action() -> void:
 	_pending_action = Callable()
 	_resume_after_save = false
+
+
+func play_map() -> void:
+	if _gameplay_map != null:
+		return
+	var document: Dictionary = Document.capture(_terrain)
+	var error := Document.validate(document)
+	if not error.is_empty():
+		_status.text = error
+		return
+	_stop_brush()
+	var gameplay := load("res://scenes/gameplay_map.tscn") as PackedScene
+	_gameplay_map = gameplay.instantiate()
+	_gameplay_map.get_node("Terrain").startup_document = document
+	_gameplay_map.return_requested.connect(_return_from_map)
+	var editor_world := get_parent().get_parent() as Node3D
+	_editor_process_mode = editor_world.process_mode
+	editor_world.process_mode = Node.PROCESS_MODE_DISABLED
+	editor_world.visible = false
+	get_parent().visible = false
+	get_tree().root.add_child(_gameplay_map)
+
+func _return_from_map() -> void:
+	if _gameplay_map == null:
+		return
+	_gameplay_map.queue_free()
+	_gameplay_map = null
+	var editor_world := get_parent().get_parent() as Node3D
+	editor_world.visible = true
+	editor_world.process_mode = _editor_process_mode
+	get_parent().visible = true
+	_camera_rig._camera.make_current()
+
+func _request_app_close() -> void:
+	_return_from_map()
+	request_action(func(): get_tree().quit())

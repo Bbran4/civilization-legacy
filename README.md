@@ -16,7 +16,9 @@ are planned gameplay systems.
 
 The editor currently opens in **heightmap-only mode**. Pick a template and seed,
 then tune coast detail and mountain detail. The detailed raster is the source for
-both the grayscale viewport and export; shaded relief is an optional preview.
+both views and export. Editor and gameplay now share shaded relief by default;
+**Play map** opens the current terrain in the runtime view, with Escape to return.
+Raw height inspection remains available in the editor.
 Trees, biomes, climate, rivers, lakes and provinces are disabled in this workspace.
 Their existing code and terrain saves are retained. See the
 [heightmap focus guide](docs/heightmap-focus.md).

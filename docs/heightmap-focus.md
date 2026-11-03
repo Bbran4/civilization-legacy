@@ -14,16 +14,21 @@ and their editing controls are disabled. The code is retained for later work.
 - Resolution offers 513 or 1025 samples along the longest edge (the existing save
   format uses 512 or 1024 grid cells). Aspect ratio follows map width/height.
 - Generate applies the staged choices; New seed generates another world.
-- Shaded relief preview adds grayscale lighting to inspect landforms. It defaults
-  off and changes neither saved samples nor exported height values.
+- Shaded relief is the default presentation in the editor and runtime map. Both
+  use one shared renderer with the same height data and lighting.
+- Raw height values (editor only) temporarily disables shading for data inspection;
+  it changes neither saved samples nor exports and never changes gameplay shading.
+- Play map opens the current authored terrain in the runtime view. Return to
+  editor (or Escape) restores the editor and retains unsaved changes.
 - Export grayscale PNG writes the canonical height field as an 8-bit grayscale
   image. World/terrain documents retain the full float32 height samples.
 
 Black is low terrain and white is high terrain. Template sea datum is 20% height;
 raw exports retain elevations below it, rather than painting them with water.
-The default viewport is a flat, unshaded grayscale height field. Coastlines can
-also be inspected in the optional shaded preview. Wheel/pan/full-map navigation
-remains available. Clicking the map inspects the actual refined sample height.
+The default viewport is a flat, shaded grayscale terrain map. Wheel/pan/full-map
+navigation remains available. Clicking the map inspects the actual refined sample
+height. The shared runtime foundation is described in
+[Shared terrain rendering](shared-terrain-rendering.md).
 
 ## Generation changes
 
@@ -69,6 +74,9 @@ the active editor's new defaults.
   bounds; unchanged source cells; zero-detail identity; main-scene focus;
   disabled generators/controls; canonical grayscale export; exact terrain/world
   save/restore; legacy optional metadata; direct import sampling; plane picking.
+- `shared_terrain_rendering_smoke.gd`: editor/runtime default shading, exact
+  document handoff, shared float textures/shader, GPU output parity, return flow,
+  raw-editor isolation, unsaved-close handling and standalone runtime loading.
 - `heightmap_parity.gd`: the original cell recipes still match the upstream
   JavaScript reference for all 14 templates and reference seeds.
 - Phase 1, world workflow, editor, palette, climate and hydrology regression suites.

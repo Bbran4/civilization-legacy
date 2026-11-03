@@ -6,12 +6,16 @@ signal climate_changed
 signal vegetation_changed
 signal terrain_regenerated
 const HeightDetail = preload("res://scripts/domain/heightmap_detail.gd")
-const HEIGHT_ONLY_SHADER = preload("res://scripts/rendering/heightmap_only.gdshader")
+const MapRenderer = preload("res://scripts/rendering/terrain_map_renderer.gd")
+const TerrainDocument = preload("res://scripts/storage/terrain_document.gd")
+var map_renderer: RefCounted
+## Assigned before entering the tree when starting a runtime map from an editor snapshot.
+var startup_document: Dictionary = {}
 ## Runtime authoring focus. Legacy systems remain available to explicit test fixtures.
 @export var heightmap_only: bool = false
 var coast_detail: float = 0.75
 var mountain_detail: float = 0.8
-var shaded_relief: bool = false
+var shaded_relief: bool = true
 const PaintLayer = preload("res://scripts/rendering/terrain_paint_layer.gd")
 var paint_layer: RefCounted
 var _restore_paint: bool = false
@@ -249,6 +253,13 @@ var _sample_max: float = 0.0
 
 
 func _ready() -> void:
+	if not startup_document.is_empty():
+		var document := startup_document
+		startup_document = {}
+		var error: String = TerrainDocument.apply(self, document)
+		if error.is_empty():
+			return
+		push_error("Could not load initial terrain: " + error)
 	if not Engine.is_editor_hint():
 		GenerationProfile.apply(self)
 	regenerate()
@@ -686,11 +697,7 @@ func _build_mesh(surface: MeshInstance3D) -> void:
 		world_heights[i] = height * factor
 		_sample_min = minf(_sample_min, height)
 		_sample_max = maxf(_sample_max, height)
-	if heightmap_only:
-		var plane := PlaneMesh.new()
-		plane.size = display_size()
-		surface.mesh = plane
-	else:
+	if not heightmap_only:
 		surface.mesh = Grid.mesh_from_heights(world_heights, size, display_size())
 
 
@@ -706,7 +713,7 @@ func _sample_image(image: Image, uv: Vector2) -> float:
 
 
 func _update_material(surface: MeshInstance3D) -> void:
-	if _land_material == null:
+	if _land_material == null or _land_material.shader != TERRAIN_SHADER:
 		_land_material = ShaderMaterial.new()
 		_land_material.shader = TERRAIN_SHADER
 	if not _restore_paint or paint_layer == null:
@@ -929,21 +936,22 @@ func _regenerate_heightmap_only(surface: MeshInstance3D, water: MeshInstance3D, 
 	if not _restore_paint or paint_layer == null:
 		paint_layer = PaintLayer.new(map_size)
 	_restore_paint = false
-	var normalized := PackedFloat32Array()
-	normalized.resize(height_samples.size())
-	for i in range(height_samples.size()):
-		normalized[i] = clampf((height_samples[i] - height_offset) / elevation + (0.2 if generator_version >= 3 else 0.0), 0.0, 1.0)
-	var size := sample_size()
-	_land_material = ShaderMaterial.new()
-	_land_material.shader = HEIGHT_ONLY_SHADER
-	_land_material.set_shader_parameter("height_field", ImageTexture.create_from_image(Image.create_from_data(size.x, size.y, false, Image.FORMAT_RF, normalized.to_byte_array())))
-	_land_material.set_shader_parameter("texel_size", Vector2.ONE / Vector2(size))
-	_land_material.set_shader_parameter("shaded_relief", shaded_relief)
-	surface.material_override = _land_material
+	if map_renderer == null:
+		map_renderer = MapRenderer.new(surface)
+	map_renderer.set_shaded_relief(shaded_relief)
+	map_renderer.set_heightfield(height_samples, sample_size(), display_size(), height_offset, elevation, generator_version)
+	_land_material = map_renderer.material
 	generation_ms = (Time.get_ticks_usec() - started) / 1000.0
 	terrain_regenerated.emit()
 
-func set_relief_preview(enabled: bool) -> void:
+func set_shaded_relief(enabled: bool) -> void:
 	shaded_relief = enabled
-	if heightmap_only and _land_material != null:
-		_land_material.set_shader_parameter("shaded_relief", enabled)
+	if heightmap_only and map_renderer != null:
+		map_renderer.set_shaded_relief(enabled)
+
+func set_raw_height_view(enabled: bool) -> void:
+	set_shaded_relief(not enabled)
+
+func set_relief_preview(enabled: bool) -> void:
+	# Compatibility for callers of the original editor-preview API.
+	set_shaded_relief(enabled)
