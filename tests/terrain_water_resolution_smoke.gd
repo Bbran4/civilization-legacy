@@ -30,6 +30,8 @@ func _run() -> void:
 	check(terrain.terrain_surface_current() and terrain.terrain_surface.heights.size() == 2050 * 2050, "Maximum surface builds at full output resolution.")
 	await editor.generate_provinces()
 	check(terrain.province_layer_current() and terrain.province_layer.ids.size() == 2050 * 2050, "Province ownership matches the maximum output raster.")
+	await editor.generate_ocean_borders()
+	check(terrain.province_layer.ocean_generated, "Ocean regions generate at full 2050 resolution.")
 	var path := "user://maximum-water.terrain.json"
 	check(Document.save_file(path, terrain).is_empty(), "Maximum-size height and water data fit the expanded bounded save format.")
 	var result := Document.load_file(path)

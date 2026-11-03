@@ -8,9 +8,9 @@ a globe view at full zoom-out, while preserving terrain detail at close range.
 Successive civilizations, skill trees, prestige and inherited world history remain
 the planned gameplay layer on top of that shared world.
 
-**Current prototype: a layered terrain and province map editor.** Manual province
-painting, scenarios, civilization simulation, skill trees and prestige are planned
-gameplay systems.
+**Current prototype: a layered terrain, ocean and province map editor with manual
+border painting and Undo/Redo.** Scenarios, civilization simulation, skill trees
+and prestige are planned gameplay systems.
 
 ## Current focus: terrain, water and provinces
 
@@ -22,7 +22,9 @@ gameplay systems.
    and banks. Editor and **Play map** use this derived ground with the water layer.
 4. Select **Provinces** and generate connected land regions. Click to inspect IDs,
    names and neighbors; apply custom province names. Play map has an optional
-   Provinces view. Original terrain and water remain unchanged.
+   Provinces view. Generate ocean borders without replacing land regions, then
+   paint land/ocean borders with stroke Undo/Redo. Original terrain and water
+   remain unchanged.
 
 Both original source layers stay intact. Visibility and locks support comparison;
 changing either source retains but hides the old surface until it is rebuilt.
@@ -30,7 +32,8 @@ Old saves stay readable. Older water layers need explicit regeneration to supply
 water elevations before a surface can be built. Trees, climate, biomes and painting
 remain disabled in this focused workspace. Province IDs/names survive saving;
 regenerating provinces replaces them.
-See [province workflow](docs/provinces.md), [terrain surface workflow](docs/terrain-surface.md),
+See [ocean borders and painting](docs/ocean-borders-and-paint.md),
+[province workflow](docs/provinces.md), [terrain surface workflow](docs/terrain-surface.md),
 [water-layer workflow](docs/water-layer.md) and [heightmap focus](docs/heightmap-focus.md).
 
 ## Map Editor 2.0

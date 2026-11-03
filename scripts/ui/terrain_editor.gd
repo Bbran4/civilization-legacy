@@ -5,6 +5,9 @@ const MaterialPanel = preload("res://scripts/ui/terrain_material_panel.gd")
 const GroundBrush = preload("res://scripts/ui/terrain_brush.gd")
 const WorldProject = preload("res://scripts/storage/world_project.gd")
 const LayerGraph = preload("res://scripts/domain/map_layer_graph.gd")
+const ProvinceBorderBrush = preload("res://scripts/ui/province_border_brush.gd")
+var _province_brush: Node
+var _ocean_count: SpinBox
 const WorldProvinces = preload("res://scripts/domain/world_provinces.gd")
 const TerrainSurface = preload("res://scripts/domain/terrain_surface.gd")
 const WaterLayer = preload("res://scripts/domain/terrain_water_layer.gd")
@@ -352,6 +355,7 @@ func _sync_from_terrain() -> void:
 	if _terrain.heightmap_only:
 		if _province_count != null and _terrain.province_layer != null:
 			_province_count.set_value_no_signal(_terrain.province_layer.requested_count)
+			_ocean_count.set_value_no_signal(_terrain.province_layer.requested_oceans)
 			_select_province(0)
 		_controls["coast_detail"].set_value_no_signal(_terrain.coast_detail)
 		_controls["mountain_detail"].set_value_no_signal(_terrain.mountain_detail)
@@ -642,6 +646,8 @@ func _reset_cell_inspector() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _province_brush != null and _province_brush.handle_input(event):
+		return
 	if _brush != null and _brush.handle_input(event):
 		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -810,6 +816,9 @@ func _select_layer(key: String) -> void:
 	_stop_brush()
 
 func _stop_brush() -> void:
+	if _province_brush != null:
+		_province_brush.cancel()
+		_province_brush.enabled.button_pressed = false
 	if _brush != null:
 		_brush.painting = false
 		_brush.enabled.button_pressed = false
@@ -864,7 +873,7 @@ func _update_dependency_status() -> void:
 
 func _apply_layer_visibility() -> void:
 	if _terrain.heightmap_only:
-		_terrain.visible = (layer_visible("surface") and _terrain.terrain_surface_current()) or layers[0].visible or (layer_visible("rivers") and _terrain.water_layer_current())
+		_terrain.visible = (layer_visible("provinces") and _terrain.province_layer_current()) or (layer_visible("surface") and _terrain.terrain_surface_current()) or layers[0].visible or (layer_visible("rivers") and _terrain.water_layer_current())
 		_terrain.set_height_layer_visible(layers[0].visible)
 		for layer in layers:
 			if layer.id not in ["heightmap", "rivers", "surface", "provinces"]:
@@ -1275,7 +1284,7 @@ func build_terrain_surface() -> void:
 		_update_surface_status()
 
 func _build_province_controls() -> void:
-	_label("Generate connected land regions from the finished surface. Lakes and sea stay unassigned. Rivers and steep slopes discourage crossings.").autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_label("Generate land regions, then ocean borders around the coastline. Lakes stay separate. Paint borders below.").autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_label("Target mainland provinces")
 	_province_count = SpinBox.new()
 	_province_count.min_value = 1
@@ -1284,14 +1293,24 @@ func _build_province_controls() -> void:
 	_form.add_child(_province_count)
 	_button("Generate provinces", generate_provinces, null, "GenerateProvinces")
 	_province_generate = _form.get_child(_form.get_child_count() - 1)
-	_label("Click the map to inspect and name a province.").autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_label("Target ocean regions")
+	_ocean_count = SpinBox.new()
+	_ocean_count.min_value = 1
+	_ocean_count.max_value = 256
+	_ocean_count.value = 24
+	_form.add_child(_ocean_count)
+	_button("Generate ocean borders", generate_ocean_borders, null, "GenerateOceans")
+	_label("Click the map to inspect and name a land or ocean region.").autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_province_name = LineEdit.new()
 	_province_name.max_length = 128
-	_province_name.placeholder_text = "Province name"
+	_province_name.placeholder_text = "Region name"
 	_form.add_child(_province_name)
-	_button("Apply province name", rename_province, null, "RenameProvince")
+	_button("Apply region name", rename_province, null, "RenameProvince")
 	_province_status = _label("Build the terrain surface first.", 13)
 	_province_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_province_brush = ProvinceBorderBrush.new()
+	add_child(_province_brush)
+	_province_brush.configure(self)
 
 func _select_province(id: int) -> void:
 	_province_selected = id
@@ -1305,7 +1324,7 @@ func rename_province() -> void:
 		return
 	var value := _province_name.text.strip_edges()
 	if value.is_empty():
-		_province_status.text = "Enter a province name."
+		_province_status.text = "Enter a region name."
 		return
 	_terrain.province_layer.records[_province_selected - 1].name = value
 	mark_dirty()
@@ -1316,12 +1335,19 @@ func _update_province_status() -> void:
 		return
 	var current: bool = _terrain.province_layer_current()
 	_layer_selectors["provinces"].text = "Provinces *" if _terrain.province_layer != null and not current else "Provinces"
-	_province_status.text = "%d connected provinces. Small islands may add regions beyond the target. Regenerating replaces province names and IDs." % _terrain.province_layer.records.size() if current else "Build the terrain surface, then generate provinces. Old province data is retained but hidden when the terrain changes."
+	if current:
+		var oceans := 0
+		for record in _terrain.province_layer.records:
+			if record.kind == "ocean": oceans += 1
+		_province_status.text = "%d land · %d ocean regions. Ocean generation preserves land IDs; land regeneration replaces all IDs and names." % [_terrain.province_layer.records.size() - oceans, oceans]
+	else:
+		_province_status.text = "Build the terrain surface, then generate provinces. Old data is retained but hidden when the source changes."
 	if not current:
 		_province_selected = 0
 		_province_name.text = ""
 
 func generate_provinces() -> void:
+	if _province_brush != null: _province_brush.cancel()
 	if _province_busy or _water_busy or _surface_busy:
 		return
 	var error := regeneration_error("provinces")
@@ -1366,3 +1392,38 @@ func generate_provinces() -> void:
 	_update_province_status()
 	if not error.is_empty():
 		_province_status.text = error
+
+func generate_ocean_borders() -> void:
+	if _province_busy or _water_busy or _surface_busy: return
+	if not regeneration_error("provinces").is_empty() or not _terrain.province_layer_current():
+		_province_status.text = "Generate current land provinces and show/unlock the layer first."
+		return
+	_province_brush.cancel()
+	var original: RefCounted = _terrain.province_layer
+	var candidate: RefCounted = original.editable_copy()
+	var base: PackedFloat32Array = _terrain.map_renderer.normalized_heights.duplicate()
+	var water: RefCounted = _terrain.water_layer
+	var serial := _water_job_serial
+	_province_busy = true
+	_ocean_count.apply()
+	await get_tree().process_frame
+	var count := int(_ocean_count.value)
+	_province_status.text = "Generating connected ocean regions around the land…"
+	_province_thread = Thread.new()
+	var started := _province_thread.start(func(): return candidate.generate_oceans(base, water, count))
+	if started != OK:
+		_province_thread = null
+		_province_busy = false
+		_province_status.text = "Could not start ocean generation."
+		return
+	while _province_thread.is_alive(): await get_tree().process_frame
+	var error: String = _province_thread.wait_to_finish()
+	_province_thread = null
+	_province_busy = false
+	if serial != _water_job_serial or _terrain.province_layer != original or not regeneration_error("provinces").is_empty():
+		_province_status.text = "The document or layer changed. Generate ocean borders again."
+		return
+	if error.is_empty(): error = _terrain.install_province_layer(candidate)
+	_select_province(0)
+	_update_province_status()
+	if not error.is_empty(): _province_status.text = error

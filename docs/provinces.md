@@ -6,7 +6,9 @@ Generate Heightmap, then Rivers / lakes, then Build terrain surface. Select
 Provinces, choose a target of 1-512 mainland provinces and Generate provinces.
 Generation is deterministic for the same source field and target count. Isolated
 islands without a sampled seed gain their own province, so the actual count can
-exceed the target. Oceans and lakes have ID 0 and are not owned by land provinces.
+exceed the target. Oceans initially have ID 0; optional ocean generation adds separate typed regions.
+Lakes and enclosed inland water stay unassigned. See
+[Ocean borders and painting](ocean-borders-and-paint.md).
 
 Click the map to inspect a province ID, name, pixel area and number of neighbors.
 The selected province is highlighted. Enter a name and Apply province name. Hide
@@ -17,8 +19,8 @@ same saved political regions over the same ground and water.
 The province lock protects names, direct regeneration and upstream height, water
 and surface edits through the editor. Source changes retain old province data but
 mark it stale and hide it. Generating again replaces IDs and names; this is an
-explicit rebuild rather than an automatic operation. Manual brush/split/merge is
-not implemented yet. Civilization ownership and dated scenarios are separate
+explicit rebuild rather than an automatic operation. Manual border painting with per-stroke Undo/Redo is available. Split/merge remains
+future work. Civilization ownership and dated scenarios are separate
 future systems, not province identity.
 
 ## Generation and storage
@@ -49,7 +51,7 @@ untouched. Existing snapshot-first world saving remains unchanged.
 
 Generation runs on a worker using immutable input references/copies. Installation
 rechecks source identity, document session and layer state; shutdown joins workers.
-The new map shader adds stable province tints and shared-edge borders with water
+The map shader adds stable province tints and shared-edge borders with water
 on top, using nearest-sampled IDs so colors cannot create false identities.
 Original shaded relief and raw base inspection remain available.
 
@@ -63,7 +65,11 @@ It runs headless and with actual graphics. The maximum-resolution water test now
 builds and restores all four layers at 2050 square. Editor/world/heightmap/surface/
 water and shared-renderer suites provide regression coverage.
 
-Next: manual border paint with undo, split/merge and stable-ID editing, water
+Next: split/merge and further stable-ID editing, water
 crossing relationships, province selection/inspection in gameplay, and optional
 political labels. Biomes, painting and trees remain separate later layers. Manual
 visual/zoom/performance review remains with the user.
+
+Province snapshots now use version 2 to distinguish land and ocean records. V1
+land-only maps remain readable. Accepted painted borders preserve IDs/names and
+save exactly. Ocean generation preserves authored land borders.
