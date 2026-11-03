@@ -1,4 +1,6 @@
 extends Node3D
+
+var editor_visible := true
 ## Chunked miniature forests; instance placement is fixed until terrain/climate edits.
 const Layout = preload("res://scripts/rendering/terrain_vegetation_layout.gd")
 const Library = preload("res://scripts/rendering/terrain_tree_library.gd")
@@ -109,7 +111,7 @@ func set_view(mode: int, heights: bool) -> void:
 	_update_visibility()
 
 func _update_visibility() -> void:
-	visible = _mode == 0 and not _heights and _overview < 0.999 and fade > 0.001
+	visible = editor_visible and _mode == 0 and not _heights and _overview < 0.999 and fade > 0.001
 
 func _process(_delta: float) -> void:
 	if _material == null:

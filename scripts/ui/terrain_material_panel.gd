@@ -188,8 +188,12 @@ func _clear_file(role: String, slot: int) -> void:
 	_show_row(picker.selected)
 
 func _apply() -> bool:
+	if not editor.can_edit("ground"):
+		return false
 	status.text = "Preparing ground textures…"
 	await get_tree().process_frame
+	if not editor.can_edit("ground"):
+		return false
 	var error: String = terrain.apply_surface_catalog(catalog.duplicate(true))
 	status.text = "Textures applied. Save terrain to keep the palette and brush strokes." if error.is_empty() else error
 	return error.is_empty()

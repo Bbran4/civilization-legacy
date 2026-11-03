@@ -1,4 +1,6 @@
 extends RefCounted
+
+var editor_visible := true
 ## A lossless appearance layer, independent from climate, elevation and native biomes.
 const Grid = preload("res://scripts/domain/heightmap_grid.gd")
 var extent := Vector2.ZERO
@@ -68,7 +70,7 @@ func snapshot() -> Dictionary:
 	return {"version": 1, "png": Marshalls.raw_to_base64(image.save_png_to_buffer()) if image != null else ""}
 
 func bind(material: ShaderMaterial) -> void:
-	material.set_shader_parameter("ground_paint_enabled", image != null)
+	material.set_shader_parameter("ground_paint_enabled", editor_visible and image != null)
 	if texture != null:
 		material.set_shader_parameter("ground_paint", texture)
 

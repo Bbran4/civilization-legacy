@@ -78,7 +78,8 @@ func _run() -> void:
 	var terrain = world.get_node("Terrain")
 	terrain.map_size = Vector2(256, 256)
 	terrain.regenerate()
-	var panel = world.get_node("Interface/Editor/ClimatePanel")
+	world.get_node("Interface/Editor")._select_layer("climate")
+	var panel = world.get_node("Interface/Editor")._climate_panel
 	var mesh_id: int = terrain.detail.chunks[0].meshes[0].get_instance_id()
 	var heights: PackedFloat32Array = terrain.height_samples.duplicate()
 	var geography = terrain.geography
@@ -110,7 +111,7 @@ func _run() -> void:
 	var wet_options: Dictionary = original_options.duplicate()
 	wet_options.rainfall_scale = 3
 	terrain.apply_climate(dry_options)
-	_check(editor._cell_label.text.contains("Rainfall: 0 mm/yr") and editor._cell_label.text.contains("Biome:"), "Applying climate must refresh the selected cell without requiring another click.")
+	_check(editor._cell_label.text.contains("Rainfall: 0 mm/yr") and editor._cell_label.text.contains("Biome at point:"), "Applying climate must refresh the selected cell without requiring another click.")
 	var dry_biomes: PackedByteArray = terrain.biomes.ids.duplicate()
 	var dry_colors: PackedByteArray = terrain._climate_texture.get_image().get_data()
 	var palette_id: int = terrain._biome_texture.get_instance_id()

@@ -5,7 +5,8 @@ signal zoom_changed
 
 @export_range(20.0, 500.0, 1.0) var initial_view_size: float = 180.0
 @export_range(5.0, 200.0, 1.0) var movement_speed: float = 60.0
-@export var sidebar_width: float = 380.0
+@export var sidebar_width: float = 638.0
+@export var panel_balance: float = -130.0
 var _yaw: float = 0.0
 var _pitch: float = 55.0
 var _map_size := Vector2.ZERO
@@ -46,7 +47,7 @@ func _map_changed() -> void:
 
 
 func _process(delta: float) -> void:
-	_camera.h_offset = -0.5 * _camera.size * minf(sidebar_width, get_viewport().get_visible_rect().size.x * 0.5) / maxf(1.0, get_viewport().get_visible_rect().size.y)
+	_camera.h_offset = -0.5 * _camera.size * panel_balance / maxf(1.0, get_viewport().get_visible_rect().size.y)
 	if get_viewport().gui_get_focus_owner() is LineEdit or get_viewport().gui_get_focus_owner() is TextEdit:
 		return
 	var direction := Vector2.ZERO
@@ -131,7 +132,7 @@ func _apply_zoom() -> void:
 	if is_instance_valid(_camera):
 		_apply_pose()
 		_camera.size = _fit_size / _zoom
-		_camera.h_offset = -0.5 * _camera.size * minf(sidebar_width, get_viewport().get_visible_rect().size.x * 0.5) / maxf(1.0, get_viewport().get_visible_rect().size.y)
+		_camera.h_offset = -0.5 * _camera.size * panel_balance / maxf(1.0, get_viewport().get_visible_rect().size.y)
 		_fit_depth()
 	zoom_changed.emit()
 

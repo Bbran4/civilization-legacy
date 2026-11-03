@@ -3,6 +3,16 @@ extends Control
 
 const MaterialPanel = preload("res://scripts/ui/terrain_material_panel.gd")
 const GroundBrush = preload("res://scripts/ui/terrain_brush.gd")
+const Manifest = preload("res://scripts/storage/world_manifest.gd")
+var layers: Array = Manifest.default_layers()
+var selected_layer := "heightmap"
+var _terrain_path := ""
+var _contexts: Dictionary = {}
+var _layer_buttons: Dictionary = {}
+var _layer_selectors: Dictionary = {}
+var _context_host: VBoxContainer
+var _climate_panel: PanelContainer
+var _toolbar: HBoxContainer
 var _material_panel: Window
 var _brush: Node
 
@@ -46,10 +56,17 @@ func _ready() -> void:
 	_update_zoom_status()
 	_terrain.terrain_regenerated.connect(_update_preview)
 	_update_preview()
+	_terrain.terrain_regenerated.connect(_apply_layer_visibility)
 	_build_cell_inspector()
 	var climate_panel := ClimatePanel.new()
 	climate_panel.terrain = _terrain
-	add_child(climate_panel)
+	climate_panel.editor = self
+	_climate_panel = climate_panel
+	_contexts["climate"].add_child(climate_panel)
+	climate_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	climate_panel.custom_minimum_size.y = 450
+	climate_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_select_layer("heightmap")
 
 
 func _build_interface() -> void:
@@ -58,11 +75,13 @@ func _build_interface() -> void:
 	editor_theme.set_color("font_color", "Label", Color("dce5e9"))
 	theme = editor_theme
 	var panel := PanelContainer.new()
-	panel.name = "Sidebar"
+	panel.name = "PropertiesPanel"
 	panel.anchor_bottom = 1.0
-	panel.offset_left = 14
-	panel.offset_top = 14
-	panel.offset_right = 370
+	panel.anchor_left = 1.0
+	panel.anchor_right = 1.0
+	panel.offset_left = -370
+	panel.offset_top = 60
+	panel.offset_right = -14
 	panel.offset_bottom = -14
 	var background := StyleBoxFlat.new()
 	background.bg_color = Color("14212c")
@@ -83,11 +102,13 @@ func _build_interface() -> void:
 	_form.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_form.add_theme_constant_override("separation", 9)
 	scroll.add_child(_form)
+	_build_shell()
+	_contexts["heightmap"] = _form
 	_label("CIVILIZATION LEGACY", 13, Color("afbdc6"))
-	_label("Terrain editor", 28, Color("f0dbab"))
+	_label("World editor", 28, Color("f0dbab"))
 	_label("Create a heightmap. Keep the world.", 14)
 	var files := HBoxContainer.new()
-	_form.add_child(files)
+	_toolbar.add_child(files)
 	_button("Save terrain…", func(): _show_dialog("save"), files, "SaveTerrain")
 	_button("Load terrain…", func(): _show_dialog("load"), files, "LoadTerrain")
 	_section("CREATE A MAP")
@@ -139,6 +160,7 @@ func _build_interface() -> void:
 	_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_form.add_child(_preview)
 	_help(_preview, "preview")
+	_context("trees")
 	_section("TREES")
 	_label("Requested tree population", 13)
 	_tree_population = SpinBox.new()
@@ -151,9 +173,11 @@ func _build_interface() -> void:
 	_button("Apply trees", _apply_trees, null, "ApplyTrees")
 	_tree_status = _label("", 12, Color("a9bdc8"))
 	_tree_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_context("ground")
 	_brush = GroundBrush.new()
 	add_child(_brush)
 	_brush.configure(self)
+	_context("view")
 	_section("VIEW")
 	_number("Minimum zoom (×)", "min_zoom", 0.1, 1, 0.1, true)
 	_number("Maximum zoom (×)", "max_zoom", 1, 8192, 1, true)
@@ -181,6 +205,11 @@ func _build_interface() -> void:
 		_help(_controls[key], key)
 		if _controls[key] is SpinBox:
 			_help(_controls[key].get_parent(), key)
+	_context("rivers")
+	_label("Rivers / lakes", 22)
+	_label("Generated from height and climate. Independent river authoring is planned.").autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_context("climate")
+	_form = _contexts["heightmap"]
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("user://maps"))
 
 
@@ -242,7 +271,8 @@ func _number(title: String, key: String, minimum: float, maximum: float, step: f
 func _button(title: String, action: Callable, parent: Node = null, node_name: String = "") -> void:
 	var button := Button.new()
 	button.text = title
-	_help(button, title)
+	if Help.HINTS.has(title):
+		_help(button, title)
 	if not node_name.is_empty():
 		button.name = node_name
 	button.custom_minimum_size.y = 32
@@ -279,8 +309,12 @@ func _sync_from_terrain() -> void:
 
 
 func _apply_trees() -> void:
+	if not can_edit("trees"):
+		return
 	_tree_population.apply()
 	await get_tree().process_frame
+	if not can_edit("trees"):
+		return
 	_terrain.apply_tree_population(int(_tree_population.value))
 	_update_tree_status()
 	_refresh_selected_cell()
@@ -334,6 +368,9 @@ func _update_description() -> void:
 
 
 func apply_settings() -> void:
+	if not can_edit("heightmap") or _any_locked():
+		_status.text = "Unlock affected layers before generating terrain."
+		return
 	var picker := _controls["terrain_template"] as OptionButton
 	_terrain.terrain_template = picker.get_item_metadata(picker.selected)
 	_terrain.map_size = Vector2(_controls["map_size.x"].value, _controls["map_size.y"].value)
@@ -353,6 +390,8 @@ func apply_settings() -> void:
 
 
 func _new_seed() -> void:
+	if _any_locked():
+		return
 	(_controls["map_seed"] as LineEdit).text = str(randi_range(1, 2147483647))
 	apply_settings()
 
@@ -365,8 +404,12 @@ func _update_preview() -> void:
 func _show_dialog(action: String) -> void:
 	_dialog_action = action
 	_dialog.current_dir = ProjectSettings.globalize_path("user://maps")
-	_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE if action in ["load", "image"] else FileDialog.FILE_MODE_SAVE_FILE
+	_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE if action in ["load", "image", "load_world"] else FileDialog.FILE_MODE_SAVE_FILE
 	match action:
+		"save_world", "load_world":
+			_dialog.title = "World manifest (references the last saved terrain)"
+			_dialog.filters = PackedStringArray(["*.world.json ; World manifests"])
+			_dialog.current_file = "world.world.json"
 		"save":
 			_dialog.title = "Save terrain and settings"
 			_dialog.filters = PackedStringArray(["*.terrain.json ; Terrain maps"])
@@ -386,8 +429,19 @@ func _show_dialog(action: String) -> void:
 
 func _file_selected(path: String) -> void:
 	match _dialog_action:
+		"save_world":
+			if _terrain_path.is_empty():
+				_status.text = "Save terrain first, then save its world manifest."
+				return
+			_status.text = Manifest.save_file(path, Manifest.capture(layers, _manifest_reference(path), selected_layer if selected_layer != "view" else "heightmap"))
+			if _status.text.is_empty():
+				_status.text = "World manifest saved. Terrain was not changed."
+		"load_world":
+			load_world(path)
 		"save":
 			var error: String = Document.save_file(path, _terrain)
+			if error.is_empty():
+				_terrain_path = path
 			_status.text = "Saved " + path.get_file() if error.is_empty() else error
 		"load":
 			load_terrain(path)
@@ -417,6 +471,7 @@ func load_terrain(path: String) -> String:
 		return result.error
 	var error: String = Document.apply(_terrain, result.document)
 	if error.is_empty():
+		_terrain_path = path
 		_sync_from_terrain()
 		get_parent().get_parent().get_node("CameraRig")._reset_view()
 		_status.text = "Loaded " + path.get_file() + "\nSaved terrain samples restored exactly."
@@ -429,11 +484,11 @@ func _build_cell_inspector() -> void:
 	var panel := PanelContainer.new()
 	panel.name = "CellInspector"
 	_cell_panel = panel
-	panel.anchor_left = 1.0
-	panel.anchor_right = 1.0
-	panel.offset_left = -274
-	panel.offset_right = -14
-	panel.offset_top = 14
+	panel.anchor_left = 0.0
+	panel.anchor_right = 0.0
+	panel.offset_left = 14
+	panel.offset_right = 240
+	panel.offset_top = 310
 	panel.anchor_bottom = 1.0
 	panel.offset_bottom = -470
 	panel.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -458,6 +513,7 @@ func _build_cell_inspector() -> void:
 
 
 func _open_ground_palette() -> void:
+	_select_layer("ground")
 	if _material_panel == null:
 		_material_panel = MaterialPanel.new()
 		_material_panel.visible = false
@@ -471,7 +527,7 @@ func _reset_cell_inspector() -> void:
 	_selected_point = Vector2.INF
 	_cell_label.text = "CELL DATA\nClick the map to inspect its terrain." if _terrain.graph != null else "LEGACY TERRAIN\nGenerate to create cell data."
 	_cell_panel.anchor_bottom = 0.0
-	_cell_panel.offset_bottom = 84
+	_cell_panel.offset_bottom = 410
 
 
 
@@ -496,7 +552,7 @@ func _refresh_selected_cell() -> void:
 
 func _show_cell_info(info: Dictionary) -> void:
 	_cell_panel.anchor_bottom = 1.0
-	_cell_panel.offset_bottom = -470
+	_cell_panel.offset_bottom = -14
 	_cell_label.text = "CELL %d · %s\nX %.2f   Y %.2f\nHeight %d / 100 · sea datum 20\n%d neighbors\nArea %.2f map units²" % [info.id, info.get("surface_kind", "Land" if info.land else "Water"), info.position.x, info.position.y, info.height, info.neighbor_count, info.area]
 	if info.has("inspected_position"):
 		_cell_label.text += "\nClicked at %.2f, %.2f · %s" % [info.inspected_position.x, info.inspected_position.y, info.surface_kind]
@@ -537,3 +593,145 @@ func _show_cell_info(info: Dictionary) -> void:
 func _wind_name(wind: Vector2) -> String:
 	var bearing: float = fposmod(rad_to_deg(atan2(wind.x, -wind.y)), 360.0)
 	return ["North", "North-east", "East", "South-east", "South", "South-west", "West", "North-west"][roundi(bearing / 45.0) % 8]
+
+
+func _build_shell() -> void:
+	var scroll := _form.get_parent()
+	scroll.remove_child(_form)
+	var host := VBoxContainer.new()
+	host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(host)
+	host.add_child(_form)
+	_context_host = _form
+	_toolbar = HBoxContainer.new()
+	_toolbar.name = "Toolbar"
+	_toolbar.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	_toolbar.offset_left = 14
+	_toolbar.offset_right = -14
+	_toolbar.offset_top = 10
+	_toolbar.offset_bottom = 50
+	add_child(_toolbar)
+	_button("Save world…", func(): _show_dialog("save_world"), _toolbar)
+	_button("Open world…", func(): _show_dialog("load_world"), _toolbar)
+	_button("View settings", func(): _select_layer("view"), _toolbar)
+	_button("Full map", func(): _camera_rig._reset_view(), _toolbar)
+	var stack := VBoxContainer.new()
+	stack.name = "LayerStack"
+	stack.position = Vector2(14, 60)
+	stack.custom_minimum_size.x = 226
+	add_child(stack)
+	var title := Label.new()
+	title.text = "MAP LAYERS"
+	stack.add_child(title)
+	for layer in layers:
+		var row := HBoxContainer.new()
+		stack.add_child(row)
+		_button(layer.title, func(): _select_layer(layer.id), row)
+		var selector := row.get_child(0) as Button
+		selector.toggle_mode = true
+		_layer_selectors[layer.id] = selector
+		var eye := CheckBox.new()
+		eye.text = "V"
+		eye.tooltip_text = "Show layer (heightmap is the base world)"
+		eye.button_pressed = layer.visible
+		eye.toggled.connect(func(value: bool): layer.visible = value; _apply_layer_visibility())
+		row.add_child(eye)
+		var lock := CheckBox.new()
+		lock.text = "L"
+		lock.tooltip_text = "Protect this layer from editor changes"
+		lock.toggled.connect(func(value: bool): layer.locked = value; _stop_brush())
+		row.add_child(lock)
+		_layer_buttons[layer.id] = [eye, lock]
+	# The central region stays transparent to the existing 3D camera and picking.
+	var viewport_label := Label.new()
+	viewport_label.name = "MapViewport"
+	viewport_label.text = "WORLD VIEW · Wheel to zoom · WASD to move"
+	viewport_label.position = Vector2(256, 65)
+	viewport_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(viewport_label)
+
+func _context(key: String) -> void:
+	var box := VBoxContainer.new()
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_context_host.get_parent().add_child(box)
+	_contexts[key] = box
+	_form = box
+
+func _select_layer(key: String) -> void:
+	selected_layer = key
+	for id in _layer_selectors:
+		_layer_selectors[id].set_pressed_no_signal(id == key)
+	for id in _contexts:
+		_contexts[id].visible = id == key
+	_stop_brush()
+
+func _stop_brush() -> void:
+	if _brush != null:
+		_brush.painting = false
+		_brush.enabled.button_pressed = false
+
+func can_edit(key: String) -> bool:
+	for layer in layers:
+		if layer.id == key:
+			return not layer.locked and layer.visible
+	return false
+
+func _any_locked() -> bool:
+	for layer in layers:
+		if layer.locked:
+			return true
+	return false
+
+func _apply_layer_visibility() -> void:
+	for layer in layers:
+		match layer.id:
+			"heightmap": _terrain.visible = layer.visible
+			"trees":
+				if _terrain.vegetation_view != null:
+					_terrain.vegetation_view.editor_visible = layer.visible
+					_terrain.vegetation_view._update_visibility()
+			"ground":
+				if _terrain.paint_layer != null:
+					_terrain.paint_layer.editor_visible = layer.visible
+					_terrain.update_painted_surface()
+			"climate":
+				if not layer.visible:
+					_terrain.set_climate_view(0)
+			"rivers":
+				if _terrain.hydrology_view != null:
+					_terrain.hydrology_view.editor_visible = layer.visible
+					_terrain.hydrology_view._update_visibility()
+	_stop_brush()
+
+func load_world(path: String) -> String:
+	var result: Dictionary = Manifest.load_file(path)
+	if not result.error.is_empty():
+		_status.text = result.error
+		return result.error
+	var data: Dictionary = result.document
+	var terrain_path: String = data.terrain
+	if not terrain_path.is_absolute_path():
+		terrain_path = path.get_base_dir().path_join(terrain_path)
+	var error := load_terrain(terrain_path)
+	if not error.is_empty():
+		return error
+	for entry in data.layers:
+		for layer in layers:
+			if layer.id == entry.id:
+				layer.visible = entry.visible
+				layer.locked = entry.locked
+				_layer_buttons[layer.id][0].set_pressed_no_signal(layer.visible)
+				_layer_buttons[layer.id][1].set_pressed_no_signal(layer.locked)
+	_select_layer(data.selected_layer)
+	_apply_layer_visibility()
+	return ""
+
+func layer_visible(key: String) -> bool:
+	for layer in layers:
+		if layer.id == key:
+			return layer.visible
+	return false
+
+func _manifest_reference(path: String) -> String:
+	var absolute := ProjectSettings.globalize_path(_terrain_path)
+	return absolute.get_file() if path.get_base_dir() == absolute.get_base_dir() else absolute

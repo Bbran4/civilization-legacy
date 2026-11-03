@@ -182,7 +182,7 @@ func _run() -> void:
 		brush.last_point = terrain.map_size * 0.5
 		brush._paint(brush.last_point + Vector2(16, -8))
 		brush.enabled.button_pressed = false
-		editor._form.get_parent().get_v_scroll_bar().value = maxf(0, brush.enabled.position.y - 80)
+		editor._context_host.get_parent().get_parent().get_v_scroll_bar().value = maxf(0, brush.enabled.position.y - 80)
 		await _capture("brush-controls")
 	world.queue_free()
 	await process_frame

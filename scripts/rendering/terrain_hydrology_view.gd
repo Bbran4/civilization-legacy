@@ -1,4 +1,6 @@
 extends Node3D
+
+var editor_visible := true
 ## Fixed lake surfaces and runoff-sized river ribbons, rebuilt on source/climate edits.
 const Grid = preload("res://scripts/domain/heightmap_grid.gd")
 const WATER_SHADER = preload("res://scripts/rendering/hydrology.gdshader")
@@ -248,7 +250,7 @@ func set_view(mode: int, heights: bool) -> void:
 
 
 func _update_visibility() -> void:
-	visible = not _heights_view and _mode == 0
+	visible = editor_visible and not _heights_view and _mode == 0
 
 
 func river_near(point: Vector2, clearance: float = 0.0) -> bool:

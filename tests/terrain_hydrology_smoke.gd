@@ -162,7 +162,7 @@ func _run() -> void:
 	await process_frame
 	var terrain = world.get_node("Terrain")
 	var editor = world.get_node("Interface/Editor")
-	var panel = editor.get_node("ClimatePanel")
+	var panel = editor._climate_panel
 	var image := Image.create(129, 97, false, Image.FORMAT_RGB8)
 	for y in range(97):
 		for x in range(129):

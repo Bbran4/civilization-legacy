@@ -2,6 +2,7 @@ extends PanelContainer
 ## Runtime climate editor; all controls stage settings until Apply climate.
 const Climate = preload("res://scripts/domain/terrain_climate.gd")
 const Gizmo = preload("res://scripts/ui/climate_gizmo.gd")
+var editor: Node
 var terrain: Node
 var gizmo: Control
 var controls: Dictionary = {}
@@ -50,7 +51,7 @@ func _ready() -> void:
 	for title in ["Terrain", "Temperature", "Rainfall", "Winds", "Drainage basins", "Biomes"]:
 		overlay.add_item(title)
 	overlay.tooltip_text = "Terrain shows the resulting biomes, while the other views show the climate data that created them."
-	overlay.item_selected.connect(func(index: int): terrain.set_climate_view(index); _update_legend())
+	overlay.item_selected.connect(func(index: int): terrain.set_climate_view(index if editor == null or editor.layer_visible("climate") else 0); _update_legend())
 	_form.add_child(overlay)
 	legend = _label("", 12)
 	status = _label("", 12)
@@ -136,10 +137,14 @@ func _update_legend() -> void:
 
 
 func apply_settings() -> void:
+	if editor != null and (not editor.can_edit("climate") or editor._any_locked()):
+		return
 	for control in controls.values():
 		control.apply()
 	# SpinBox commits submitted text through deferred native signals.
 	await get_tree().process_frame
+	if editor != null and editor._any_locked():
+		return
 	var options: Dictionary = {"latitude_center": gizmo.latitude_center, "latitude_span": gizmo.latitude_span, "temperature_bias": controls.temperature_bias.value, "rainfall_scale": controls.rainfall_scale.value, "wind_rotation": gizmo.wind_rotation}
 	var error: String = terrain.apply_climate(options)
 	if not error.is_empty():

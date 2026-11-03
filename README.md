@@ -12,6 +12,13 @@ the planned gameplay layer on top of that shared world.
 political map modes, scenarios, civilization simulation, skill trees and prestige
 are planned gameplay systems.
 
+## Map Editor 2.0
+
+Phase 1 introduces a layer stack, contextual properties, a central map view and
+a top toolbar while retaining terrain generation and saves. See the
+[Phase 1 guide](docs/map-editor-v2-phase1.md) for controls, world manifests,
+validation and remaining work.
+
 ## World direction
 
 Real-world maps and seeded random maps are equally important. Both should produce the

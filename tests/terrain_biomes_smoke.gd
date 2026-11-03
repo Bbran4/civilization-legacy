@@ -71,7 +71,7 @@ func _run() -> void:
 	var saved_ids: PackedByteArray = terrain.biomes.ids.duplicate()
 	var canopy: PackedFloat32Array = terrain.biomes.canopy.duplicate()
 	var mesh: int = terrain.detail.chunks[0].meshes[0].get_instance_id()
-	var panel = world.get_node("Interface/Editor/ClimatePanel")
+	var panel = world.get_node("Interface/Editor")._climate_panel
 	panel.overlay.select(5)
 	panel.overlay.item_selected.emit(5)
 	_check(terrain.detail._material.get_shader_parameter("climate_mode") == 5 and terrain._land_material.get_shader_parameter("habitats_enabled"), "Biomes view and ecology must reach all terrain materials.")

@@ -120,6 +120,8 @@ func _run() -> void:
 	_check(is_equal_approx(camera.rotation_degrees.x, -90.0) and is_equal_approx(camera.rotation_degrees.y, 0.0), "The full-map view must be exactly overhead and north-up.")
 	_check(is_equal_approx(terrain.overview_blend, 1.0) and not world.get_node("Sun").shadow_enabled, "The full-map view must use flat map colours without 3D shadows.")
 	_check(camera._pan_down().dot(Vector3.BACK) > 0.99, "Panning must remain usable in the exactly overhead view.")
+	# This section exercises the optional 3D presentation, not the flat default.
+	terrain.flat_map_mode = false
 	camera._zoom = 4.0
 	camera._apply_zoom()
 	_check(is_equal_approx(camera.rotation_degrees.x, -55.0) and world.get_node("Sun").shadow_enabled and is_zero_approx(terrain.overview_blend), "Zooming in must restore the angled, shaded terrain view.")
@@ -234,7 +236,8 @@ func _run() -> void:
 			click.position = camera._camera.unproject_position(Vector3(location.x, terrain.surface_height(site), location.y))
 			editor._unhandled_input(click)
 			_check(editor._cell_label.text.contains("Island #"), "Clicking an island must show its new label in the real inspector.")
-		var zoom_scroll: ScrollContainer = editor._form.get_parent()
+		editor._select_layer("view")
+		var zoom_scroll: ScrollContainer = editor._context_host.get_parent().get_parent()
 		zoom_scroll.ensure_control_visible(editor._zoom_status)
 		await process_frame
 		await RenderingServer.frame_post_draw

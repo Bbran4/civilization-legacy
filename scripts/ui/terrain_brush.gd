@@ -67,6 +67,9 @@ func _number(label: String, low: float, high: float, step: float, value: float, 
 	return control
 
 func choose(row_id: int, selected: int) -> void:
+	if not editor.can_edit("ground"):
+		return
+	editor._select_layer("ground")
 	row.select(row_id)
 	slot.select(selected + 1)
 	enabled.button_pressed = true
@@ -82,7 +85,7 @@ func _hit(position: Vector2) -> Variant:
 	return Vector2(local.x, local.z) + terrain.map_size * 0.5
 
 func handle_input(event: InputEvent) -> bool:
-	if enabled == null or not enabled.button_pressed:
+	if enabled == null or not enabled.button_pressed or not editor.can_edit("ground") or editor.selected_layer != "ground":
 		return false
 	if event is InputEventKey and event.pressed and event.keycode == KEY_Z and event.ctrl_pressed:
 		undo()
@@ -106,6 +109,8 @@ func handle_input(event: InputEvent) -> bool:
 	return false
 
 func _paint(point: Vector2) -> void:
+	if not editor.can_edit("ground"):
+		return
 	terrain.paint_layer.stroke(last_point if last_point.is_finite() else point, point, radius.value, strength.value, row.selected, slot.selected - 1, eraser.button_pressed)
 	terrain.update_painted_surface()
 	last_point = point
@@ -116,7 +121,7 @@ func _process(delta: float) -> void:
 	if _time < 1.0 / 30.0 or preview == null:
 		return
 	_time = 0
-	if not enabled.button_pressed or terrain.climate_view != 0 or terrain.heightmap_view or get_viewport().gui_get_hovered_control() != null:
+	if not editor.can_edit("ground") or editor.selected_layer != "ground" or not enabled.button_pressed or terrain.climate_view != 0 or terrain.heightmap_view or get_viewport().gui_get_hovered_control() != null:
 		preview.visible = false
 		if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 			painting = false
@@ -140,6 +145,8 @@ func _process(delta: float) -> void:
 		painting = false
 
 func undo() -> void:
+	if not editor.can_edit("ground"):
+		return
 	painting = false
 	last_point = Vector2.INF
 	if terrain.paint_layer.undo():
@@ -149,6 +156,8 @@ func undo() -> void:
 		status.text = "No paint strokes to undo."
 
 func clear() -> void:
+	if not editor.can_edit("ground"):
+		return
 	painting = false
 	if terrain.paint_layer.image == null:
 		return
