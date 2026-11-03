@@ -6,6 +6,8 @@ var size := Vector2i.ZERO
 var ids := PackedInt32Array()
 var records: Array[Dictionary] = []
 var nations: Array[Dictionary] = []
+## Derived movement hooks. Each record links two province IDs and a crossing type.
+var connections: Array[Dictionary] = []
 var border_revision := 0
 var border_geometry: RefCounted
 var requested_count := 64
@@ -81,6 +83,27 @@ func generate(base: PackedFloat32Array, surface: RefCounted, water: RefCounted, 
 			_seed(pixel, distance)
 			_grow(land, distance, growth_heights, water.mask_bytes)
 	return _index_regions()
+
+func build_connections(water: RefCounted) -> void:
+	connections.clear()
+	if water == null or water.mask_bytes.size() != ids.size() * 4: return
+	var seen := {}
+	for y in range(size.y):
+		for x in range(size.x):
+			var i := y * size.x + x
+			for next in [i + 1 if x + 1 < size.x else -1, i + size.x if y + 1 < size.y else -1]:
+				if next < 0: continue
+				var a: int = ids[i]
+				var b: int = ids[next]
+				if a <= 0 or b <= 0 or a == b: continue
+				var low := mini(a, b)
+				var high := maxi(a, b)
+				var river := water.mask_bytes[i * 4] > 64 or water.mask_bytes[next * 4] > 64
+				var kind := "river_crossing" if river else ("strait" if records[a - 1].kind != records[b - 1].kind else "province_border")
+				var key := str(low) + ":" + str(high) + ":" + kind
+				if seen.has(key): continue
+				seen[key] = true
+				connections.append({"a": low, "b": high, "type": kind, "crossings": 1})
 
 func _growth_heights(source: PackedFloat32Array) -> PackedFloat32Array:
 	var result := PackedFloat32Array()

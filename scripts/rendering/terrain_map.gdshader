@@ -74,8 +74,11 @@ void fragment() {
 	if (provinces_enabled && shaded_relief) {
 		float id = province_id(UV);
 		int zone = int(round(texture(province_field, UV).b * 255.0));
-		if (id < 0.5 && zone == 2) color = vec3(0.16, 0.21, 0.27);
-		if (id < 0.5 && zone == 3) color = vec3(value * 0.45);
+		// Keep unassigned terrain visually distinct from generated regions:
+		// coastal sea band, impassable land, and ordinary/unassigned water.
+		if (id < 0.5 && zone == 2) color = vec3(0.10, 0.30, 0.46);
+		if (id < 0.5 && zone == 3) color = vec3(0.24, 0.24, 0.27);
+		if (id < 0.5 && zone == 0 && h < 0.2) color = vec3(0.055, 0.16, 0.24);
 		if (id > 0.5) {
 			bool ocean = texelFetch(province_kinds,ivec2(int(id)%256,int(id)/256),0).r > 0.5;
 			vec4 nation = texelFetch(nation_colors,ivec2(int(id)%256,int(id)/256),0);

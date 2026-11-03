@@ -683,9 +683,28 @@ func _show_cell_info(info: Dictionary) -> void:
 			if _terrain.province_layer.is_impassable(point / _terrain.map_size): _cell_label.text += "\nImpassable land (unassigned)"
 			if _province_selected > 0:
 				var record: Dictionary = _terrain.province_layer.records[_province_selected - 1]
-				_cell_label.text += "\n%s (ID %d)\n%d land pixels, %d neighbors" % [record.name, record.id, record.pixels, record.neighbors.size()]
+				var kind_text := "Land province" if record.kind == "land" else "Coastal sea province"
+				_cell_label.text += "\n%s · %s (ID %d)\n%d map pixels, %d neighbors" % [record.name, kind_text, record.id, record.pixels, record.neighbors.size()]
+				if not record.neighbors.is_empty():
+					var names: Array[String] = []
+					for neighbor_id in record.neighbors:
+						if neighbor_id > 0 and neighbor_id <= _terrain.province_layer.records.size(): names.append(_terrain.province_layer.records[neighbor_id - 1].name)
+					_cell_label.text += "\nNeighbors: " + ", ".join(names.slice(0, 8))
+				var crossing_count := 0
+				var strait_count := 0
+				for connection in _terrain.province_layer.connections:
+					if connection.a == record.id or connection.b == record.id:
+						if connection.type == "river_crossing": crossing_count += 1
+						elif connection.type == "strait": strait_count += 1
+				_cell_label.text += "\nConnections: %d river crossings · %d straits" % [crossing_count, strait_count]
 				if record.kind == "land" and record.parts > 1: _cell_label.text += "\n%d land parts" % record.parts
 				_cell_panel.offset_bottom = 620
+			else:
+				var sample := Vector2i((point / _terrain.map_size * Vector2(_terrain.province_layer.size)).floor()).clamp(Vector2i.ZERO, _terrain.province_layer.size - Vector2i.ONE)
+				var sample_index: int = sample.y * _terrain.province_layer.size.x + sample.x
+				var water_kind := "Unassigned coastal sea" if _terrain.province_layer.sea_mask.size() == _terrain.province_layer.ids.size() and _terrain.province_layer.sea_mask[sample_index] != 0 else "Unassigned water"
+				if _terrain.province_layer.is_impassable(point / _terrain.map_size): water_kind = "Unassigned impassable land"
+				_cell_label.text += "\n" + water_kind
 		return
 	_cell_panel.anchor_bottom = 1.0
 	_cell_panel.offset_bottom = -14
@@ -1356,6 +1375,8 @@ func _select_province(id: int) -> void:
 	_sync_nation_choices()
 	if _terrain.map_renderer != null:
 		_terrain.map_renderer.material.set_shader_parameter("selected_province", id)
+		_terrain.map_renderer.material.set_shader_parameter("merge_ids", PackedInt32Array())
+		_terrain.map_renderer.material.set_shader_parameter("merge_count", 0)
 	if _province_name != null:
 		_province_name.text = _terrain.province_layer.records[id - 1].name if id > 0 else ""
 
@@ -1457,7 +1478,9 @@ func generate_provinces() -> void:
 	_province_thread = Thread.new()
 	var started := _province_thread.start(func():
 		var layer := WorldProvinces.new()
-		return {"error": layer.generate(source, surface, water, count), "layer": layer})
+		var generation_error := layer.generate(source, surface, water, count)
+		if generation_error.is_empty(): layer.build_connections(water)
+		return {"error": generation_error, "layer": layer})
 	if started != OK:
 		_province_thread = null
 		_province_busy = false
@@ -1502,7 +1525,10 @@ func generate_ocean_borders() -> void:
 	var reach := float(_coastal_reach.value)
 	_province_status.text = "Generating connected ocean regions around the land…"
 	_province_thread = Thread.new()
-	var started := _province_thread.start(func(): return candidate.generate_oceans(base, water, count, style, reach))
+	var started := _province_thread.start(func():
+		var generation_error := candidate.generate_oceans(base, water, count, style, reach)
+		if generation_error.is_empty(): candidate.build_connections(water)
+		return generation_error)
 	if started != OK:
 		_province_thread = null
 		_province_busy = false
