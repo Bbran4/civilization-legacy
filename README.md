@@ -34,7 +34,10 @@ Old saves stay readable. Older water layers need explicit regeneration to supply
 water elevations before a surface can be built. Trees, climate, biomes and painting
 remain disabled in this focused workspace. Province IDs/names survive saving;
 regenerating provinces replaces them.
-See [impassable land and repainting](docs/impassable-land.md),
+Borders-only terrain presentation, smooth dotted province lines and authored
+nation borders with colors on each side are available in editor and Play map.
+See [province appearance and nation borders](docs/province-appearance.md),
+[impassable land and repainting](docs/impassable-land.md),
 [province split/merge](docs/province-split-merge.md),
 [coastal seas and open ocean](docs/coastal-seas.md),
 [island attachment and maritime regions](docs/islands-and-maritime.md),

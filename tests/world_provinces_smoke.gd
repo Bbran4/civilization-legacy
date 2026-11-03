@@ -90,12 +90,18 @@ func _run() -> void:
 	check(terrain.province_layer_current() and terrain.height_samples == heights and terrain.terrain_surface.heights == ground, "Integrated provinces preserve all terrain inputs.")
 	check(terrain.map_renderer.material.get_shader_parameter("provinces_enabled"), "Province overlay is enabled in the editor.")
 	editor._select_province(1)
+	var nation: int = terrain.province_layer.add_nation("Test realm",Color(0.7,0.1,0.08))
+	editor._sync_nation_choices()
+	editor._province_nation.select(nation)
+	editor._assign_province_nation()
+	check(terrain.province_layer.records[0].nation_id == nation,"Editor assigns a nation to the selected land province.")
 	editor._province_name.text = "Saved Province"
 	editor.rename_province()
 	var saved := Document.capture(terrain)
 	check(Document.save_file("user://province-roundtrip.terrain.json", terrain).is_empty(), "Province terrain document saves to disk.")
 	var disk := Document.load_file("user://province-roundtrip.terrain.json")
 	check(disk.ok and Document.apply(terrain, disk.document).is_empty(), "Province document restores from actual JSON disk data.")
+	check(terrain.province_layer.records[0].nation_id == nation and terrain.province_layer.nations.size() == 1,"Nation assignments and palette restore through full terrain saves.")
 	var bad := saved.duplicate(true)
 	var payload := preload("res://scripts/storage/float_payload.gd").decode(bad.province_layer.ids, terrain.height_samples.size(), 0, terrain.province_layer.records.size())
 	for i in range(payload.values.size()):
@@ -110,6 +116,9 @@ func _run() -> void:
 	editor._layer_buttons.provinces[0].button_pressed = true
 	editor._layer_buttons.provinces[1].button_pressed = true
 	check(not editor.regeneration_error("heightmap").is_empty() and not editor.regeneration_error("rivers").is_empty() and not editor.regeneration_error("surface").is_empty(), "Province lock protects every upstream input.")
+	editor._province_nation.select(0)
+	editor._assign_province_nation()
+	check(terrain.province_layer.records[0].nation_id == nation,"Province lock prevents nation reassignment.")
 	editor._province_name.text = "Blocked"
 	editor.rename_province()
 	check(terrain.province_layer.records[0].name == "Saved Province", "Locked province names cannot change.")

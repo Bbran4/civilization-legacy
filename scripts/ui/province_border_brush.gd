@@ -140,7 +140,7 @@ func _paint(point: Vector2) -> void:
 	var r: float = radius.value * maxi(history.draft.size.x, history.draft.size.y) / 1025.0
 	history.stroke(last if last.is_finite() else point, point, r, attach_islands.button_pressed)
 	last = point
-	editor._terrain.map_renderer.set_provinces(history.draft, true)
+	editor._terrain.map_renderer.set_provinces(history.draft, true, true)
 func finish() -> void:
 	if not painting: return
 	painting = false

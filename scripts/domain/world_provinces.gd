@@ -5,6 +5,9 @@ var source_hash := ""
 var size := Vector2i.ZERO
 var ids := PackedInt32Array()
 var records: Array[Dictionary] = []
+var nations: Array[Dictionary] = []
+var border_revision := 0
+var border_geometry: RefCounted
 var requested_count := 64
 var ocean_generated := false
 var requested_oceans := 24
@@ -196,6 +199,7 @@ func _index_regions(allow_absorption: bool = false) -> String:
 			else: return "A region has no pixels."
 		if counts[i] > 0 and not records[i].get("active", true): return "An absorbed province still owns pixels."
 		records[i].allow_fragments = records[i].get("allow_fragments",false)
+		records[i].nation_id = records[i].get("nation_id",0)
 		records[i].active = records[i].get("active", true)
 		records[i].parts = part_counts[i]
 		records[i].landmasses = mass_lists[i]
@@ -205,6 +209,8 @@ func _index_regions(allow_absorption: bool = false) -> String:
 		records[edge.x - 1].neighbors.append(edge.y)
 		records[edge.y - 1].neighbors.append(edge.x)
 	for record in records: record.neighbors.sort()
+	border_revision += 1
+	border_geometry = null
 	return ""
 
 func id_at(uv: Vector2) -> int:
@@ -232,10 +238,10 @@ func snapshot() -> Dictionary:
 	var blocked_values := PackedFloat32Array()
 	blocked_values.resize(impassable.size())
 	for i in range(impassable.size()): blocked_values[i] = impassable[i]
-	return {"version": 6, "impassable": Payload.encode(blocked_values) if not blocked_values.is_empty() else null, "coastal_reach": coastal_reach, "sea_mask": Payload.encode(sea_values) if not sea_values.is_empty() else null, "ocean_style": ocean_style, "ocean_generated": ocean_generated, "requested_oceans": requested_oceans, "source_hash": source_hash, "size": [size.x, size.y], "requested_count": requested_count, "ids": Payload.encode(values), "records": records.duplicate(true)}
+	return {"version": 7, "nations":nations.duplicate(true), "impassable": Payload.encode(blocked_values) if not blocked_values.is_empty() else null, "coastal_reach": coastal_reach, "sea_mask": Payload.encode(sea_values) if not sea_values.is_empty() else null, "ocean_style": ocean_style, "ocean_generated": ocean_generated, "requested_oceans": requested_oceans, "source_hash": source_hash, "size": [size.x, size.y], "requested_count": requested_count, "ids": Payload.encode(values), "records": records.duplicate(true)}
 static func decode(data: Variant) -> Dictionary:
 	if data == null: return {"error": "", "layer": null}
-	if not data is Dictionary or data.get("version") not in [1, 1.0, 2, 2.0, 3, 3.0, 4, 4.0, 5, 5.0, 6, 6.0] or not data.get("source_hash") is String or data.source_hash.length() != 64 or not data.get("size") is Array or data.size.size() != 2 or not data.get("records") is Array or data.records.size() > 65535:
+	if not data is Dictionary or data.get("version") not in [1, 1.0, 2, 2.0, 3, 3.0, 4, 4.0, 5, 5.0, 6, 6.0, 7, 7.0] or not data.get("source_hash") is String or data.source_hash.length() != 64 or not data.get("size") is Array or data.size.size() != 2 or not data.get("records") is Array or data.records.size() > 65535:
 		return {"error": "Invalid province document."}
 	for v in data.size:
 		if not (v is int or v is float) or not is_finite(float(v)) or v != int(v) or v < 3 or v > 2050: return {"error": "Invalid province dimensions."}
@@ -246,6 +252,14 @@ static func decode(data: Variant) -> Dictionary:
 	var layer: RefCounted = load("res://scripts/domain/world_provinces.gd").new()
 	layer.size = Vector2i(data.size[0], data.size[1])
 	layer.source_hash = data.source_hash
+	if int(data.version) >= 7:
+		if not data.get("nations") is Array or data.nations.size() > 256: return {"error":"Invalid nation palette."}
+		for i in range(data.nations.size()):
+			var nation: Variant = data.nations[i]
+			if not nation is Dictionary or nation.get("id") != i+1 or not nation.get("name") is String or nation.name.strip_edges().is_empty() or nation.name.length() > 128 or not nation.get("color") is Array or nation.color.size() != 3: return {"error":"Invalid nation definition."}
+			for channel in nation.color:
+				if not (channel is int or channel is float) or not is_finite(float(channel)) or channel < 0 or channel > 1: return {"error":"Invalid nation color."}
+			layer.nations.append({"id":i+1,"name":nation.name,"color":nation.color.duplicate()})
 	layer.requested_count = int(count)
 	if int(data.version) >= 2:
 		if not data.get("ocean_generated") is bool or not (data.get("requested_oceans") is int or data.get("requested_oceans") is float) or not is_finite(float(data.requested_oceans)) or data.requested_oceans != int(data.requested_oceans) or data.requested_oceans < 1 or data.requested_oceans > 256:
@@ -288,7 +302,9 @@ static func decode(data: Variant) -> Dictionary:
 		ocean_seen = ocean_seen or kind == "ocean"
 		if int(data.version) >= 3 and not record.get("active") is bool: return {"error": "Invalid absorbed province state."}
 		if int(data.version) >= 6 and not record.get("allow_fragments",false) is bool: return {"error": "Invalid land part policy."}
-		layer.records.append({"allow_fragments":record.get("allow_fragments",false) if int(data.version) >= 6 else false,"id": i + 1, "name": record.name, "pixels": 0, "neighbors": [], "kind": kind, "active": record.get("active", true) if int(data.version) >= 3 else true})
+		var nation: Variant = record.get("nation_id",0) if int(data.version) >= 7 else 0
+		if not (nation is int or nation is float) or not is_finite(float(nation)) or nation != int(nation) or nation < 0 or nation > layer.nations.size() or (kind != "land" and nation != 0): return {"error":"Invalid province nation assignment."}
+		layer.records.append({"nation_id":int(nation),"allow_fragments":record.get("allow_fragments",false) if int(data.version) >= 6 else false,"id": i + 1, "name": record.name, "pixels": 0, "neighbors": [], "kind": kind, "active": record.get("active", true) if int(data.version) >= 3 else true})
 	var error: String = layer._index_regions()
 	return {"error": error, "layer": layer}
 
@@ -338,6 +354,7 @@ func editable_copy() -> RefCounted:
 	copy.ids = ids.duplicate()
 	copy._land_components = _land_components
 	copy.records.assign(records.duplicate(true))
+	copy.nations.assign(nations.duplicate(true))
 	copy.requested_count = requested_count
 	copy.ocean_generated = ocean_generated
 	copy.requested_oceans = requested_oceans
@@ -573,7 +590,7 @@ func split_region(id: int, points: PackedVector2Array) -> Dictionary:
 		if labels[pixel] == new_label:
 			changes[pixel] = id
 			ids[pixel] = new_id
-	records.append({"id": new_id, "name": records[id - 1].name.left(108) + " split " + str(new_id), "kind": records[id - 1].kind, "active": true})
+	records.append({"id": new_id, "name": records[id - 1].name.left(108) + " split " + str(new_id), "kind": records[id - 1].kind, "nation_id": records[id-1].get("nation_id",0), "active": true})
 	_texture = null
 	_image = null
 	return {"error": "", "changes": changes, "new_id": new_id}
@@ -601,3 +618,20 @@ func _physical_land_labels() -> PackedInt32Array:
 					labels[next] = component
 					queue.append(next)
 	return labels
+
+func add_nation(title: String,color: Color) -> int:
+	title = title.strip_edges()
+	if title.is_empty() or title.length() > 128 or nations.size() >= 256 or not is_finite(color.r) or not is_finite(color.g) or not is_finite(color.b): return 0
+	var id := nations.size()+1
+	nations.append({"id":id,"name":title,"color":[clampf(color.r,0,1),clampf(color.g,0,1),clampf(color.b,0,1)]})
+	border_revision += 1
+	return id
+func assign_nation(province: int,nation: int) -> String:
+	if province < 1 or province > records.size() or not records[province-1].active or records[province-1].kind != "land" or nation < 0 or nation > nations.size(): return "Select an active land province and a valid nation."
+	records[province-1].nation_id = nation
+	border_revision += 1
+	return ""
+func nation_color(id: int) -> Color:
+	if id <= 0 or id > nations.size(): return Color(0,0,0,0)
+	var c: Array = nations[id-1].color
+	return Color(c[0],c[1],c[2],1)

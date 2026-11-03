@@ -8,6 +8,7 @@ uniform bool water_enabled = false;
 uniform sampler2D water_field : filter_linear, repeat_disable;
 uniform bool provinces_enabled = false;
 uniform bool province_fill = true;
+uniform bool vector_borders = false;
 uniform int selected_province = 0;
 uniform int merge_ids[32];
 uniform int merge_count = 0;
@@ -40,7 +41,7 @@ void fragment() {
 			vec2 border_step = max(texel_size, fwidth(UV) * 1.25);
 			bool edge = province_id(UV + vec2(border_step.x, 0.0)) != id || province_id(UV + vec2(0.0, border_step.y)) != id;
 			if (ocean) edge = edge || province_id(UV - vec2(border_step.x, 0.0)) != id || province_id(UV - vec2(0.0, border_step.y)) != id;
-			if (edge) color = ocean ? vec3(0.055, 0.08, 0.12) : color * 0.35;
+			if (edge && !vector_borders) color = ocean ? vec3(0.055, 0.08, 0.12) : color * 0.35;
 			bool selected = int(id) == selected_province;
 			for (int i = 0; i < 32; i++) {
 				if (i >= merge_count) break;

@@ -19,6 +19,7 @@ var selected_layer := "heightmap"
 var _terrain_path := ""
 var _province_count: SpinBox
 var _province_status: Label
+var _province_nation: OptionButton
 var _province_name: LineEdit
 var _province_selected := 0
 var _province_thread: Thread
@@ -1333,6 +1334,13 @@ func _build_province_controls() -> void:
 	_province_name.placeholder_text = "Region name"
 	_form.add_child(_province_name)
 	_button("Apply region name", rename_province, null, "RenameProvince")
+	_label("Nation borders")
+	_province_nation = OptionButton.new()
+	_province_nation.name = "ProvinceNation"
+	_form.add_child(_province_nation)
+	_button("Assign nation to selected province", _assign_province_nation)
+	_button("Create nation color", _create_nation_dialog)
+	_sync_nation_choices()
 	_province_status = _label("Build the terrain surface first.", 13)
 	_province_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_province_brush = ProvinceBorderBrush.new()
@@ -1342,10 +1350,57 @@ func _build_province_controls() -> void:
 func _select_province(id: int) -> void:
 	if id > 0 and (_terrain.province_layer == null or id > _terrain.province_layer.records.size() or not _terrain.province_layer.records[id - 1].get("active", true)): id = 0
 	_province_selected = id
+	_sync_nation_choices()
 	if _terrain.map_renderer != null:
 		_terrain.map_renderer.material.set_shader_parameter("selected_province", id)
 	if _province_name != null:
 		_province_name.text = _terrain.province_layer.records[id - 1].name if id > 0 else ""
+
+func _sync_nation_choices() -> void:
+	if _province_nation == null: return
+	_province_nation.clear()
+	_province_nation.add_item("Unassigned",0)
+	if _terrain.province_layer == null: return
+	for nation in _terrain.province_layer.nations:
+		_province_nation.add_item(nation.name,nation.id)
+	if _province_selected > 0:
+		_province_nation.select(int(_terrain.province_layer.records[_province_selected-1].get("nation_id",0)))
+
+func _assign_province_nation() -> void:
+	if not _terrain.province_layer_current() or not can_edit("provinces") or _province_busy: return
+	var error: String = _terrain.province_layer.assign_nation(_province_selected,_province_nation.get_selected_id())
+	if not error.is_empty():
+		_province_status.text = error
+		return
+	_terrain.refresh_water_layer()
+	mark_dirty()
+
+func _create_nation_dialog() -> void:
+	if not _terrain.province_layer_current() or not can_edit("provinces") or _province_busy: return
+	var dialog := ConfirmationDialog.new()
+	dialog.title = "Create nation color"
+	var box := VBoxContainer.new()
+	var title := LineEdit.new()
+	title.placeholder_text = "Nation name"
+	title.max_length = 128
+	var color := ColorPickerButton.new()
+	color.color = Color(0.7,0.16,0.12)
+	color.edit_alpha = false
+	box.add_child(title)
+	box.add_child(color)
+	dialog.add_child(box)
+	add_child(dialog)
+	var original_layer: RefCounted = _terrain.province_layer
+	dialog.confirmed.connect(func():
+		if _terrain.province_layer != original_layer or not _terrain.province_layer_current() or not can_edit("provinces") or _province_busy: return
+		var id: int = _terrain.province_layer.add_nation(title.text,color.color)
+		if id == 0: return
+		_sync_nation_choices()
+		_province_nation.select(id)
+		mark_dirty())
+	dialog.visibility_changed.connect(func():
+		if not dialog.visible: dialog.queue_free())
+	dialog.popup_centered(Vector2i(360,150))
 
 func rename_province() -> void:
 	if not _terrain.province_layer_current() or not can_edit("provinces") or _province_busy or _province_selected <= 0 or _province_selected > _terrain.province_layer.records.size():

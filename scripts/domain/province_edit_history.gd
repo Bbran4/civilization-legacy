@@ -31,7 +31,10 @@ func finish() -> Dictionary:
 	if draft == null or changes.is_empty():
 		cancel()
 		return {"error": "", "layer": null}
-	for i in range(current.records.size()): draft.records[i].name = current.records[i].name
+	draft.nations.assign(current.nations.duplicate(true))
+	for i in range(current.records.size()):
+		draft.records[i].name = current.records[i].name
+		draft.records[i].nation_id = current.records[i].get("nation_id",0)
 	var error: String = draft._index_regions(true)
 	if not error.is_empty():
 		cancel()
