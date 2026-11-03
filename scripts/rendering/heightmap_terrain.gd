@@ -4,6 +4,7 @@ extends Node3D
 
 signal climate_changed
 signal vegetation_changed
+signal world_painter_enabled
 signal province_layer_changed
 var province_layer: RefCounted
 var province_layer_visible := false
@@ -368,6 +369,30 @@ func regenerate() -> void:
 	_refresh_climate(true)
 	generation_ms = (Time.get_ticks_usec() - started) / 1000.0
 	terrain_regenerated.emit()
+
+func enter_world_painter() -> void:
+	if not heightmap_only:
+		return
+	var saved_water: RefCounted = water_layer
+	var saved_surface: RefCounted = terrain_surface
+	var saved_provinces: RefCounted = province_layer
+	heightmap_only = false
+	heightmap_view = false
+	shaded_relief = true
+	regenerate()
+	water_layer = saved_water
+	terrain_surface = saved_surface
+	province_layer = saved_provinces
+	# Use the saved province texture in the full renderer instead of the
+	# temporary procedural province cache created during the mode transition.
+	if saved_provinces != null:
+		provinces = saved_provinces
+	_update_material(_mesh_node("Surface"))
+	_refresh_climate(true)
+	set_heightmap_view(false)
+	if map_renderer != null:
+		refresh_water_layer()
+	world_painter_enabled.emit()
 
 
 func apply_climate(options: Dictionary) -> String:

@@ -778,6 +778,7 @@ func _build_shell() -> void:
 	_button("Full map", func(): _camera_rig._reset_view(), _toolbar)
 	if _terrain.heightmap_only:
 		_button("Play map", play_map, _toolbar, "PlayMap")
+		_button("World painter", _enter_world_painter, _toolbar, "WorldPainter")
 	var stack := VBoxContainer.new()
 	stack.name = "LayerStack"
 	stack.position = Vector2(14, 60)
@@ -847,6 +848,19 @@ func _select_layer(key: String) -> void:
 		_contexts[id].visible = id == key
 	_update_dependency_status()
 	_stop_brush()
+
+func _enter_world_painter() -> void:
+	if not _terrain.heightmap_only:
+		return
+	_terrain.enter_world_painter()
+	for id in ["climate", "ground", "trees"]:
+		if _layer_buttons.has(id):
+			_layer_buttons[id][0].disabled = false
+			_layer_buttons[id][1].disabled = false
+			_layer_selectors[id].disabled = false
+			_layer_selectors[id].tooltip_text = ""
+	_update_dependency_status()
+	_select_layer("ground")
 
 func _stop_brush() -> void:
 	if _province_brush != null:
@@ -1320,6 +1334,9 @@ func build_terrain_surface() -> void:
 		_update_surface_status()
 
 func generate_natural_ground() -> void:
+	if _terrain.heightmap_only:
+		_enter_world_painter()
+		return
 	if _surface_busy or _water_busy or _province_busy:
 		return
 	if not _terrain.water_layer_current():
