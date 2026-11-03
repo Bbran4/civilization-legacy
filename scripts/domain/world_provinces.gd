@@ -68,15 +68,37 @@ func generate(base: PackedFloat32Array, surface: RefCounted, water: RefCounted, 
 		if best >= 0:
 			seeds.append(best)
 			_seed(best, distance)
-	_grow(land, distance, surface.heights, water.mask_bytes)
+	# Province fronts should respond to broad terrain shape, not single-pixel
+	# height noise. Keep the original heightmap untouched; only the slope cost
+	# field is lightly smoothed for deterministic, less ragged boundaries.
+	var growth_heights := _growth_heights(surface.heights)
+	_grow(land, distance, growth_heights, water.mask_bytes)
 	# Every disconnected island receives an identity, even without a sampled seed.
 	for pixel in candidates:
 		if ids[pixel] == 0:
 			if records.size() >= 65535:
 				return "Too many disconnected land regions."
 			_seed(pixel, distance)
-			_grow(land, distance, surface.heights, water.mask_bytes)
+			_grow(land, distance, growth_heights, water.mask_bytes)
 	return _index_regions()
+
+func _growth_heights(source: PackedFloat32Array) -> PackedFloat32Array:
+	var result := PackedFloat32Array()
+	result.resize(source.size())
+	for y in range(size.y):
+		for x in range(size.x):
+			var total := 0.0
+			var samples := 0
+			for oy in range(-1, 2):
+				var sy := y + oy
+				if sy < 0 or sy >= size.y: continue
+				for ox in range(-1, 2):
+					var sx := x + ox
+					if sx < 0 or sx >= size.x: continue
+					total += source[sy * size.x + sx]
+					samples += 1
+			result[y * size.x + x] = total / float(samples)
+	return result
 
 func _seed(pixel: int, distance: PackedInt32Array) -> void:
 	var id := records.size() + 1
