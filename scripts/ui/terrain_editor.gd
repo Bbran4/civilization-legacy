@@ -859,6 +859,12 @@ func _enter_world_painter() -> void:
 			_layer_buttons[id][1].disabled = false
 			_layer_selectors[id].disabled = false
 			_layer_selectors[id].tooltip_text = ""
+	for id in ["rivers", "surface", "provinces", "ground"]:
+		if _layer_buttons.has(id):
+			_layer_buttons[id][0].set_pressed_no_signal(true)
+			for layer in layers:
+				if layer.id == id: layer.visible = true
+	_apply_layer_visibility()
 	_update_dependency_status()
 	_select_layer("ground")
 

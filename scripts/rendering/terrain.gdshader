@@ -98,7 +98,7 @@ void fragment() {
 	float beach_extent = ecotone ? beach_width * 1.8 : beach_width;
 	float beach = terrain_patch_edge(1.0 - smoothstep(0.2, beach_extent, altitude), blend_signals.a);
 	vec3 color = mix(grass, sand_color.rgb, beach);
-	if (provinces_enabled && flat_map_mode) {
+	if (provinces_enabled) {
 		vec2 province_uv = clamp(uv + vec2(0.5), vec2(0.0), vec2(1.0));
 		vec4 province = texture(province_field, province_uv);
 		vec2 texel = 1.0 / vec2(textureSize(province_field, 0));
@@ -107,8 +107,9 @@ void fragment() {
 		edge = max(edge, step(0.015, distance(province.rgb, texture(province_field, province_uv + vec2(0.0, texel.y)).rgb)));
 		edge = max(edge, step(0.015, distance(province.rgb, texture(province_field, province_uv - vec2(texel.x, 0.0)).rgb)));
 		edge = max(edge, step(0.015, distance(province.rgb, texture(province_field, province_uv - vec2(0.0, texel.y)).rgb)));
-		color = province.a > 0.5 ? mix(color, province.rgb, 0.38) : color;
-		color = mix(color, vec3(0.12, 0.10, 0.08), edge * province.a * 0.8);
+		vec3 province_color = province.a > 0.5 ? province.rgb : (0.35 + 0.45 * fract(sin(vec3(province.r, province.g + 17.0, province.b + 43.0)) * 43758.5453));
+		color = mix(color, province_color, province.a > 0.5 ? 0.38 : 0.18);
+		color = mix(color, vec3(0.12, 0.10, 0.08), edge * 0.8);
 	}
 	float rock = max(smoothstep(rock_slope, min(rock_slope + 0.25, 1.0), slope), smoothstep(height_scale * 0.55, height_scale * 0.8, altitude));
 	float highland = smoothstep(height_scale * 0.28, height_scale * 0.62, altitude);

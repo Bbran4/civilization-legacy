@@ -379,6 +379,8 @@ func enter_world_painter() -> void:
 	heightmap_only = false
 	heightmap_view = false
 	shaded_relief = true
+	flat_map_mode = false
+	show_water = true
 	regenerate()
 	water_layer = saved_water
 	terrain_surface = saved_surface
