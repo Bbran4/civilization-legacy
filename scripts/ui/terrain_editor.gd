@@ -1478,7 +1478,7 @@ func generate_provinces() -> void:
 	_province_thread = Thread.new()
 	var started := _province_thread.start(func():
 		var layer := WorldProvinces.new()
-		var generation_error := layer.generate(source, surface, water, count)
+		var generation_error: String = layer.generate(source, surface, water, count)
 		if generation_error.is_empty(): layer.build_connections(water)
 		return {"error": generation_error, "layer": layer})
 	if started != OK:
@@ -1526,7 +1526,7 @@ func generate_ocean_borders() -> void:
 	_province_status.text = "Generating connected ocean regions around the land…"
 	_province_thread = Thread.new()
 	var started := _province_thread.start(func():
-		var generation_error := candidate.generate_oceans(base, water, count, style, reach)
+		var generation_error: String = candidate.generate_oceans(base, water, count, style, reach)
 		if generation_error.is_empty(): candidate.build_connections(water)
 		return generation_error)
 	if started != OK:

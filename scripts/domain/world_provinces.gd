@@ -98,12 +98,16 @@ func build_connections(water: RefCounted) -> void:
 				if a <= 0 or b <= 0 or a == b: continue
 				var low := mini(a, b)
 				var high := maxi(a, b)
-				var river := water.mask_bytes[i * 4] > 64 or water.mask_bytes[next * 4] > 64
+				var river :Variant= water.mask_bytes[i * 4] > 64 or water.mask_bytes[next * 4] > 64
 				var kind := "river_crossing" if river else ("strait" if records[a - 1].kind != records[b - 1].kind else "province_border")
 				var key := str(low) + ":" + str(high) + ":" + kind
 				if seen.has(key): continue
 				seen[key] = true
 				connections.append({"a": low, "b": high, "type": kind, "crossings": 1})
+	for record in records:
+		var parts: int = int(record.get("parts", 1))
+		if record.kind == "land" and parts > 1:
+			connections.append({"a": record.id, "b": record.id, "type": "island_connection", "crossings": parts - 1})
 
 func _growth_heights(source: PackedFloat32Array) -> PackedFloat32Array:
 	var result := PackedFloat32Array()
