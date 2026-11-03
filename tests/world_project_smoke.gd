@@ -33,6 +33,8 @@ func _run() -> void:
 	layers[0].dependencies.append("trees")
 	check(Graph.affected(layers, "heightmap").size() == 5, "Traversal terminates even when extensions introduce cycles.")
 	var world := (load("res://scenes/main.tscn") as PackedScene).instantiate()
+	world.get_node("Terrain").heightmap_only = false
+	world.get_node("Terrain").terrain_template = "Noise"
 	root.add_child(world)
 	await process_frame
 	var editor = world.get_node("Interface/Editor")

@@ -65,6 +65,7 @@ static func capture(terrain: Node) -> Dictionary:
 	if source.has("error"):
 		return {}
 	return {"format": "civilization-legacy-terrain", "version": VERSION,
+		"heightmap_detail": {"version": 1, "coast": terrain.coast_detail, "mountains": terrain.mountain_detail},
 		"ground_palette": terrain.surface_catalog.snapshot(), "ground_paint": terrain.paint_layer.snapshot() if terrain.paint_layer != null else {"version": 1, "png": ""},
 		"biomes": {"version": Biomes.VERSION}, "hydrology": {"version": Hydrology.VERSION}, "generator_version": terrain.generator_version, "climate": {"version": Climate.VERSION, "settings": terrain.climate_settings.duplicate()}, "settings": settings, "source_image": source,
 		"sample_size": [terrain.sample_size().x, terrain.sample_size().y], "graph": terrain.graph_snapshot(),
@@ -78,6 +79,10 @@ static func validate(document: Variant) -> String:
 		return "This is not a supported Civilization Legacy terrain file (versions 1–10)."
 	if not _within(document.get("generator_version"), [1, 4, true]):
 		return "The terrain generator version is unsupported."
+	if document.has("heightmap_detail"):
+		var detail: Variant = document.heightmap_detail
+		if not detail is Dictionary or not _within(detail.get("version", 1), [1, 1, true]) or not _within(detail.get("coast"), [0, 1]) or not _within(detail.get("mountains"), [0, 1]):
+			return "Invalid heightmap refinement settings."
 	var settings: Variant = document.get("settings")
 	if not settings is Dictionary:
 		return "Terrain settings are missing."
@@ -178,6 +183,9 @@ static func apply(terrain: Node, document: Dictionary) -> String:
 	if not layer.ok:
 		return layer.error
 	# Dependencies and paint are valid before changing the live map.
+	var detail: Dictionary = document.get("heightmap_detail", {"coast": 0.75, "mountains": 0.8})
+	terrain.coast_detail = detail.coast
+	terrain.mountain_detail = detail.mountains
 	terrain.surface_catalog = ground_catalog
 	terrain.paint_layer = layer.layer
 	terrain._restore_paint = true

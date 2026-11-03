@@ -1,5 +1,13 @@
 # Map Editor 2.0 — Phase 1
 
+## Active workspace
+
+The current application is temporarily restricted to Heightmap while terrain
+quality is refined. The other layers are disabled, including their runtime
+simulation and rendering. See [Heightmap focus](heightmap-focus.md) for the active
+controls and generation pipeline. The remaining sections describe the broader
+editor foundation, retained for later reactivation and regression fixtures.
+
 ## Workspace
 
 Run `scenes/main.tscn`. Select Heightmap, Rivers / lakes, Climate, Ground paint,

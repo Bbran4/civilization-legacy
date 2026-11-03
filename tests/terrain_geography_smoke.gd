@@ -93,6 +93,8 @@ func _run() -> void:
 	_check(Geography.land_kind(999.0 * 4, false, 40000.0) == "island", "Land size classification must scale with map area, not cell count.")
 	# Exercise real terrain regeneration, the inspector, files and the LOD camera.
 	var world = load("res://scenes/main.tscn").instantiate()
+	world.get_node("Terrain").heightmap_only = false
+	world.get_node("Terrain").terrain_template = "Noise"
 	root.add_child(world)
 	await process_frame
 	var terrain = world.get_node("Terrain")

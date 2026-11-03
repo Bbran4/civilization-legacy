@@ -61,6 +61,8 @@ func _run() -> void:
 	for value in biomes.water_support:
 		_check(value == 0, "Zero-rain dry channels must not supply permanent freshwater.")
 	var world = load("res://scenes/main.tscn").instantiate()
+	world.get_node("Terrain").heightmap_only = false
+	world.get_node("Terrain").terrain_template = "Noise"
 	root.add_child(world)
 	await process_frame
 	var terrain = world.get_node("Terrain")

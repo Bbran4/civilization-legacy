@@ -158,6 +158,8 @@ func _run() -> void:
 	print("Procedural hydrology recipes checked: ", Recipe.PRESETS.size())
 	# Run the real editor, climate generator, lake/river meshes and document pipeline.
 	var world = load("res://scenes/main.tscn").instantiate()
+	world.get_node("Terrain").heightmap_only = false
+	world.get_node("Terrain").terrain_template = "Noise"
 	root.add_child(world)
 	await process_frame
 	var terrain = world.get_node("Terrain")

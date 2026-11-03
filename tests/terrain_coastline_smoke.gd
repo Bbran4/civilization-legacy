@@ -145,6 +145,8 @@ func _run() -> void:
 	if DisplayServer.get_name() != "headless":
 		await _gpu_fixture()
 	var world = load("res://scenes/main.tscn").instantiate()
+	world.get_node("Terrain").heightmap_only = false
+	world.get_node("Terrain").terrain_template = "Noise"
 	root.add_child(world)
 	await process_frame
 	var terrain = world.get_node("Terrain")

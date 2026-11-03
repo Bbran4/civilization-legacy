@@ -12,6 +12,15 @@ the planned gameplay layer on top of that shared world.
 political map modes, scenarios, civilization simulation, skill trees and prestige
 are planned gameplay systems.
 
+## Current focus: grayscale heightmaps
+
+The editor currently opens in **heightmap-only mode**. Pick a template and seed,
+then tune coast detail and mountain detail. The detailed raster is the source for
+both the grayscale viewport and export; shaded relief is an optional preview.
+Trees, biomes, climate, rivers, lakes and provinces are disabled in this workspace.
+Their existing code and terrain saves are retained. See the
+[heightmap focus guide](docs/heightmap-focus.md).
+
 ## Map Editor 2.0
 
 Phase 1 introduces a layer stack, contextual properties, a central map view and

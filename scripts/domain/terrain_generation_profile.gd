@@ -49,3 +49,9 @@ static func apply(terrain: Node) -> void:
 	terrain.beach_width = clampf(longest / 192.0 * 0.25, 0.1, 10.0)
 	terrain.rock_slope = 0.32
 	terrain.snow_height = terrain.elevation * 0.55
+	if terrain.heightmap_only:
+		terrain.auto_density = false
+		terrain.graph_points = 20000
+		terrain.resolution = 1024
+		terrain.close_detail_enabled = false
+		terrain.show_water = false

@@ -73,6 +73,8 @@ func _run() -> void:
 	invalid.temperature_bias = NAN
 	_check(not Climate.validate(invalid).is_empty(), "Nonfinite climate inputs must be rejected.")
 	var world = load("res://scenes/main.tscn").instantiate()
+	world.get_node("Terrain").heightmap_only = false
+	world.get_node("Terrain").terrain_template = "Noise"
 	root.add_child(world)
 	await process_frame
 	var terrain = world.get_node("Terrain")

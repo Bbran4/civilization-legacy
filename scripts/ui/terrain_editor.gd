@@ -68,14 +68,15 @@ func _ready() -> void:
 	_update_preview()
 	_terrain.terrain_regenerated.connect(_apply_layer_visibility)
 	_build_cell_inspector()
-	var climate_panel := ClimatePanel.new()
-	climate_panel.terrain = _terrain
-	climate_panel.editor = self
-	_climate_panel = climate_panel
-	_contexts["climate"].add_child(climate_panel)
-	climate_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-	climate_panel.custom_minimum_size.y = 450
-	climate_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if not _terrain.heightmap_only:
+		var climate_panel := ClimatePanel.new()
+		climate_panel.terrain = _terrain
+		climate_panel.editor = self
+		_climate_panel = climate_panel
+		_contexts["climate"].add_child(climate_panel)
+		climate_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+		climate_panel.custom_minimum_size.y = 450
+		climate_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_select_layer("heightmap")
 	_setup_document_tracking()
 
@@ -116,7 +117,7 @@ func _build_interface() -> void:
 	_build_shell()
 	_contexts["heightmap"] = _form
 	_label("CIVILIZATION LEGACY", 13, Color("afbdc6"))
-	_label("World editor", 28, Color("f0dbab"))
+	_label("Heightmap editor" if _terrain.heightmap_only else "World editor", 28, Color("f0dbab"))
 	_label("Create a heightmap. Keep the world.", 14)
 	var files := HBoxContainer.new()
 	_toolbar.add_child(files)
@@ -157,11 +158,30 @@ func _build_interface() -> void:
 	_form.add_child(island)
 	_controls["island_enabled"] = island
 	_number("Elevation (relief)", "elevation", 1, 100, 0.5)
+	if _terrain.heightmap_only:
+		_controls["elevation"].get_parent().visible = false
+		_number("Coast detail", "coast_detail", 0, 1, 0.05)
+		_number("Mountain detail", "mountain_detail", 0, 1, 0.05)
+		_label("Output resolution")
+		var output := OptionButton.new()
+		for pixels in [512, 1024]:
+			output.add_item(str(pixels + 1) + " px longest edge")
+			output.set_item_metadata(output.item_count - 1, pixels)
+		output.select(1)
+		output.item_selected.connect(func(_index: int): _settings_changed())
+		_controls["heightmap_resolution"] = output
+		_form.add_child(output)
+		var relief := CheckBox.new()
+		relief.text = "Shaded relief preview"
+		relief.tooltip_text = "Grayscale lighting to inspect ridges. The saved heightmap and exported values do not change."
+		relief.toggled.connect(_terrain.set_relief_preview)
+		_form.add_child(relief)
+		_button("Export grayscale PNG…", func(): _show_dialog("export"))
 	var actions := HBoxContainer.new()
 	_form.add_child(actions)
 	_button("Generate", apply_settings, actions, "Generate")
 	_button("New seed", _new_seed, actions, "NewSeed")
-	var automatic := _label("Terrain detail and colours are chosen automatically.", 13, Color("a9bdc8"))
+	var automatic := _label("Black = lowest · White = highest · Sea datum 20%" if _terrain.heightmap_only else "Terrain detail and colours are chosen automatically.", 13, Color("a9bdc8"))
 	automatic.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_status = _label("Ready", 13, Color("d7c18d"))
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -201,6 +221,7 @@ func _build_interface() -> void:
 	_button("Closest view", func(): _camera_rig.zoom_to_limit(true), zoom_actions, "ClosestView")
 	var view := CheckBox.new()
 	view.text = "Show heights"
+	view.visible = not _terrain.heightmap_only
 	view.toggled.connect(_terrain.set_heightmap_view)
 	_form.add_child(view)
 	_help(view, "grayscale")
@@ -296,6 +317,11 @@ func _sync_from_terrain() -> void:
 	_syncing = true
 	_tree_population.set_value_no_signal(_terrain.tree_population)
 	_update_tree_status()
+	if _terrain.heightmap_only:
+		_controls["coast_detail"].set_value_no_signal(_terrain.coast_detail)
+		_controls["mountain_detail"].set_value_no_signal(_terrain.mountain_detail)
+		var output: OptionButton = _controls["heightmap_resolution"]
+		output.select(0 if _terrain.resolution == 512 else 1)
 	(_controls["map_seed"] as LineEdit).text = _terrain.map_seed
 	(_controls["map_size.x"] as SpinBox).set_value_no_signal(_terrain.map_size.x)
 	(_controls["map_size.y"] as SpinBox).set_value_no_signal(_terrain.map_size.y)
@@ -376,6 +402,14 @@ func _preset_selected(index: int) -> void:
 func _update_description() -> void:
 	var picker := _controls["terrain_template"] as OptionButton
 	_description.text = "Imported: " + _image_path.get_file() if picker.selected == _custom_index else Help.DESCRIPTIONS[picker.get_item_text(picker.selected)]
+	if _terrain.heightmap_only:
+		var raster: bool = picker.selected == _custom_index or Recipe.PRECREATED.has(picker.get_item_metadata(picker.selected))
+		_controls["coast_detail"].editable = not raster
+		_controls["mountain_detail"].editable = not raster
+		_controls["island_enabled"].disabled = raster
+		if raster:
+			_controls["island_enabled"].set_pressed_no_signal(false)
+			_description.text += "\nImported height data is preserved without procedural embellishment."
 
 
 func apply_settings() -> void:
@@ -391,6 +425,11 @@ func apply_settings() -> void:
 	_terrain.source_heightmap_path = _image_path
 	_terrain.source_heightmap_size = _image_size
 	GenerationProfile.apply(_terrain)
+	if _terrain.heightmap_only:
+		_terrain.coast_detail = _controls["coast_detail"].value
+		_terrain.mountain_detail = _controls["mountain_detail"].value
+		var output: OptionButton = _controls["heightmap_resolution"]
+		_terrain.resolution = output.get_item_metadata(output.selected)
 	_terrain.island_enabled = (_controls["island_enabled"] as CheckBox).button_pressed
 	_terrain.elevation = _controls["elevation"].value
 	_terrain.snow_height = _terrain.elevation * 0.55
@@ -564,6 +603,11 @@ func _refresh_selected_cell() -> void:
 
 
 func _show_cell_info(info: Dictionary) -> void:
+	if _terrain.heightmap_only:
+		var point: Vector2 = info.get("inspected_position", info.position)
+		var h: float = (_terrain.base_surface_height(point / _terrain.map_size) / _terrain.relief_scale() - _terrain.height_offset) / _terrain.elevation + (0.2 if _terrain.generator_version >= 3 else 0.0)
+		_cell_label.text = "HEIGHTMAP SAMPLE\nX %.2f · Y %.2f\nHeight %.3f / 1.0\n%s" % [point.x, point.y, h, "Below sea datum" if h < 0.2 else "Land"]
+		return
 	_cell_panel.anchor_bottom = 1.0
 	_cell_panel.offset_bottom = -14
 	_cell_label.text = "CELL %d · %s\nX %.2f   Y %.2f\nHeight %d / 100 · sea datum 20\n%d neighbors\nArea %.2f map units²" % [info.id, info.get("surface_kind", "Land" if info.land else "Water"), info.position.x, info.position.y, info.height, info.neighbor_count, info.area]
@@ -656,6 +700,14 @@ func _build_shell() -> void:
 		lock.toggled.connect(func(value: bool): layer.locked = value; _stop_brush(); _update_dependency_status(); mark_dirty())
 		row.add_child(lock)
 		_layer_buttons[layer.id] = [eye, lock]
+		if _terrain.heightmap_only and layer.id != "heightmap":
+			layer.visible = false
+			eye.set_pressed_no_signal(false)
+			eye.disabled = true
+			lock.disabled = true
+			selector.disabled = true
+			selector.tooltip_text = "Disabled while we focus on the heightmap."
+
 	_dependency_status = Label.new()
 	_dependency_status.custom_minimum_size.x = 226
 	_dependency_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -677,6 +729,8 @@ func _context(key: String) -> void:
 	_form = box
 
 func _select_layer(key: String) -> void:
+	if _terrain.heightmap_only and key not in ["heightmap", "view"]:
+		key = "heightmap"
 	if selected_layer != key:
 		mark_dirty()
 	selected_layer = key
@@ -693,18 +747,25 @@ func _stop_brush() -> void:
 		_brush.enabled.button_pressed = false
 
 func can_edit(key: String) -> bool:
+	if _terrain.heightmap_only and key != "heightmap":
+		return false
 	for layer in layers:
 		if layer.id == key:
 			return not layer.locked and layer.visible
 	return false
 
 func regeneration_error(key: String) -> String:
+	if _terrain.heightmap_only:
+		return "" if key == "heightmap" and can_edit(key) else "Heightmap is hidden or locked. Other layers are disabled for now."
 	if not layer_visible(key):
 		return "Show the layer before editing it."
 	return LayerGraph.lock_reason(layers, key)
 
 func _update_dependency_status() -> void:
 	if _dependency_status == null:
+		return
+	if _terrain.heightmap_only:
+		_dependency_status.text = "HEIGHTMAP ONLY\nTrees, biomes, rivers and lakes are disabled."
 		return
 	var affected := LayerGraph.affected(layers, selected_layer)
 	var names: PackedStringArray = []
@@ -718,6 +779,13 @@ func _update_dependency_status() -> void:
 
 
 func _apply_layer_visibility() -> void:
+	if _terrain.heightmap_only:
+		_terrain.visible = layers[0].visible
+		for layer in layers:
+			if layer.id != "heightmap":
+				layer.visible = false
+				_layer_buttons[layer.id][0].set_pressed_no_signal(false)
+		return
 	for layer in layers:
 		match layer.id:
 			"heightmap": _terrain.visible = layer.visible

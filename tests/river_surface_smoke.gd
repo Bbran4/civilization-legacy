@@ -80,6 +80,8 @@ func _run() -> void:
 	var game = load("res://scenes/main.tscn").instantiate()
 	var terrain = game.get_node("Terrain")
 	terrain.tree_population = 0
+	game.get_node("Terrain").heightmap_only = false
+	game.get_node("Terrain").terrain_template = "Noise"
 	root.add_child(game)
 	await process_frame
 	terrain.map_size = Vector2(512, 384)

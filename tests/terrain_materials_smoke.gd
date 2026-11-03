@@ -47,6 +47,8 @@ func _run() -> void:
 				var n := Vector3(c.r, c.g, c.b) * 2.0 - Vector3.ONE
 				_check(absf(n.length() - 1.0) < 0.02 and n.z > 0 and c.a >= 0.7, "Packed normals must be unit vectors with valid independent roughness.")
 	var world = load("res://scenes/main.tscn").instantiate()
+	world.get_node("Terrain").heightmap_only = false
+	world.get_node("Terrain").terrain_template = "Noise"
 	root.add_child(world)
 	await process_frame
 	var terrain = world.get_node("Terrain")

@@ -27,6 +27,8 @@ func _run() -> void:
 	var terrain = world.get_node("Terrain")
 	terrain.tree_population = 0
 	terrain.micro_detail_strength = 0.0
+	world.get_node("Terrain").heightmap_only = false
+	world.get_node("Terrain").terrain_template = "Noise"
 	root.add_child(world)
 	await process_frame
 	terrain.map_size = Vector2(256, 192)

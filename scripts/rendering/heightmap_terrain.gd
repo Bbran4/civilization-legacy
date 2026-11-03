@@ -5,6 +5,13 @@ extends Node3D
 signal climate_changed
 signal vegetation_changed
 signal terrain_regenerated
+const HeightDetail = preload("res://scripts/domain/heightmap_detail.gd")
+const HEIGHT_ONLY_SHADER = preload("res://scripts/rendering/heightmap_only.gdshader")
+## Runtime authoring focus. Legacy systems remain available to explicit test fixtures.
+@export var heightmap_only: bool = false
+var coast_detail: float = 0.75
+var mountain_detail: float = 0.8
+var shaded_relief: bool = false
 const PaintLayer = preload("res://scripts/rendering/terrain_paint_layer.gd")
 var paint_layer: RefCounted
 var _restore_paint: bool = false
@@ -283,6 +290,9 @@ func regenerate() -> void:
 	_dirty = false
 	var source_image: Image = _source_image()
 	_recipe_samples = PackedFloat32Array()
+	if heightmap_only:
+		_regenerate_heightmap_only(surface, water, source_image, started)
+		return
 	if _restored_samples.is_empty():
 		generator_version = 4
 		_prepare_graph(source_image)
@@ -618,7 +628,7 @@ func set_overview_blend(value: float) -> void:
 	if vegetation_view != null:
 		vegetation_view.set_overview_blend(value)
 	overview_blend = clampf(value, 0.0, 1.0)
-	if _land_material != null:
+	if _land_material != null and not heightmap_only:
 		_land_material.set_shader_parameter("overview_blend", overview_blend)
 	if detail != null:
 		detail.set_overview_blend(overview_blend)
@@ -626,10 +636,13 @@ func set_overview_blend(value: float) -> void:
 		geography_view.set_overview_blend(overview_blend)
 
 func is_flat_map_mode() -> bool:
-	return flat_map_mode
+	return heightmap_only or flat_map_mode
 
 
 func set_heightmap_view(enabled: bool) -> void:
+	if heightmap_only:
+		heightmap_view = true
+		return
 	heightmap_view = enabled
 	if vegetation_view != null:
 		vegetation_view.set_view(climate_view, enabled)
@@ -673,7 +686,12 @@ func _build_mesh(surface: MeshInstance3D) -> void:
 		world_heights[i] = height * factor
 		_sample_min = minf(_sample_min, height)
 		_sample_max = maxf(_sample_max, height)
-	surface.mesh = Grid.mesh_from_heights(world_heights, size, display_size())
+	if heightmap_only:
+		var plane := PlaneMesh.new()
+		plane.size = display_size()
+		surface.mesh = plane
+	else:
+		surface.mesh = Grid.mesh_from_heights(world_heights, size, display_size())
 
 
 func _sample_image(image: Image, uv: Vector2) -> float:
@@ -830,6 +848,11 @@ func ray_surface_hit(ray_origin: Vector3, ray_direction: Vector3) -> Variant:
 	var origin: Vector3 = to_local(ray_origin)
 	var direction: Vector3 = global_transform.basis.inverse() * ray_direction
 	var extent: Vector2 = display_size()
+	if heightmap_only:
+		var hit: Variant = Plane(Vector3.UP, 0.0).intersects_ray(origin, direction)
+		if hit != null and absf(hit.x) <= extent.x * 0.5 and absf(hit.z) <= extent.y * 0.5:
+			return to_global(hit)
+		return null
 	var bounds: Vector2 = height_bounds()
 	var low := Vector3(-extent.x * 0.5, minf(bounds.x, sea_level * relief_scale()) - 2.0, -extent.y * 0.5)
 	var high := Vector3(extent.x * 0.5, maxf(bounds.y, sea_level * relief_scale()) + 2.0, extent.y * 0.5)
@@ -866,3 +889,61 @@ func ray_surface_hit(ray_origin: Vector3, ray_direction: Vector3) -> Variant:
 			return to_global(origin + direction * t)
 		previous_t = t
 	return null
+
+
+func _regenerate_heightmap_only(surface: MeshInstance3D, water: MeshInstance3D, source_image: Image, started: int) -> void:
+	heightmap_view = true
+	water.visible = false
+	for node in [vegetation_view, hydrology_view, geography_view]:
+		if node != null:
+			node.free()
+	vegetation_view = null
+	hydrology_view = null
+	geography_view = null
+	climate = null
+	biomes = null
+	hydrology = null
+	provinces = null
+	if _restored_samples.is_empty():
+		generator_version = 4
+		_prepare_graph(source_image)
+		var image := source_image
+		if image == null and Recipe.PRECREATED.has(terrain_template):
+			image = (load(Recipe.PRECREATED[terrain_template]) as Texture2D).get_image()
+		if image != null:
+			var size := sample_size()
+			_recipe_samples.resize(size.x * size.y)
+			for y in range(size.y):
+				for x in range(size.x):
+					var uv := Vector2(x, y) / Vector2(size - Vector2i.ONE)
+					var h := _sample_image(image, uv)
+					_recipe_samples[y * size.x + x] = 1.0 - h if invert_image else h
+		else:
+			_recipe_samples = HeightDetail.refine(graph.rasterize(sample_size(), surface_smoothing), sample_size(), map_seed, coast_detail, mountain_detail)
+	# Retain the existing document's geographic cache contract; no climate or water
+	# simulation and no geography rendering is instantiated in this workspace.
+	if graph != null and (geography == null or geography.source_hash != graph.source_fingerprint(surface_smoothing)):
+		geography = Geography.new()
+		geography.generate(graph, surface_smoothing)
+	_build_mesh(surface)
+	if not _restore_paint or paint_layer == null:
+		paint_layer = PaintLayer.new(map_size)
+	_restore_paint = false
+	var normalized := PackedFloat32Array()
+	normalized.resize(height_samples.size())
+	for i in range(height_samples.size()):
+		normalized[i] = clampf((height_samples[i] - height_offset) / elevation + (0.2 if generator_version >= 3 else 0.0), 0.0, 1.0)
+	var size := sample_size()
+	_land_material = ShaderMaterial.new()
+	_land_material.shader = HEIGHT_ONLY_SHADER
+	_land_material.set_shader_parameter("height_field", ImageTexture.create_from_image(Image.create_from_data(size.x, size.y, false, Image.FORMAT_RF, normalized.to_byte_array())))
+	_land_material.set_shader_parameter("texel_size", Vector2.ONE / Vector2(size))
+	_land_material.set_shader_parameter("shaded_relief", shaded_relief)
+	surface.material_override = _land_material
+	generation_ms = (Time.get_ticks_usec() - started) / 1000.0
+	terrain_regenerated.emit()
+
+func set_relief_preview(enabled: bool) -> void:
+	shaded_relief = enabled
+	if heightmap_only and _land_material != null:
+		_land_material.set_shader_parameter("shaded_relief", enabled)

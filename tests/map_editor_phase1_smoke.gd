@@ -27,6 +27,8 @@ func _run() -> void:
 	check(not Manifest.validate(bad).is_empty(), "Layer flags require boolean types.")
 	check(not Manifest.save_file("user://wrong.terrain.json", data).is_empty(), "Manifest writes cannot target terrain filenames.")
 	var world := (load("res://scenes/main.tscn") as PackedScene).instantiate()
+	world.get_node("Terrain").heightmap_only = false
+	world.get_node("Terrain").terrain_template = "Noise"
 	root.add_child(world)
 	await process_frame
 	var editor = world.get_node("Interface/Editor")

@@ -96,6 +96,8 @@ func _run() -> void:
 	for kind in range(5):
 		_check(Library.mesh_for(kind, true).surface_get_array_len(0) < Library.mesh_for(kind, false).surface_get_array_len(0), "Every tree type must reduce geometry at distance.")
 	var world = load("res://scenes/main.tscn").instantiate()
+	world.get_node("Terrain").heightmap_only = false
+	world.get_node("Terrain").terrain_template = "Noise"
 	root.add_child(world)
 	await process_frame
 	var terrain = world.get_node("Terrain")
