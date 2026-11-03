@@ -24,7 +24,9 @@ and prestige are planned gameplay systems.
    names and neighbors; apply custom province names. Play map has an optional
    Provinces view. Generate ocean borders without replacing land regions, then
    paint land/ocean borders with stroke Undo/Redo. Original terrain and water
-   remain unchanged.
+   remain unchanged. Attach separate islands to a mainland province with a brush
+   touch, with Undo restoring their old IDs/names. Coastal maritime partitioning
+   is available alongside open sea zones.
 
 Both original source layers stay intact. Visibility and locks support comparison;
 changing either source retains but hides the old surface until it is rebuilt.
@@ -32,7 +34,8 @@ Old saves stay readable. Older water layers need explicit regeneration to supply
 water elevations before a surface can be built. Trees, climate, biomes and painting
 remain disabled in this focused workspace. Province IDs/names survive saving;
 regenerating provinces replaces them.
-See [ocean borders and painting](docs/ocean-borders-and-paint.md),
+See [island attachment and maritime regions](docs/islands-and-maritime.md),
+[ocean borders and painting](docs/ocean-borders-and-paint.md),
 [province workflow](docs/provinces.md), [terrain surface workflow](docs/terrain-surface.md),
 [water-layer workflow](docs/water-layer.md) and [heightmap focus](docs/heightmap-focus.md).
 

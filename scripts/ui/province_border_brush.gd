@@ -2,6 +2,7 @@ extends Node
 const History = preload("res://scripts/domain/province_edit_history.gd")
 var editor: Node
 var enabled: CheckBox
+var attach_islands: CheckBox
 var radius: SpinBox
 var status: Label
 var history := History.new()
@@ -15,7 +16,12 @@ func configure(owner_editor: Node) -> void:
 	enabled.toggled.connect(func(value: bool):
 		if not value: cancel())
 	editor._form.add_child(enabled)
-	editor._label("Pick a region first, then drag to expand it. Alt-click picks another region. Land and ocean cannot overwrite each other.", 12).autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	editor._label("Pick a region, then paint to expand it or absorb an island. Alt-click picks another region. Land and ocean cannot overwrite each other.", 12).autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	attach_islands = CheckBox.new()
+	attach_islands.text = "Attach whole separate islands"
+	attach_islands.button_pressed = true
+	editor._form.add_child(attach_islands)
+	editor._label("Touch a separate island to absorb it into the selected land province. Turn this off to paint island pixels individually.", 12).autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	editor._label("Brush radius (pixels at 1025)", 13)
 	radius = SpinBox.new()
 	radius.min_value = 0.5
@@ -25,7 +31,7 @@ func configure(owner_editor: Node) -> void:
 	editor._form.add_child(radius)
 	editor._button("Undo border stroke (Ctrl+Z)", undo, null, "UndoBorder")
 	editor._button("Redo border stroke (Ctrl+Y)", redo, null, "RedoBorder")
-	status = editor._label("Each stroke must keep every region connected. Undo history is session-only.", 12)
+	status = editor._label("Land provinces can span islands. Painting over a whole land province absorbs it. Undo restores it.", 12)
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	preview = MeshInstance3D.new()
 	preview.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -94,7 +100,7 @@ func _paint(point: Vector2) -> void:
 		cancel()
 		return
 	var r: float = radius.value * maxi(history.draft.size.x, history.draft.size.y) / 1025.0
-	history.stroke(last if last.is_finite() else point, point, r)
+	history.stroke(last if last.is_finite() else point, point, r, attach_islands.button_pressed)
 	last = point
 	editor._terrain.map_renderer.set_provinces(history.draft, true)
 func finish() -> void:

@@ -5,7 +5,7 @@
 After generating Heightmap, Rivers / lakes, Terrain surface and land Provinces:
 
 1. In Provinces, choose Target ocean regions (1-256).
-2. Press Generate ocean borders. Sea connected to a map edge is partitioned into
+2. Choose Coastal maritime regions or Open sea zones, then Generate ocean borders. Sea connected to a map edge is partitioned into
    connected ocean regions, following the exact existing coastline. Explicit lake
    pixels and enclosed inland water remain excluded.
 3. Click an ocean region to inspect/name it just like a land province. The optional
@@ -35,9 +35,12 @@ unchanged. Borders maintain readable screen width when the map is zoomed out.
 
 Land can repaint only land regions, ocean only ocean regions. Lakes, inland water,
 coastlines and all source height/water fields remain unchanged. Strokes must leave
-all regions connected and nonempty. A stroke that would split a donor region,
-create a disconnected target or remove a region is rejected as a whole with a
-message. Manual split/merge/deletion are separate future tools. Region IDs and
+land regions connected within each physical island and ocean regions connected.
+Separate islands can share one land ID. Attach whole separate islands (on by
+default) transfers a touched separate landmass to the selected province. A fully
+painted-over land province is archived, with Undo restoring its ID/name. Invalid
+same-island splits or ocean disconnections reject the whole stroke. Dedicated
+split/merge commands remain future tools. See [Island attachment](islands-and-maritime.md). Region IDs and
 names remain stable during painting; areas and neighbors update after each edit.
 
 Draft strokes are separate from the installed world. Saving or inspecting the
@@ -55,9 +58,9 @@ names and recomputed adjacency. Renaming does not overwrite border history.
 ## Implementation and compatibility
 
 - `world_provinces.gd`: typed land/ocean records, boundary-connected ocean flood,
-  deterministic sea partition, kind-safe capsule edits, exact v2 region snapshots,
-  complete typed coverage and connected-region validation. V1 land-only province
-  snapshots still load as land. Main terrain v10/world manifest v3 stay unchanged.
+  deterministic coastal/offshore sea partition, kind-safe capsule edits, exact v3 region snapshots,
+  complete typed coverage and connected-region validation. V1 land-only and v2 land/ocean province
+  snapshots still load. V3 also stores archived IDs and sea partition style. Main terrain v10/world manifest v3 stay unchanged.
 - `province_edit_history.gd`: separate editable drafts, atomic connectedness checks,
   bounded pixel deltas, exact Undo/Redo and preservation of separately edited names.
 - `province_border_brush.gd`: picking, projected cursor, gestures/shortcuts, target
@@ -78,7 +81,7 @@ cannot activate against different source maps.
 
 `ocean_border_paint_smoke.gd` covers deterministic ocean IDs, preserved land data,
 lake/inland exclusion, v1 compatibility, mixed-region round trips, draft isolation,
-continuous painting, exact Undo/Redo, rejection of disconnected/empty regions,
+continuous painting, exact Undo/Redo, rejection of invalid same-island/ocean disconnections,
 cross-kind protection, screen-to-map gestures, document replacement, locks,
 background-job replacement/shutdown and real graphics/gameplay output. The maximum
 resolution test also generates/restores oceans at 2050 square. Manual visual/zoom

@@ -8,6 +8,7 @@ const LayerGraph = preload("res://scripts/domain/map_layer_graph.gd")
 const ProvinceBorderBrush = preload("res://scripts/ui/province_border_brush.gd")
 var _province_brush: Node
 var _ocean_count: SpinBox
+var _ocean_style: OptionButton
 const WorldProvinces = preload("res://scripts/domain/world_provinces.gd")
 const TerrainSurface = preload("res://scripts/domain/terrain_surface.gd")
 const WaterLayer = preload("res://scripts/domain/terrain_water_layer.gd")
@@ -356,6 +357,7 @@ func _sync_from_terrain() -> void:
 		if _province_count != null and _terrain.province_layer != null:
 			_province_count.set_value_no_signal(_terrain.province_layer.requested_count)
 			_ocean_count.set_value_no_signal(_terrain.province_layer.requested_oceans)
+			_ocean_style.select(0 if _terrain.province_layer.ocean_style == "coastal" else 1)
 			_select_province(0)
 		_controls["coast_detail"].set_value_no_signal(_terrain.coast_detail)
 		_controls["mountain_detail"].set_value_no_signal(_terrain.mountain_detail)
@@ -676,6 +678,7 @@ func _show_cell_info(info: Dictionary) -> void:
 			if _province_selected > 0:
 				var record: Dictionary = _terrain.province_layer.records[_province_selected - 1]
 				_cell_label.text += "\n%s (ID %d)\n%d land pixels, %d neighbors" % [record.name, record.id, record.pixels, record.neighbors.size()]
+				if record.kind == "land" and record.parts > 1: _cell_label.text += "\n%d island parts" % record.parts
 				_cell_panel.offset_bottom = 620
 		return
 	_cell_panel.anchor_bottom = 1.0
@@ -1299,6 +1302,12 @@ func _build_province_controls() -> void:
 	_ocean_count.max_value = 256
 	_ocean_count.value = 24
 	_form.add_child(_ocean_count)
+	_ocean_style = OptionButton.new()
+	_ocean_style.add_item("Coastal maritime regions")
+	_ocean_style.set_item_metadata(0, "coastal")
+	_ocean_style.add_item("Open sea zones")
+	_ocean_style.set_item_metadata(1, "open")
+	_form.add_child(_ocean_style)
 	_button("Generate ocean borders", generate_ocean_borders, null, "GenerateOceans")
 	_label("Click the map to inspect and name a land or ocean region.").autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_province_name = LineEdit.new()
@@ -1313,6 +1322,7 @@ func _build_province_controls() -> void:
 	_province_brush.configure(self)
 
 func _select_province(id: int) -> void:
+	if id > 0 and (_terrain.province_layer == null or id > _terrain.province_layer.records.size() or not _terrain.province_layer.records[id - 1].get("active", true)): id = 0
 	_province_selected = id
 	if _terrain.map_renderer != null:
 		_terrain.map_renderer.material.set_shader_parameter("selected_province", id)
@@ -1337,9 +1347,12 @@ func _update_province_status() -> void:
 	_layer_selectors["provinces"].text = "Provinces *" if _terrain.province_layer != null and not current else "Provinces"
 	if current:
 		var oceans := 0
+		var active := 0
 		for record in _terrain.province_layer.records:
+			if not record.get("active", true): continue
+			active += 1
 			if record.kind == "ocean": oceans += 1
-		_province_status.text = "%d land · %d ocean regions. Ocean generation preserves land IDs; land regeneration replaces all IDs and names." % [_terrain.province_layer.records.size() - oceans, oceans]
+		_province_status.text = "%d land · %d ocean regions. Ocean generation preserves land IDs; land regeneration replaces all IDs and names." % [active - oceans, oceans]
 	else:
 		_province_status.text = "Build the terrain surface, then generate provinces. Old data is retained but hidden when the source changes."
 	if not current:
@@ -1408,9 +1421,10 @@ func generate_ocean_borders() -> void:
 	_ocean_count.apply()
 	await get_tree().process_frame
 	var count := int(_ocean_count.value)
+	var style: String = _ocean_style.get_item_metadata(_ocean_style.selected)
 	_province_status.text = "Generating connected ocean regions around the land…"
 	_province_thread = Thread.new()
-	var started := _province_thread.start(func(): return candidate.generate_oceans(base, water, count))
+	var started := _province_thread.start(func(): return candidate.generate_oceans(base, water, count, style))
 	if started != OK:
 		_province_thread = null
 		_province_busy = false

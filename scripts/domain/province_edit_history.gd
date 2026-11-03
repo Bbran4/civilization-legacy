@@ -20,22 +20,22 @@ func cancel() -> void:
 	changes.clear()
 func begin(layer: RefCounted, id: int) -> bool:
 	sync(layer)
-	if layer == null or id < 1 or id > layer.records.size(): return false
+	if layer == null or id < 1 or id > layer.records.size() or not layer.records[id - 1].get("active", true): return false
 	target = id
 	draft = layer.editable_copy()
 	changes.clear()
 	return true
-func stroke(a: Vector2, b: Vector2, radius: float) -> void:
-	if draft != null: draft.paint_segment(a, b, radius, target, changes)
+func stroke(a: Vector2, b: Vector2, radius: float, attach_islands: bool = false) -> void:
+	if draft != null: draft.paint_segment(a, b, radius, target, changes, attach_islands)
 func finish() -> Dictionary:
 	if draft == null or changes.is_empty():
 		cancel()
 		return {"error": "", "layer": null}
 	for i in range(draft.records.size()): draft.records[i].name = current.records[i].name
-	var error: String = draft._index_regions()
+	var error: String = draft._index_regions(true)
 	if not error.is_empty():
 		cancel()
-		return {"error": "Stroke cancelled: it would split a region or remove its last pixel.", "layer": null}
+		return {"error": "Stroke cancelled: it would split a region on the same island or disconnect an ocean region.", "layer": null}
 	var indices := PackedInt32Array()
 	var before := PackedInt32Array()
 	for pixel in changes:
@@ -43,7 +43,10 @@ func finish() -> Dictionary:
 		before.append(changes[pixel])
 	for entry in redo_stack: history_bytes -= entry.indices.size() * 8
 	redo_stack.clear()
-	undo_stack.append({"indices": indices, "before": before, "target": target})
+	var retired: Array[int] = []
+	for i in range(draft.records.size()):
+		if current.records[i].get("active", true) and not draft.records[i].active: retired.append(i)
+	undo_stack.append({"indices": indices, "before": before, "target": target, "retired": retired})
 	history_bytes += indices.size() * 8
 	while undo_stack.size() > 50 or history_bytes > MAX_BYTES:
 		history_bytes -= undo_stack.pop_front().indices.size() * 8
@@ -64,6 +67,7 @@ func _apply(forward: bool) -> Dictionary:
 	var next: RefCounted = current.editable_copy()
 	for j in range(entry.indices.size()):
 		next.ids[entry.indices[j]] = entry.target if forward else entry.before[j]
+	for id in entry.get("retired", []): next.records[id].active = not forward
 	var error: String = next._index_regions()
 	if not error.is_empty(): return {"error": error, "layer": null}
 	stack.pop_back()

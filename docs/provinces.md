@@ -30,7 +30,9 @@ terrain-cell preview. It reads canonical land elevations, the finished surface
 and independent water mask at full output resolution, up to 2050 pixels. Sampled
 seeds spread using a deterministic best-candidate strategy. Multi-source weighted
 region growth favors gentle routes and penalizes river crossings. Shared-edge
-land connectivity is mandatory; disconnected islands get separate identities.
+land connectivity is mandatory within each physical island. Initial generation
+assigns islands separate identities; manual attachment can group them under a
+mainland ID. See [Island attachment and maritime regions](islands-and-maritime.md).
 Rivers remain land pixels in this initial model; lakes and seas stay unassigned.
 Rivers influence borders but are not mandatory borders or ownerless major-river
 water provinces yet. Mountain passes, crossings and gameplay movement remain later
@@ -65,11 +67,11 @@ It runs headless and with actual graphics. The maximum-resolution water test now
 builds and restores all four layers at 2050 square. Editor/world/heightmap/surface/
 water and shared-renderer suites provide regression coverage.
 
-Next: split/merge and further stable-ID editing, water
+Next: dedicated split/merge commands and further stable-ID editing, water
 crossing relationships, province selection/inspection in gameplay, and optional
 political labels. Biomes, painting and trees remain separate later layers. Manual
 visual/zoom/performance review remains with the user.
 
-Province snapshots now use version 2 to distinguish land and ocean records. V1
-land-only maps remain readable. Accepted painted borders preserve IDs/names and
+Province snapshots now use version 3 for archived IDs and maritime style, retaining
+land/ocean kinds. V1 land-only and v2 region maps remain readable. Accepted painted borders preserve IDs/names and
 save exactly. Ocean generation preserves authored land borders.
