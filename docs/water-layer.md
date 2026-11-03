@@ -13,6 +13,7 @@
    its source from being regenerated through the editor.
 4. **Play map** loads the same height and water data with the shared renderer.
    Editor raw-height inspection hides water and does not change gameplay shading.
+   Visibility switches are authoring views; Play map presents the full valid map.
 5. Save terrain/world normally. **Export water PNG** writes transparent blue water
    artwork separately; heightmap PNG export remains raw grayscale elevation.
 
