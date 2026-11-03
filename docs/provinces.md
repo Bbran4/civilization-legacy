@@ -72,6 +72,7 @@ crossing relationships, province selection/inspection in gameplay, and optional
 political labels. Biomes, painting and trees remain separate later layers. Manual
 visual/zoom/performance review remains with the user.
 
-Province snapshots now use version 3 for archived IDs and maritime style, retaining
-land/ocean kinds. V1 land-only and v2 region maps remain readable. Accepted painted borders preserve IDs/names and
+Province snapshots now use version 4 for a finite coastal sea band and deep-ocean
+background, retaining archived IDs and land/ocean kinds. V1-v3 maps remain readable.
+See [Coastal seas](coastal-seas.md). Accepted painted borders preserve IDs/names and
 save exactly. Ocean generation preserves authored land borders.

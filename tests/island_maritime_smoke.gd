@@ -107,7 +107,7 @@ func _run() -> void:
 	await editor.build_terrain_surface()
 	editor._select_layer("provinces")
 	await editor.generate_provinces()
-	check(editor._province_brush.attach_islands.button_pressed and editor._ocean_style.get_item_metadata(editor._ocean_style.selected) == "coastal", "New editor defaults enable whole-island attachment and coastal maritime mode.")
+	check(editor._province_brush.attach_islands.button_pressed and editor._ocean_style.get_item_metadata(editor._ocean_style.selected) == "coastal_band", "New editor defaults enable whole-island attachment and coastal maritime mode.")
 	var installed: RefCounted = terrain.province_layer
 	var target := 1
 	for record in installed.records:
@@ -138,10 +138,10 @@ func _run() -> void:
 	check(terrain.province_layer.ids[pixel] == target and not terrain.province_layer.records[old_id - 1].active, "Editor Redo reattaches the island.")
 	await editor.generate_ocean_borders()
 	check(not terrain.province_layer.records[old_id - 1].active and terrain.province_layer.ids[pixel] == target, "Maritime generation preserves authored multi-island province assignments.")
-	check(terrain.province_layer.ocean_style == "coastal", "Ocean worker installs the selected maritime mode.")
+	check(terrain.province_layer.ocean_style == "coastal_band", "Ocean worker installs the selected maritime mode.")
 	check(Document.save_file("user://maritime.terrain.json", terrain).is_empty(), "Maritime maps save through the world terrain format.")
 	var saved := Document.load_file("user://maritime.terrain.json")
-	check(saved.ok and Document.apply(terrain, saved.document).is_empty() and terrain.province_layer.ocean_style == "coastal", "Maritime mode and regions restore through disk.")
+	check(saved.ok and Document.apply(terrain, saved.document).is_empty() and terrain.province_layer.ocean_style == "coastal_band", "Maritime mode and regions restore through disk.")
 	check(not terrain.province_layer.records[old_id - 1].active and terrain.province_layer.ids[pixel] == target, "Disk restoration preserves absorbed island records and IDs.")
 	if DisplayServer.get_name() != "headless":
 		editor._sync_from_terrain()

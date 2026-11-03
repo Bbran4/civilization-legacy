@@ -9,6 +9,7 @@ const ProvinceBorderBrush = preload("res://scripts/ui/province_border_brush.gd")
 var _province_brush: Node
 var _ocean_count: SpinBox
 var _ocean_style: OptionButton
+var _coastal_reach: SpinBox
 const WorldProvinces = preload("res://scripts/domain/world_provinces.gd")
 const TerrainSurface = preload("res://scripts/domain/terrain_surface.gd")
 const WaterLayer = preload("res://scripts/domain/terrain_water_layer.gd")
@@ -357,7 +358,8 @@ func _sync_from_terrain() -> void:
 		if _province_count != null and _terrain.province_layer != null:
 			_province_count.set_value_no_signal(_terrain.province_layer.requested_count)
 			_ocean_count.set_value_no_signal(_terrain.province_layer.requested_oceans)
-			_ocean_style.select(0 if _terrain.province_layer.ocean_style == "coastal" else 1)
+			_ocean_style.select(1 if _terrain.province_layer.ocean_style == "open" else 0)
+			_coastal_reach.set_value_no_signal(_terrain.province_layer.coastal_reach)
 			_select_province(0)
 		_controls["coast_detail"].set_value_no_signal(_terrain.coast_detail)
 		_controls["mountain_detail"].set_value_no_signal(_terrain.mountain_detail)
@@ -1303,11 +1305,19 @@ func _build_province_controls() -> void:
 	_ocean_count.value = 24
 	_form.add_child(_ocean_count)
 	_ocean_style = OptionButton.new()
-	_ocean_style.add_item("Coastal maritime regions")
-	_ocean_style.set_item_metadata(0, "coastal")
-	_ocean_style.add_item("Open sea zones")
+	_ocean_style.add_item("Coastal seas + borderless open ocean")
+	_ocean_style.set_item_metadata(0, "coastal_band")
+	_ocean_style.add_item("Legacy full-ocean zones")
 	_ocean_style.set_item_metadata(1, "open")
 	_form.add_child(_ocean_style)
+	_label("Coastal sea reach (pixels at 1025)", 13)
+	_coastal_reach = SpinBox.new()
+	_coastal_reach.min_value = 8
+	_coastal_reach.max_value = 256
+	_coastal_reach.step = 4
+	_coastal_reach.value = 64
+	_form.add_child(_coastal_reach)
+	_label("Light-blue coastal sea zones have borders. Dark-blue open ocean stays continuous and unassigned.", 12).autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_button("Generate ocean borders", generate_ocean_borders, null, "GenerateOceans")
 	_label("Click the map to inspect and name a land or ocean region.").autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_province_name = LineEdit.new()
@@ -1419,12 +1429,14 @@ func generate_ocean_borders() -> void:
 	var serial := _water_job_serial
 	_province_busy = true
 	_ocean_count.apply()
+	_coastal_reach.apply()
 	await get_tree().process_frame
 	var count := int(_ocean_count.value)
 	var style: String = _ocean_style.get_item_metadata(_ocean_style.selected)
+	var reach := float(_coastal_reach.value)
 	_province_status.text = "Generating connected ocean regions around the land…"
 	_province_thread = Thread.new()
-	var started := _province_thread.start(func(): return candidate.generate_oceans(base, water, count, style))
+	var started := _province_thread.start(func(): return candidate.generate_oceans(base, water, count, style, reach))
 	if started != OK:
 		_province_thread = null
 		_province_busy = false

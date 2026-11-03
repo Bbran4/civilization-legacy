@@ -27,13 +27,15 @@ void fragment() {
 	vec3 color = height_enabled ? vec3(value) : vec3(0.02);
 	if (provinces_enabled && shaded_relief) {
 		float id = province_id(UV);
+		if (id < 0.5 && texture(province_field, UV).b > 0.005) color = vec3(0.16, 0.21, 0.27);
 		if (id > 0.5) {
 			bool ocean = texture(province_field, UV).b > 0.001;
 			vec3 tint = 0.3 + 0.6 * fract(sin(vec3(id, id + 17.0, id + 43.0)) * 43758.5453);
-			color = ocean ? mix(vec3(0.035, 0.10, 0.16), vec3(0.06, 0.19, 0.28) + tint * 0.055, 0.7) : mix(color, tint * (0.45 + value * 0.7), 0.62);
+			color = ocean ? vec3(0.27, 0.42, 0.61) : mix(color, tint * (0.45 + value * 0.7), 0.62);
 			vec2 border_step = max(texel_size, fwidth(UV) * 1.25);
 			bool edge = province_id(UV + vec2(border_step.x, 0.0)) != id || province_id(UV + vec2(0.0, border_step.y)) != id;
-			if (edge) color = ocean ? vec3(0.16, 0.32, 0.43) : color * 0.35;
+			if (ocean) edge = edge || province_id(UV - vec2(border_step.x, 0.0)) != id || province_id(UV - vec2(0.0, border_step.y)) != id;
+			if (edge) color = ocean ? vec3(0.055, 0.08, 0.12) : color * 0.35;
 			if (int(id) == selected_province) color = mix(color, vec3(1.0, 0.8, 0.3), 0.45);
 		}
 	}

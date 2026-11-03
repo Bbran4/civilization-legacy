@@ -32,7 +32,9 @@ active for that remaining land.
 
 ## Coastal maritime partition
 
-The ocean partition selector now offers:
+See [Coastal seas and borderless open ocean](coastal-seas.md) for the current
+default. The earlier partition modes remain readable for old maps. Previously,
+the ocean partition selector offered:
 
 - Coastal maritime regions (default for new maps): choose spread-out coastline
   anchors, then grow equal-cost regions through connected sea. Borders therefore
@@ -41,8 +43,9 @@ The ocean partition selector now offers:
 
 Coastless sea maps fall back to offshore seeds. Ocean generation preserves authored
 land IDs/names and island attachments. It remains explicit and replaces existing
-ocean regions when run. Loading an old ocean map preserves its existing IDs and
-selects Open sea zones; it does not silently regenerate the sea.
+ocean regions when run. Loading an old ocean map preserves its existing IDs without regeneration. The
+current controls stage the new coastal-band style for older coastal maps; Generate
+ocean borders explicitly applies the selected layout.
 
 Lakes and enclosed inland water stay unassigned in both modes. Maritime regions
 are geographic game-map sectors; ownership, naval access and sea movement rules
@@ -51,9 +54,9 @@ limit or country ownership to the generated sea regions.
 
 ## Storage and validation
 
-The optional province section advances to version 3, storing active/inactive
-records and the ocean partition style. Existing v1/v2 province sections remain
-readable. Main terrain v10 and world manifest v3 are unchanged; snapshot-first
+The optional province section now uses version 4, retaining active/inactive
+records and ocean style while adding coastal reach and the deep-ocean background
+mask. Existing v1/v2/v3 province sections remain readable. Main terrain v10 and world manifest v3 are unchanged; snapshot-first
 world saving still preserves previous source documents.
 
 Landmass labels and per-region part lists are derived from the authoritative

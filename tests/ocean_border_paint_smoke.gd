@@ -29,7 +29,7 @@ func _run() -> void:
 	water.mask_bytes.resize(base.size() * 4)
 	var before: PackedInt32Array = layer.ids.duplicate()
 	var ocean: RefCounted = layer.editable_copy()
-	check(ocean.generate_oceans(base, water, 3).is_empty(), "Ocean borders generate around land.")
+	check(ocean.generate_oceans(base, water, 3, "coastal").is_empty(), "Ocean borders generate around land.")
 	var classes_ok := true
 	for i in range(before.size()):
 		if before[i] > 0: classes_ok = classes_ok and ocean.ids[i] == before[i]
@@ -37,7 +37,7 @@ func _run() -> void:
 	check(classes_ok and ocean.records[0].name == "West", "Ocean generation preserves all land IDs and names.")
 	check(ocean.validate_coverage(base, 0.2, water).is_empty(), "Mixed land/ocean coverage validates.")
 	var repeat: RefCounted = layer.editable_copy()
-	repeat.generate_oceans(base, water, 3)
+	repeat.generate_oceans(base, water, 3, "coastal")
 	check(repeat.ids == ocean.ids, "Ocean borders are deterministic.")
 	var decoded := Provinces.decode(JSON.parse_string(JSON.stringify(ocean.snapshot())))
 	check(decoded.error.is_empty() and decoded.layer.ids == ocean.ids and decoded.layer.records == ocean.records, "Mixed region IDs, kinds and neighbors round-trip exactly.")

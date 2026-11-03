@@ -5,7 +5,9 @@
 After generating Heightmap, Rivers / lakes, Terrain surface and land Provinces:
 
 1. In Provinces, choose Target ocean regions (1-256).
-2. Choose Coastal maritime regions or Open sea zones, then Generate ocean borders. Sea connected to a map edge is partitioned into
+2. Choose Coastal seas + borderless open ocean, then Generate ocean borders.
+   Coastal sea reach limits the light-blue bordered envelope. Deep ocean receives
+   no IDs or borders; see [Coastal seas](coastal-seas.md). Sea connected to a map edge is partitioned into
    connected ocean regions, following the exact existing coastline. Explicit lake
    pixels and enclosed inland water remain excluded.
 3. Click an ocean region to inspect/name it just like a land province. The optional
@@ -58,9 +60,10 @@ names and recomputed adjacency. Renaming does not overwrite border history.
 ## Implementation and compatibility
 
 - `world_provinces.gd`: typed land/ocean records, boundary-connected ocean flood,
-  deterministic coastal/offshore sea partition, kind-safe capsule edits, exact v3 region snapshots,
+  deterministic coastal/offshore sea partition, kind-safe capsule edits, exact v4 region snapshots,
   complete typed coverage and connected-region validation. V1 land-only and v2 land/ocean province
-  snapshots still load. V3 also stores archived IDs and sea partition style. Main terrain v10/world manifest v3 stay unchanged.
+  snapshots still load. V3 archived IDs remain supported; V4 adds coastal reach
+  and the borderless open-ocean background mask. Main terrain v10/world manifest v3 stay unchanged.
 - `province_edit_history.gd`: separate editable drafts, atomic connectedness checks,
   bounded pixel deltas, exact Undo/Redo and preservation of separately edited names.
 - `province_border_brush.gd`: picking, projected cursor, gestures/shortcuts, target

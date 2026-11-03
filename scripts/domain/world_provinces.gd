@@ -8,7 +8,9 @@ var records: Array[Dictionary] = []
 var requested_count := 64
 var ocean_generated := false
 var requested_oceans := 24
-var ocean_style := "coastal"
+var ocean_style := "coastal_band"
+var coastal_reach := 64.0
+var sea_mask := PackedByteArray()
 var _image: Image
 var _land_components := PackedInt32Array()
 var _heap: Array[Vector2i] = []
@@ -25,6 +27,7 @@ func generate(base: PackedFloat32Array, surface: RefCounted, water: RefCounted, 
 	ids.resize(base.size())
 	ids.fill(0)
 	ocean_generated = false
+	sea_mask.clear()
 	records.clear()
 	_texture = null
 	_image = null
@@ -208,7 +211,7 @@ func texture() -> ImageTexture:
 		for i in range(ids.size()):
 			bytes[i * 4] = ids[i] & 255
 			bytes[i * 4 + 1] = (ids[i] >> 8) & 255
-			bytes[i * 4 + 2] = 1 if ids[i] > 0 and records[ids[i] - 1].get("kind", "land") == "ocean" else 0
+			bytes[i * 4 + 2] = 2 if ids[i] == 0 and sea_mask.size() == ids.size() and sea_mask[i] != 0 else (1 if ids[i] > 0 and records[ids[i] - 1].get("kind", "land") == "ocean" else 0)
 			bytes[i * 4 + 3] = 255
 		_image = Image.create_from_data(size.x, size.y, false, Image.FORMAT_RGBA8, bytes)
 		_texture = ImageTexture.create_from_image(_image)
@@ -217,10 +220,13 @@ func snapshot() -> Dictionary:
 	var values := PackedFloat32Array()
 	values.resize(ids.size())
 	for i in range(ids.size()): values[i] = ids[i]
-	return {"version": 3, "ocean_style": ocean_style, "ocean_generated": ocean_generated, "requested_oceans": requested_oceans, "source_hash": source_hash, "size": [size.x, size.y], "requested_count": requested_count, "ids": Payload.encode(values), "records": records.duplicate(true)}
+	var sea_values := PackedFloat32Array()
+	sea_values.resize(sea_mask.size())
+	for i in range(sea_mask.size()): sea_values[i] = sea_mask[i]
+	return {"version": 4, "coastal_reach": coastal_reach, "sea_mask": Payload.encode(sea_values) if not sea_values.is_empty() else null, "ocean_style": ocean_style, "ocean_generated": ocean_generated, "requested_oceans": requested_oceans, "source_hash": source_hash, "size": [size.x, size.y], "requested_count": requested_count, "ids": Payload.encode(values), "records": records.duplicate(true)}
 static func decode(data: Variant) -> Dictionary:
 	if data == null: return {"error": "", "layer": null}
-	if not data is Dictionary or data.get("version") not in [1, 1.0, 2, 2.0, 3, 3.0] or not data.get("source_hash") is String or data.source_hash.length() != 64 or not data.get("size") is Array or data.size.size() != 2 or not data.get("records") is Array or data.records.size() > 65535:
+	if not data is Dictionary or data.get("version") not in [1, 1.0, 2, 2.0, 3, 3.0, 4, 4.0] or not data.get("source_hash") is String or data.source_hash.length() != 64 or not data.get("size") is Array or data.size.size() != 2 or not data.get("records") is Array or data.records.size() > 65535:
 		return {"error": "Invalid province document."}
 	for v in data.size:
 		if not (v is int or v is float) or not is_finite(float(v)) or v != int(v) or v < 3 or v > 2050: return {"error": "Invalid province dimensions."}
@@ -238,9 +244,20 @@ static func decode(data: Variant) -> Dictionary:
 		layer.ocean_generated = data.ocean_generated
 		layer.requested_oceans = int(data.requested_oceans)
 	if int(data.version) >= 3:
-		if data.get("ocean_style") not in ["open", "coastal"]: return {"error": "Invalid sea partition style."}
+		if data.get("ocean_style") not in ["open", "coastal", "coastal_band"]: return {"error": "Invalid sea partition style."}
 		layer.ocean_style = data.ocean_style
 	else: layer.ocean_style = "open"
+	if layer.ocean_style == "coastal_band":
+		var reach: Variant = data.get("coastal_reach")
+		if int(data.version) < 4 or not (reach is int or reach is float) or not is_finite(float(reach)) or reach < 8 or reach > 256: return {"error": "Invalid coastal sea reach."}
+		layer.coastal_reach = float(reach)
+		if layer.ocean_generated:
+			var sea := Payload.decode(data.get("sea_mask"), payload.values.size(), 0, 1)
+			if not sea.error.is_empty(): return {"error": sea.error}
+			layer.sea_mask.resize(sea.values.size())
+			for i in range(sea.values.size()):
+				if sea.values[i] != int(sea.values[i]): return {"error": "Invalid open ocean mask."}
+				layer.sea_mask[i] = int(sea.values[i])
 	layer.ids.resize(payload.values.size())
 	for i in range(layer.ids.size()):
 		layer.ids[i] = int(payload.values[i])
@@ -262,8 +279,12 @@ func validate_coverage(samples: PackedFloat32Array, land_datum: float, water: Re
 	if samples.size() != ids.size() or water.mask_size != size:
 		return "Province coverage dimensions do not match terrain."
 	var classes := classify(samples, land_datum, water.mask_bytes, size)
+	var band := coastal_band(classes, size, coastal_reach) if ocean_generated and ocean_style == "coastal_band" else PackedByteArray()
 	for i in range(ids.size()):
 		var expected: int = classes[i]
+		if ocean_generated and ocean_style == "coastal_band":
+			if sea_mask.size() != ids.size() or (sea_mask[i] != 0) != (classes[i] == 2): return "Open ocean mask does not match sea coverage."
+			if expected == 2 and band[i] == 0: expected = 0
 		if expected == 2 and not ocean_generated: expected = 0
 		var actual := 0 if ids[i] == 0 else (2 if records[ids[i] - 1].kind == "ocean" else 1)
 		if actual != expected: return "Region coverage must keep land, ocean and lakes separate."
@@ -301,11 +322,18 @@ func editable_copy() -> RefCounted:
 	copy.ocean_generated = ocean_generated
 	copy.requested_oceans = requested_oceans
 	copy.ocean_style = ocean_style
+	copy.coastal_reach = coastal_reach
+	copy.sea_mask = sea_mask.duplicate()
 	return copy
 
-func generate_oceans(base: PackedFloat32Array, water: RefCounted, count: int = 24, style: String = "coastal") -> String:
-	if style not in ["open", "coastal"] or count < 1 or count > 256 or base.size() != ids.size() or water.mask_size != size: return "Invalid ocean region inputs."
+func generate_oceans(base: PackedFloat32Array, water: RefCounted, count: int = 24, style: String = "coastal_band", reach: float = 64.0) -> String:
+	if not is_finite(reach) or reach < 8 or reach > 256 or style not in ["open", "coastal", "coastal_band"] or count < 1 or count > 256 or base.size() != ids.size() or water.mask_size != size: return "Invalid ocean region inputs."
 	var classes := classify(base, 0.2, water.mask_bytes, size)
+	var band := coastal_band(classes, size, reach) if style == "coastal_band" else PackedByteArray()
+	sea_mask.clear()
+	if style == "coastal_band":
+		sea_mask.resize(ids.size())
+		for i in range(ids.size()): sea_mask[i] = 1 if classes[i] == 2 else 0
 	while not records.is_empty() and records[-1].kind == "ocean": records.pop_back()
 	for i in range(ids.size()):
 		if ids[i] > records.size(): ids[i] = 0
@@ -313,11 +341,11 @@ func generate_oceans(base: PackedFloat32Array, water: RefCounted, count: int = 2
 	allowed.resize(ids.size())
 	var candidates := PackedInt32Array()
 	for i in range(ids.size()):
-		if classes[i] == 2:
+		if classes[i] == 2 and (band.is_empty() or band[i] != 0):
 			allowed[i] = 1
 			candidates.append(i)
 	var seed_candidates := PackedInt32Array()
-	if style == "coastal":
+	if style in ["coastal", "coastal_band"]:
 		for i in candidates:
 			for next in _neighbors(i):
 				if classes[next] == 1:
@@ -355,6 +383,7 @@ func generate_oceans(base: PackedFloat32Array, water: RefCounted, count: int = 2
 			if records.size() >= 65535: return "Too many ocean regions."
 			_ocean_seed(i, distances)
 			_grow(allowed, distances, flat, no_rivers)
+	coastal_reach = reach
 	ocean_style = style
 	ocean_generated = true
 	requested_oceans = count
@@ -396,3 +425,34 @@ func paint_segment(a: Vector2, b: Vector2, radius: float, target: int, changes: 
 
 func _id_color(id: int) -> Color:
 	return Color8(id & 255, (id >> 8) & 255, 1 if records[id - 1].kind == "ocean" else 0, 255)
+
+static func coastal_band(classes: PackedByteArray, dimensions: Vector2i, reach: float) -> PackedByteArray:
+	var limit := maxf(1.0, reach * maxi(dimensions.x, dimensions.y) / 1025.0)
+	var distance := PackedFloat32Array()
+	distance.resize(classes.size())
+	distance.fill(limit + 2.0)
+	for i in range(classes.size()):
+		if classes[i] != 2: continue
+		for next in [i - 1 if i % dimensions.x > 0 else -1, i + 1 if i % dimensions.x < dimensions.x - 1 else -1, i - dimensions.x, i + dimensions.x]:
+			if next >= 0 and next < classes.size() and classes[next] == 1:
+				distance[i] = 0
+				break
+	# Chamfer sweeps keep the outer sea envelope broad and coast-following.
+	for forward in [true, false]:
+		var step := 1 if forward else -1
+		for i in range(0 if forward else classes.size() - 1, classes.size() if forward else -1, step):
+			if classes[i] != 2: continue
+			var x := i % dimensions.x
+			var y := i / dimensions.x
+			if (x > 0 if forward else x < dimensions.x - 1) and classes[i - step] == 2:
+				distance[i] = minf(distance[i], distance[i - step] + 1.0)
+			if y > 0 if forward else y < dimensions.y - 1:
+				var row := i - step * dimensions.x
+				if classes[row] == 2: distance[i] = minf(distance[i], distance[row] + 1.0)
+				for dx in [-1, 1]:
+					if x + dx >= 0 and x + dx < dimensions.x and classes[row + dx] == 2:
+						distance[i] = minf(distance[i], distance[row + dx] + 1.41421356)
+	var result := PackedByteArray()
+	result.resize(classes.size())
+	for i in range(classes.size()): result[i] = 1 if classes[i] == 2 and distance[i] <= limit else 0
+	return result
