@@ -2,10 +2,9 @@
 
 ## Active workspace
 
-The current application is temporarily restricted to Heightmap while terrain
-quality is refined. The other layers are disabled, including their runtime
-simulation and rendering. See [Heightmap focus](heightmap-focus.md) for the active
-controls and generation pipeline. The remaining sections describe the broader
+The active application now offers Heightmap followed by an independent Rivers /
+lakes layer. Other layers remain disabled. See [Heightmap focus](heightmap-focus.md)
+and [Water layer](water-layer.md) for the active controls and generation pipeline. The remaining sections describe the broader
 editor foundation, retained for later reactivation and regression fixtures.
 
 ## Workspace

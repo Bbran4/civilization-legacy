@@ -167,7 +167,7 @@ static func snapshot_fingerprint(data: Dictionary, size: Vector2, smoothing: int
 	return _fingerprint(sites, PackedInt32Array(data.triangles), PackedByteArray(data.heights), size, int(data.columns), int(data.rows), float(data.spacing), smoothing)
 
 
-static func _fingerprint(sites: PackedVector2Array, topology: PackedInt32Array, values: PackedByteArray, size: Vector2, width: int, height: int, step: float, smoothing: int) -> String:
+static func _fingerprint(sites: PackedVector2Array, topology: PackedInt32Array, values: PackedByteArray, size: Vector2, width: int, height: int, step: float, smoothing: int, canonical_zero: bool = true) -> String:
 	var context := HashingContext.new()
 	context.start(HashingContext.HASH_SHA256)
 	context.update("terrain-graph-v1".to_utf8_buffer())
@@ -175,7 +175,14 @@ static func _fingerprint(sites: PackedVector2Array, topology: PackedInt32Array, 
 	# decimal parsing while keeping source geometry and display choices bound.
 	context.update(PackedFloat32Array([size.x, size.y, step]).to_byte_array())
 	context.update(PackedInt32Array([width, height, smoothing]).to_byte_array())
-	context.update(sites.to_byte_array())
+	var coordinates := sites.to_byte_array()
+	if canonical_zero:
+		# ceilf of a small negative boundary coordinate produces -0.0. JSON writes
+		# that as +0.0; both represent the same point and must have the same identity.
+		for i in range(0, coordinates.size(), 4):
+			if coordinates.decode_u32(i) == 0x80000000:
+				coordinates.encode_u32(i, 0)
+	context.update(coordinates)
 	context.update(topology.to_byte_array())
 	context.update(values)
 	return context.finish().hex_encode()
@@ -314,3 +321,34 @@ func restore(data: Dictionary, size: Vector2, desired: int) -> void:
 
 static func _round2(value: float) -> float:
 	return floorf(value * 100.0 + 0.5) / 100.0
+
+
+static func legacy_snapshot_fingerprint(data: Dictionary, size: Vector2, smoothing: int) -> String:
+	# Recognize caches written before signed-zero canonicalization. Restore only
+	# the deterministic pseudo-site boundary, verifying every coordinate first.
+	var step := float(data.spacing)
+	var offset := floorf(-step + 0.5)
+	var boundary_width: float = size.x - offset * 2.0
+	var boundary_height: float = size.y - offset * 2.0
+	var nx := ceili(boundary_width / (step * 2.0)) - 1
+	var ny := ceili(boundary_height / (step * 2.0)) - 1
+	var count := int(data.columns) * int(data.rows)
+	if nx < 1 or ny < 1 or data.points.size() != count + (nx + ny) * 2:
+		return ""
+	var sites := PackedVector2Array()
+	for point in data.points:
+		sites.append(Vector2(point[0], point[1]))
+	var boundary := PackedVector2Array()
+	for i in range(nx):
+		var x := ceilf(boundary_width * (i + 0.5) / nx + offset)
+		boundary.append(Vector2(x, offset))
+		boundary.append(Vector2(x, boundary_height + offset))
+	for i in range(ny):
+		var y := ceilf(boundary_height * (i + 0.5) / ny + offset)
+		boundary.append(Vector2(offset, y))
+		boundary.append(Vector2(boundary_width + offset, y))
+	for i in range(boundary.size()):
+		if sites[count + i] != boundary[i]:
+			return ""
+		sites[count + i] = boundary[i]
+	return _fingerprint(sites, PackedInt32Array(data.triangles), PackedByteArray(data.heights), size, int(data.columns), int(data.rows), step, smoothing, false)

@@ -4,7 +4,7 @@ extends RefCounted
 const HINTS: Dictionary = {
 	"coast_detail": "Break up template coastlines into smaller bays and headlands. Zero keeps the unrefined template raster.",
 	"mountain_detail": "Add connected ridges, smaller shoulders and shallow erosion valleys to the saved height data.",
-	"heightmap_resolution": "Choose the number of height samples on the longest edge. The preview, save and export share these samples.",
+	"heightmap_resolution": "Choose 256–2050 pixels on the longest edge. The editor, gameplay, terrain save and PNG export share these height samples.",
 	"Ground textures…": "Choose up to three ground textures and coverage patterns for each biome or surface.",
 	"Undo paint stroke": "Undo your last ground-painting stroke with this button or Ctrl+Z.",
 	"Clear ground paint": "Remove all painted ground and reveal the generated materials; Undo can restore the paint.",

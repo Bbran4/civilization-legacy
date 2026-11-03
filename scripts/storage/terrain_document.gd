@@ -1,6 +1,7 @@
 extends RefCounted
 ## Versioned terrain-only documents. Parse and validate completely before applying.
 
+const WaterLayer = preload("res://scripts/domain/terrain_water_layer.gd")
 const PaintCatalog = preload("res://scripts/rendering/terrain_paint_catalog.gd")
 const PaintLayer = preload("res://scripts/rendering/terrain_paint_layer.gd")
 const PaintLibrary = preload("res://scripts/rendering/terrain_palette_library.gd")
@@ -10,12 +11,12 @@ const Climate = preload("res://scripts/domain/terrain_climate.gd")
 const Geography = preload("res://scripts/domain/terrain_geography.gd")
 const Recipe = preload("res://scripts/domain/heightmap_recipe.gd")
 const VERSION: int = 10
-const MAX_BYTES: int = 64 * 1024 * 1024
+const MAX_BYTES: int = 256 * 1024 * 1024
 const NUMBERS: Dictionary = {
 	"tree_population": [0, 250000, true],
 	"close_detail_resolution": [32, 256, true], "micro_detail_strength": [0, 2],
 	"graph_points": [1000, 100000, true], "surface_smoothing": [0, 4, true],
-	"resolution": [16, 1024, true], "template_resolution": [32, 256, true], "elevation": [1, 100], "height_offset": [-50, 50],
+	"resolution": [16, 2049, true], "template_resolution": [32, 256, true], "elevation": [1, 100], "height_offset": [-50, 50],
 	"height_contrast": [0.25, 4], "mountain_strength": [0, 1],
 	"image_blend": [0, 1], "island_inner_radius": [0.1, 0.95],
 	"island_roundness": [1, 8], "sea_level": [-40, 80], "beach_width": [0.1, 10],
@@ -65,6 +66,7 @@ static func capture(terrain: Node) -> Dictionary:
 	if source.has("error"):
 		return {}
 	return {"format": "civilization-legacy-terrain", "version": VERSION,
+		"water_layer": terrain.water_layer.snapshot() if terrain.water_layer != null else null,
 		"heightmap_detail": {"version": 1, "coast": terrain.coast_detail, "mountains": terrain.mountain_detail},
 		"ground_palette": terrain.surface_catalog.snapshot(), "ground_paint": terrain.paint_layer.snapshot() if terrain.paint_layer != null else {"version": 1, "png": ""},
 		"biomes": {"version": Biomes.VERSION}, "hydrology": {"version": Hydrology.VERSION}, "generator_version": terrain.generator_version, "climate": {"version": Climate.VERSION, "settings": terrain.climate_settings.duplicate()}, "settings": settings, "source_image": source,
@@ -83,6 +85,9 @@ static func validate(document: Variant) -> String:
 		var detail: Variant = document.heightmap_detail
 		if not detail is Dictionary or not _within(detail.get("version", 1), [1, 1, true]) or not _within(detail.get("coast"), [0, 1]) or not _within(detail.get("mountains"), [0, 1]):
 			return "Invalid heightmap refinement settings."
+	var water: Dictionary = WaterLayer.decode(document.get("water_layer"))
+	if not water.error.is_empty():
+		return water.error
 	var settings: Variant = document.get("settings")
 	if not settings is Dictionary:
 		return "Terrain settings are missing."
@@ -174,6 +179,9 @@ static func apply(terrain: Node, document: Dictionary) -> String:
 	var error: String = validate(document)
 	if not error.is_empty():
 		return error
+	if not terrain.heightmap_only and int(document.settings.resolution) > 1024:
+		return "High-resolution maps require the focused terrain renderer."
+	var water: Dictionary = WaterLayer.decode(document.get("water_layer"))
 	var ground_catalog: Resource = PaintCatalog.from_data(document.ground_palette) if document.version >= 10 else load("res://assets/terrain/default_ground_palette.tres")
 	var ground_resources: Dictionary = PaintLibrary.build(ground_catalog)
 	if not ground_resources.ok:
@@ -184,6 +192,7 @@ static func apply(terrain: Node, document: Dictionary) -> String:
 		return layer.error
 	# Dependencies and paint are valid before changing the live map.
 	var detail: Dictionary = document.get("heightmap_detail", {"coast": 0.75, "mountains": 0.8})
+	terrain.water_layer = water.layer
 	terrain.coast_detail = detail.coast
 	terrain.mountain_detail = detail.mountains
 	terrain.surface_catalog = ground_catalog
@@ -240,7 +249,7 @@ static func save_file(path: String, terrain: Node) -> String:
 		return "Cannot save: " + error
 	var encoded: String = JSON.stringify(document, "", true, true)
 	if encoded.to_utf8_buffer().size() > MAX_BYTES:
-		return "Terrain file exceeds the 64 MiB document limit."
+		return "Terrain file exceeds the 256 MiB document limit."
 	var temporary: String = path + ".tmp"
 	var file := FileAccess.open(temporary, FileAccess.WRITE)
 	if file == null:
@@ -268,7 +277,7 @@ static func load_file(path: String) -> Dictionary:
 		return {"ok": false, "error": "Could not open the selected terrain file."}
 	if file.get_length() > MAX_BYTES:
 		file.close()
-		return {"ok": false, "error": "The terrain file exceeds 64 MiB."}
+		return {"ok": false, "error": "The terrain file exceeds 256 MiB."}
 	var parser := JSON.new()
 	var parse_error: Error = parser.parse(file.get_as_text())
 	file.close()

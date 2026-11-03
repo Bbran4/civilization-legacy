@@ -4,7 +4,13 @@ extends Node3D
 
 signal climate_changed
 signal vegetation_changed
+signal water_layer_changed
 signal terrain_regenerated
+const WaterLayer = preload("res://scripts/domain/terrain_water_layer.gd")
+var water_layer: RefCounted
+var water_layer_visible := true
+var height_layer_visible := true
+var water_source_hash := ""
 const HeightDetail = preload("res://scripts/domain/heightmap_detail.gd")
 const MapRenderer = preload("res://scripts/rendering/terrain_map_renderer.gd")
 const TerrainDocument = preload("res://scripts/storage/terrain_document.gd")
@@ -89,9 +95,9 @@ var smoothing_passes: int = 1
 	set(value):
 		map_size = value.clamp(Vector2(8.0, 8.0), Vector2(8192.0, 8192.0))
 		_request_rebuild()
-@export_range(16, 1024, 1) var resolution: int = 512:
+@export_range(16, 2049, 1) var resolution: int = 512:
 	set(value):
-		resolution = clampi(value, 16, 1024)
+		resolution = clampi(value, 16, 2049 if heightmap_only else 1024)
 		_request_rebuild()
 @export_range(1.0, 100.0, 0.5) var elevation: float = 28.0:
 	set(value):
@@ -941,6 +947,8 @@ func _regenerate_heightmap_only(surface: MeshInstance3D, water: MeshInstance3D, 
 	map_renderer.set_shaded_relief(shaded_relief)
 	map_renderer.set_heightfield(height_samples, sample_size(), display_size(), height_offset, elevation, generator_version)
 	_land_material = map_renderer.material
+	water_source_hash = WaterLayer.fingerprint(height_samples, sample_size(), map_size, height_offset, elevation, generator_version)
+	refresh_water_layer()
 	generation_ms = (Time.get_ticks_usec() - started) / 1000.0
 	terrain_regenerated.emit()
 
@@ -955,3 +963,27 @@ func set_raw_height_view(enabled: bool) -> void:
 func set_relief_preview(enabled: bool) -> void:
 	# Compatibility for callers of the original editor-preview API.
 	set_shaded_relief(enabled)
+
+func water_layer_current() -> bool:
+	return water_layer != null and water_layer.source_hash == water_source_hash and water_layer.mask_size == sample_size()
+
+func refresh_water_layer() -> void:
+	if heightmap_only and map_renderer != null:
+		map_renderer.set_height_layer_visible(height_layer_visible)
+		map_renderer.set_water_layer(water_layer, water_layer_visible and water_layer_current())
+
+func install_water_layer(layer: RefCounted) -> String:
+	if layer == null or layer.source_hash != water_source_hash or layer.mask_size != sample_size():
+		return "The heightmap changed. Generate water again for the current terrain."
+	water_layer = layer
+	refresh_water_layer()
+	water_layer_changed.emit()
+	return ""
+
+func set_water_layer_visible(enabled: bool) -> void:
+	water_layer_visible = enabled
+	refresh_water_layer()
+
+func set_height_layer_visible(enabled: bool) -> void:
+	height_layer_visible = enabled
+	refresh_water_layer()

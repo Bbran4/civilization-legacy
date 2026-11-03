@@ -284,7 +284,9 @@ static func validate_cache(data: Variant, source: Dictionary, size: Vector2, smo
 	if not _integer(data.get("version"), 1, VERSION) or not _integer(data.get("sea_datum"), SEA_DATUM, SEA_DATUM) or not data.get("source_hash") is String:
 		return "Unsupported geography data."
 	if data.source_hash != Graph.snapshot_fingerprint(source, size, smoothing):
-		return "Geography does not match the saved graph and smoothing."
+		var legacy_hash := Graph.legacy_snapshot_fingerprint(source, size, smoothing)
+		if legacy_hash.is_empty() or data.source_hash != legacy_hash:
+			return "Geography does not match the saved graph and smoothing."
 	var count: int = source.heights.size()
 	for key in ["feature_ids", "coastal", "distance_to_coast", "depth"]:
 		if not data.get(key) is Array or data[key].size() != count:

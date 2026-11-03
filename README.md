@@ -12,16 +12,18 @@ the planned gameplay layer on top of that shared world.
 political map modes, scenarios, civilization simulation, skill trees and prestige
 are planned gameplay systems.
 
-## Current focus: grayscale heightmaps
+## Current focus: heightmaps, rivers and lakes
 
-The editor currently opens in **heightmap-only mode**. Pick a template and seed,
-then tune coast detail and mountain detail. The detailed raster is the source for
-both views and export. Editor and gameplay now share shaded relief by default;
-**Play map** opens the current terrain in the runtime view, with Escape to return.
-Raw height inspection remains available in the editor.
-Trees, biomes, climate, rivers, lakes and provinces are disabled in this workspace.
-Their existing code and terrain saves are retained. See the
-[heightmap focus guide](docs/heightmap-focus.md).
+Generate a template-based heightmap first, with output from **256 to 2050 pixels**
+on the longest edge. Then select **Rivers / lakes** and generate a separate water
+layer over the current terrain. Drainage detail, river density/width and lake
+filters are adjustable. Generating water never changes the saved height samples.
+
+Editor and **Play map** share shaded relief and the water overlay. Both layers
+have visibility/lock controls, and water is retained but marked stale if its source
+heightmap changes. Trees, climate, biomes and provinces remain disabled.
+See [water-layer workflow](docs/water-layer.md) and
+[heightmap focus](docs/heightmap-focus.md).
 
 ## Map Editor 2.0
 

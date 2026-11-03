@@ -3,7 +3,8 @@
 Shaded relief is now the default terrain presentation in both the editor and the
 runtime map. The accepted lighting calculation is unchanged: the same height
 samples, fixed light direction, ridge contrast and sea-datum treatment drive both.
-Trees, climate/biomes, ground paint, provinces, rivers and lakes stay disabled.
+Trees, climate/biomes, ground paint and provinces stay disabled. Rivers/lakes are
+now an optional, separately generated overlay; see [Water layer](water-layer.md).
 
 ## Using it
 
@@ -15,7 +16,8 @@ Trees, climate/biomes, ground paint, provinces, rivers and lakes stay disabled.
   selection and unsaved state are retained. The inactive editor's camera/input
   processing is suspended while playing.
 - **Raw height values (editor only)** is a diagnostic display option. Gameplay
-  always starts shaded, even if this editor option is checked. PNG exports remain
+  always starts shaded, even if this editor option is checked. Raw inspection
+  hides water so the scalar field can be inspected. Heightmap PNG exports remain
   raw height data, and terrain/world saves preserve the original float samples.
 - Closing while playing returns to the editor's existing unsaved-change safeguard.
 
@@ -45,7 +47,8 @@ The retained legacy combined biome/LOD pipeline is not reactivated or substitute
 for this foundation. Future terrain overlays should build on the shared map
 renderer so they retain its canonical height detail and shading.
 
-No terrain save format changes are introduced. No coast-generation changes,
+The shared renderer now also composites the independently stored water mask,
+using the same data in the editor and gameplay. No coast-generation changes,
 zoom/performance tuning or approved visual benchmark collection are included;
 those reviews remain with the user as requested.
 

@@ -1,9 +1,10 @@
 # Grayscale heightmap focus
 
-The active editor now works only on heightmap terrain, using the existing Noise
+The active editor builds heightmap terrain first, using the existing Noise
 and 14 procedural templates plus supplied/imported heightmaps. Default: Continents,
-seed 42. Trees, biomes, climate, river/lake water surfaces, provinces, ground paint
-and their editing controls are disabled. The code is retained for later work.
+seed 42. Rivers/lakes are now an independently generated second layer; see
+[Water-layer workflow](water-layer.md). Trees, biomes, climate, provinces and ground
+paint remain disabled. Their code is retained for later work.
 
 ## Controls
 
@@ -11,8 +12,10 @@ and their editing controls are disabled. The code is retained for later work.
 - Coast detail adds smaller bays, headlands and islands around the template coast.
 - Mountain detail adds continuous ridges, branching shoulders and shallow erosion
   valleys. These are height changes; no river or lake layer is created.
-- Resolution offers 513 or 1025 samples along the longest edge (the existing save
-  format uses 512 or 1024 grid cells). Aspect ratio follows map width/height.
+- Output resolution accepts every whole number from 256 to 2050 pixels on the
+  longest edge. The saved grid-cell count is one less, so these endpoints are
+  exact. Aspect ratio follows map width/height. Older lower-resolution saves
+  remain readable without resampling.
 - Generate applies the staged choices; New seed generates another world.
 - Shaded relief is the default presentation in the editor and runtime map. Both
   use one shared renderer with the same height data and lighting.
@@ -48,8 +51,8 @@ The viewport reads the same scalar data used by saves and exports, on one plane.
 It does not rely on extra camera-dependent LOD detail to create an appearance that
 is absent from the saved map. This avoids constructing millions of mesh triangles
 just to inspect a grayscale image. The geographic cache is retained for the legacy
-terrain document contract, but climate, hydrology, biome, tree and province
-simulation are not instantiated.
+terrain document contract. Water is explicitly generated as a separate raster
+layer; legacy climate/hydrology, biome, tree and province simulation remain off.
 
 Supplied and imported heightmaps are sampled directly, preserving their authored
 heights instead of quantizing through the coarse cell grid or adding template
