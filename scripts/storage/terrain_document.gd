@@ -1,6 +1,7 @@
 extends RefCounted
 ## Versioned terrain-only documents. Parse and validate completely before applying.
 
+const BorderAppearance = preload("res://scripts/domain/border_appearance.gd")
 const WorldProvinces = preload("res://scripts/domain/world_provinces.gd")
 const TerrainSurface = preload("res://scripts/domain/terrain_surface.gd")
 const WaterLayer = preload("res://scripts/domain/terrain_water_layer.gd")
@@ -68,6 +69,7 @@ static func capture(terrain: Node) -> Dictionary:
 	if source.has("error"):
 		return {}
 	return {"format": "civilization-legacy-terrain", "version": VERSION,
+		"border_appearance": terrain.border_appearance.duplicate(),
 		"province_layer": terrain.province_layer.snapshot() if terrain.province_layer != null else null,
 		"terrain_surface": terrain.terrain_surface.snapshot() if terrain.terrain_surface != null else null,
 		"water_layer": terrain.water_layer.snapshot() if terrain.water_layer != null else null,
@@ -85,6 +87,9 @@ static func validate(document: Variant) -> String:
 		return "This is not a supported Civilization Legacy terrain file (versions 1–10)."
 	if not _within(document.get("generator_version"), [1, 4, true]):
 		return "The terrain generator version is unsupported."
+	if document.has("border_appearance"):
+		var appearance_error := BorderAppearance.validate(document.border_appearance)
+		if not appearance_error.is_empty(): return appearance_error
 	if document.has("heightmap_detail"):
 		var detail: Variant = document.heightmap_detail
 		if not detail is Dictionary or not _within(detail.get("version", 1), [1, 1, true]) or not _within(detail.get("coast"), [0, 1]) or not _within(detail.get("mountains"), [0, 1]):
@@ -219,6 +224,7 @@ static func apply(terrain: Node, document: Dictionary) -> String:
 		return layer.error
 	# Dependencies and paint are valid before changing the live map.
 	var detail: Dictionary = document.get("heightmap_detail", {"coast": 0.75, "mountains": 0.8})
+	terrain.border_appearance = document.get("border_appearance",BorderAppearance.DEFAULTS).duplicate()
 	terrain.province_layer = province_cache.layer
 	terrain.terrain_surface = surface_cache.layer
 	terrain.water_layer = water.layer

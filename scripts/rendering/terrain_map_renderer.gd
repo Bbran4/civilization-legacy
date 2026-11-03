@@ -8,6 +8,7 @@ var surface: MeshInstance3D
 var material := ShaderMaterial.new()
 var shaded_relief := true
 var provinces_visible := false
+var _province_kinds: ImageTexture
 var _nation_colors: ImageTexture
 var _nation_source: RefCounted
 var _nation_revision := -1
@@ -67,13 +68,23 @@ func set_provinces(layer: RefCounted, enabled: bool, preview: bool = false) -> v
 func _update_nation_colors(layer: RefCounted) -> void:
 	if _nation_source == layer and _nation_revision == layer.border_revision: return
 	var image := Image.create(256,256,false,Image.FORMAT_RGBA8)
+	var kinds := Image.create(256,256,false,Image.FORMAT_R8)
 	image.fill(Color(0,0,0,0))
 	for record in layer.records:
-		if record.kind != "land": continue
+		if record.kind != "land":
+			kinds.set_pixel(record.id % 256,record.id / 256,Color(1,0,0))
+			continue
 		var color: Color = layer.nation_color(int(record.get("nation_id",0)))
 		if color.a > 0.0: image.set_pixel(record.id % 256,record.id / 256,color)
 	if _nation_colors == null: _nation_colors = ImageTexture.create_from_image(image)
 	else: _nation_colors.update(image)
+	if _province_kinds == null: _province_kinds = ImageTexture.create_from_image(kinds)
+	else: _province_kinds.update(kinds)
+	material.set_shader_parameter("province_kinds",_province_kinds)
 	_nation_source = layer
 	_nation_revision = layer.border_revision
 	material.set_shader_parameter("nation_colors",_nation_colors)
+
+func set_border_appearance(settings: Dictionary) -> void:
+	borders.configure(settings)
+	material.set_shader_parameter("smooth_borders",settings.smooth)

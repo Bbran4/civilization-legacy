@@ -2,6 +2,8 @@ shader_type spatial;
 render_mode unshaded, cull_disabled, depth_draw_never, shadows_disabled;
 uniform float width_pixels = 1.3;
 uniform int border_style = 0;
+uniform float distant_scale = 0.35;
+uniform float reference_width = 1.0;
 uniform float dash_length = 2.4;
 void vertex() {
 	vec2 normal = COLOR.rg * 2.0 - 1.0;
@@ -9,7 +11,9 @@ void vertex() {
 	vec4 neighbor = PROJECTION_MATRIX * MODELVIEW_MATRIX * vec4(VERTEX + vec3(normal.x,0.0,normal.y),1.0);
 	vec2 direction = (neighbor.xy/neighbor.w - clip.xy/clip.w) * VIEWPORT_SIZE;
 	direction = normalize(direction + vec2(0.0000001));
-	clip.xy += direction * (width_pixels * 0.5) * UV.y * 2.0 / VIEWPORT_SIZE * clip.w;
+	float pixels_per_reference = length((neighbor.xy/neighbor.w - clip.xy/clip.w) * VIEWPORT_SIZE * 0.5) * reference_width;
+	float zoom_scale = mix(distant_scale,1.0,smoothstep(0.5,3.0,pixels_per_reference));
+	clip.xy += direction * (width_pixels * zoom_scale * 0.5) * UV.y * 2.0 / VIEWPORT_SIZE * clip.w;
 	POSITION = clip;
 }
 // Integrate each horizontal slice of the oval over the pixel footprint.

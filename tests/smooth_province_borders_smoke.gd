@@ -36,7 +36,7 @@ func _run() -> void:
 	bad.records[0].nation_id = 99
 	check(not Provinces.decode(bad).error.is_empty(),"Invalid nation references are rejected.")
 	var paths := Paths.new()
-	paths.build(layer.ids,layer.size)
+	paths.build(layer.ids,layer.size,false)
 	check(paths.paths.size() == 3 and layer.ids == original,"Shared borders are traced once without changing authoritative pixels.")
 	for path in paths.paths:
 		for i in range(path.points.size()-1):
@@ -64,6 +64,9 @@ func _run() -> void:
 	var surface := MeshInstance3D.new()
 	root.add_child(surface)
 	var renderer := Renderer.new(surface)
+	var appearance: Dictionary = preload("res://scripts/domain/border_appearance.gd").DEFAULTS.duplicate()
+	appearance.distant_scale = 1.0
+	renderer.set_border_appearance(appearance)
 	var heights := PackedFloat32Array()
 	heights.resize(layer.ids.size())
 	for y in range(129):

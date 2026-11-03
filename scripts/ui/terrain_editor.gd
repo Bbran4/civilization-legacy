@@ -6,6 +6,7 @@ const GroundBrush = preload("res://scripts/ui/terrain_brush.gd")
 const WorldProject = preload("res://scripts/storage/world_project.gd")
 const LayerGraph = preload("res://scripts/domain/map_layer_graph.gd")
 const ProvinceBorderBrush = preload("res://scripts/ui/province_border_brush.gd")
+var _border_controls: Dictionary = {}
 var _province_brush: Node
 var _ocean_count: SpinBox
 var _ocean_style: OptionButton
@@ -353,6 +354,7 @@ func _button(title: String, action: Callable, parent: Node = null, node_name: St
 
 func _sync_from_terrain() -> void:
 	_syncing = true
+	_sync_border_appearance_controls()
 	_tree_population.set_value_no_signal(_terrain.tree_population)
 	_update_tree_status()
 	if _terrain.heightmap_only:
@@ -1298,6 +1300,7 @@ func _build_province_controls() -> void:
 	appearance.add_item("Borders only — no province fill")
 	appearance.item_selected.connect(func(index: int): _terrain.set_province_fill(index == 0))
 	_form.add_child(appearance)
+	_build_border_appearance_controls()
 	_label("Generate land regions, then ocean borders around the coastline. Lakes stay separate. Paint borders below.").autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_label("Target mainland provinces")
 	_province_count = SpinBox.new()
@@ -1516,3 +1519,43 @@ func generate_ocean_borders() -> void:
 	_select_province(0)
 	_update_province_status()
 	if not error.is_empty(): _province_status.text = error
+
+func _build_border_appearance_controls() -> void:
+	_label("Border appearance")
+	for spec in [["Province dash thickness","province_width",0.0,12.0,0.1],["Nation line thickness","nation_width",0.0,12.0,0.1],["Ocean line thickness","ocean_width",0.0,12.0,0.1],["Zoomed-out thickness (%)","distant_scale",10.0,100.0,5.0]]:
+		_label(spec[0],13)
+		var control := SpinBox.new()
+		control.name = "Border_"+spec[1]
+		control.update_on_text_changed = true
+		control.min_value = spec[2]
+		control.max_value = spec[3]
+		control.step = spec[4]
+		control.tooltip_text = "Maximum width in screen pixels. Zero hides this border type." if spec[1] != "distant_scale" else "Percentage of full thickness when viewing the whole map."
+		_border_controls[spec[1]] = control
+		_form.add_child(control)
+	var smooth := CheckBox.new()
+	smooth.name = "SmoothBorderContours"
+	smooth.text = "Natural contours (reduce pixel steps)"
+	smooth.tooltip_text = "Reconstruct shared polygon contours for lines and fills. Terrain-based province generation stays intact."
+	_border_controls.smooth = smooth
+	_form.add_child(smooth)
+	_button("Apply border appearance",_apply_border_appearance,null,"ApplyBorderAppearance")
+	_sync_border_appearance_controls()
+func _sync_border_appearance_controls() -> void:
+	for key in _border_controls:
+		var control = _border_controls[key]
+		if control is CheckBox: control.set_pressed_no_signal(_terrain.border_appearance[key])
+		else: control.set_value_no_signal(_terrain.border_appearance[key]*(100.0 if key == "distant_scale" else 1.0))
+func _apply_border_appearance() -> void:
+	_stop_brush()
+	var choices: Dictionary = {}
+	for key in _border_controls:
+		var control = _border_controls[key]
+		if control is CheckBox: choices[key] = control.button_pressed
+		else:
+			choices[key] = control.value/(100.0 if key == "distant_scale" else 1.0)
+	var error: String = _terrain.set_border_appearance(choices)
+	if error.is_empty():
+		mark_dirty()
+		_status.text = "Border appearance applied. Save world to retain it."
+	else: _status.text = error

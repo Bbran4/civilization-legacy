@@ -65,5 +65,41 @@ func _run() -> void:
 				failures += 1
 				push_error("Solid lines must remain continuous and bounded: "+str([ocean,zoom_size,narrowest,widest]))
 			print("Solid border pixels: ocean=",ocean," camera=",zoom_size," min/max=",narrowest,"/",widest)
+	for record in layer.records:
+		record.kind = "land"
+		record.nation_id = record.id
+	layer._index_regions()
+	renderer.set_provinces(layer,true)
+	var settings: Dictionary = preload("res://scripts/domain/border_appearance.gd").DEFAULTS.duplicate()
+	settings.nation_width = 7.0
+	settings.distant_scale = 0.2
+	renderer.set_border_appearance(settings)
+	camera.size = 128.0
+	var overview := await _coverage(camera)
+	camera.size = 6.0
+	var close := await _coverage(camera)
+	if overview >= close*0.65 or close < 1.0:
+		failures += 1
+		push_error("Overview borders must become thinner: "+str([overview,close]))
+	settings.nation_width = 0.0
+	renderer.set_border_appearance(settings)
+	var hidden := await _coverage(camera)
+	if hidden > 0.01:
+		failures += 1
+		push_error("Zero thickness must hide nation lines.")
+	print("Zoom coverage overview/close/hidden: ",overview,"/",close,"/",hidden)
 	print("Solid border zoom: ","PASS" if failures == 0 else "FAIL")
 	quit(0 if failures == 0 else 1)
+
+func _coverage(camera: Camera3D) -> float:
+	for i in range(5): await process_frame
+	await RenderingServer.frame_post_draw
+	var frame := root.get_texture().get_image()
+	var center := camera.unproject_position(Vector3((64.0/129.0-0.5)*128.0,0.06,0.0))
+	center *= Vector2(frame.get_size())/root.get_visible_rect().size
+	var sum := 0.0
+	for y in range(192,320):
+		var background := frame.get_pixel(int(center.x)+12,y).r
+		for x in range(int(center.x)-10,int(center.x)+11):
+			sum += maxf(0.0,background-frame.get_pixel(x,y).r)/maxf(0.01,background-0.055)
+	return sum/128.0

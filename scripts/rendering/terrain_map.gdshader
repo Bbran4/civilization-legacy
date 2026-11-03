@@ -14,9 +14,47 @@ uniform int merge_ids[32];
 uniform int merge_count = 0;
 uniform sampler2D province_field : filter_nearest, repeat_disable;
 uniform sampler2D nation_colors : source_color, filter_nearest, repeat_disable;
-float province_id(vec2 uv) {
-    vec2 c = round(texture(province_field, uv).rg * 255.0);
+uniform bool smooth_borders = true;
+uniform sampler2D province_kinds : filter_nearest, repeat_disable;
+float sample_id(vec2 at) {
+    vec2 c = round(texture(province_field, at).rg * 255.0);
     return c.r + c.g * 256.0;
+}
+// Same four-triangle reconstruction as ProvinceBorderPaths._contours.
+float province_id(vec2 uv) {
+    if (!smooth_borders) return sample_id(uv);
+    vec2 dimensions = vec2(textureSize(province_field,0));
+    vec2 p = clamp(uv*dimensions-0.5,vec2(0.0),dimensions-1.00001);
+    vec2 t = fract(p);
+    vec2 cell = floor(p);
+    float ids[4];
+    ids[0]=sample_id((cell+vec2(0.5,0.5))/dimensions);
+    ids[1]=sample_id((cell+vec2(1.5,0.5))/dimensions);
+    ids[2]=sample_id((cell+vec2(1.5,1.5))/dimensions);
+    ids[3]=sample_id((cell+vec2(0.5,1.5))/dimensions);
+    if (ids[0]==ids[1] && ids[0]==ids[2] && ids[0]==ids[3]) return ids[0];
+    float middle=ids[0]; int best=0;
+    for (int i=0;i<4;i++) {
+        int count=0;
+        for (int j=0;j<4;j++) if (ids[i]==ids[j]) count++;
+        if (count>best || (count==best && ids[i]<middle)) { middle=ids[i]; best=count; }
+    }
+    int a=0; int b=1; vec3 w;
+    if (t.y<=t.x && t.y<=1.0-t.x) { w=vec3(1.0-t.x-t.y,t.x-t.y,2.0*t.y); }
+    else if (t.x>=t.y && t.x>=1.0-t.y) { a=1; b=2; w=vec3(t.x-t.y,t.x+t.y-1.0,2.0*(1.0-t.x)); }
+    else if (t.y>=t.x && t.y>=1.0-t.x) { a=2; b=3; w=vec3(t.x+t.y-1.0,t.y-t.x,2.0*(1.0-t.y)); }
+    else { a=3; b=0; w=vec3(t.y-t.x,1.0-t.x-t.y,2.0*t.x); }
+    bool two_pairs=(ids[0]==ids[1] && ids[2]==ids[3] && ids[0]!=ids[2]) || (ids[0]==ids[2] && ids[1]==ids[3] && ids[0]!=ids[1]) || (ids[0]==ids[3] && ids[1]==ids[2] && ids[0]!=ids[1]);
+    float chosen=ids[0]; float largest=-1.0;
+    for (int i=0;i<4;i++) {
+        float weight=0.0;
+        if (ids[i]==ids[a]) weight+=w.x;
+        if (ids[i]==ids[b]) weight+=w.y;
+        if (two_pairs) weight+=0.5*w.z;
+        else if (ids[i]==middle) weight+=w.z;
+        if (weight>largest || (weight==largest && ids[i]<chosen)) { largest=weight; chosen=ids[i]; }
+    }
+    return chosen;
 }
 vec3 province_tint(float id) {
     return 0.3 + 0.6 * fract(sin(vec3(id,id+17.0,id+43.0))*43758.5453);
@@ -39,7 +77,7 @@ void fragment() {
 		if (id < 0.5 && zone == 2) color = vec3(0.16, 0.21, 0.27);
 		if (id < 0.5 && zone == 3) color = vec3(value * 0.45);
 		if (id > 0.5) {
-			bool ocean = texture(province_field, UV).b > 0.001;
+			bool ocean = texelFetch(province_kinds,ivec2(int(id)%256,int(id)/256),0).r > 0.5;
 			vec4 nation = texelFetch(nation_colors,ivec2(int(id)%256,int(id)/256),0);
 			vec3 tint = nation.a > 0.5 ? nation.rgb : province_tint(id);
 			color = ocean ? vec3(0.27, 0.42, 0.61) : (province_fill ? mix(color, tint * (0.65 + value * 0.35), nation.a > 0.5 ? 0.82 : 0.62) : color);

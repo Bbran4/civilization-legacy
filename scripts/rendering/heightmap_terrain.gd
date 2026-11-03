@@ -8,6 +8,8 @@ signal province_layer_changed
 var province_layer: RefCounted
 var province_layer_visible := false
 var province_fill := true
+const BorderAppearance = preload("res://scripts/domain/border_appearance.gd")
+var border_appearance: Dictionary = BorderAppearance.DEFAULTS.duplicate()
 signal terrain_surface_changed
 signal water_layer_changed
 signal terrain_regenerated
@@ -982,6 +984,7 @@ func refresh_water_layer() -> void:
 		var derived := terrain_surface_current() and surface_layer_visible and shaded_relief
 		map_renderer.set_terrain_surface(terrain_surface, derived)
 		map_renderer.material.set_shader_parameter("province_fill", province_fill)
+		map_renderer.set_border_appearance(border_appearance)
 		map_renderer.set_provinces(province_layer, province_layer_visible and province_layer_current() and shaded_relief)
 		map_renderer.set_height_layer_visible(height_layer_visible or derived)
 		map_renderer.set_water_layer(water_layer, water_layer_visible and water_layer_current())
@@ -1036,3 +1039,10 @@ func set_province_layer_visible(enabled: bool) -> void:
 func set_province_fill(enabled: bool) -> void:
 	province_fill = enabled
 	refresh_water_layer()
+
+func set_border_appearance(settings: Dictionary) -> String:
+	var error: String = BorderAppearance.validate(settings)
+	if not error.is_empty(): return error
+	border_appearance = settings.duplicate()
+	refresh_water_layer()
+	return ""

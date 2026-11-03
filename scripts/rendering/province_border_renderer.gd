@@ -1,6 +1,9 @@
 extends RefCounted
 const Paths = preload("res://scripts/rendering/province_border_paths.gd")
 const Ribbon = preload("res://scripts/rendering/province_border_ribbon.gdshader")
+const Appearance = preload("res://scripts/domain/border_appearance.gd")
+var appearance: Dictionary = Appearance.DEFAULTS.duplicate()
+var _smooth := true
 var root: Node3D
 var source: RefCounted
 var revision := -1
@@ -12,16 +15,17 @@ func _init(parent: Node3D) -> void:
 func update(layer: RefCounted,world_extent: Vector2,enabled: bool) -> void:
 	root.visible = enabled
 	if not enabled: return
-	if source == layer and revision == layer.border_revision and extent == world_extent: return
+	if source == layer and revision == layer.border_revision and extent == world_extent and _smooth == appearance.smooth: return
+	_smooth = appearance.smooth
 	source = layer
 	revision = layer.border_revision
 	extent = world_extent
 	for child in root.get_children():
 		child.visible = false
 		child.queue_free()
-	if layer.border_geometry == null:
+	if layer.border_geometry == null or layer.border_geometry.smooth != _smooth:
 		layer.border_geometry = Paths.new()
-		layer.border_geometry.build(layer.ids,layer.size)
+		layer.border_geometry.build(layer.ids,layer.size,_smooth)
 	var groups: Dictionary = {}
 	for path in layer.border_geometry.paths:
 		var a: int = path.a
@@ -47,7 +51,9 @@ func update(layer: RefCounted,world_extent: Vector2,enabled: bool) -> void:
 		var material := ShaderMaterial.new()
 		material.shader = Ribbon
 		material.set_shader_parameter("border_style",group.style)
-		material.set_shader_parameter("width_pixels",3.5 if group.style == 2 else (2.4 if group.style == 0 else 4.5))
+		material.set_shader_parameter("width_pixels",appearance.nation_width if group.style == 2 else (appearance.province_width if group.style == 0 else appearance.ocean_width))
+		material.set_shader_parameter("distant_scale",appearance.distant_scale)
+		material.set_shader_parameter("reference_width",maxf(extent.x,extent.y)/1025.0)
 		material.set_shader_parameter("dash_length",maxf(extent.x,extent.y)*2.4/1025.0)
 		var instance := MeshInstance3D.new()
 		instance.name = "Border_" + key.replace("/","_")
@@ -81,3 +87,13 @@ func _vertex(group: Dictionary,point: Vector2,normal: Vector2,arc: float,side: f
 	group.vertices.append(Vector3(point.x,0.06,point.y))
 	group.uv.append(Vector2(arc,side))
 	group.colors.append(Color(normal.x*0.5+0.5,normal.y*0.5+0.5,1.0/3.0,1.0))
+
+func configure(settings: Dictionary) -> void:
+	var changed: bool = appearance.smooth != settings.smooth
+	appearance = settings.duplicate()
+	if changed: revision = -1
+	for child in root.get_children():
+		var material: ShaderMaterial = child.material_override
+		var style: int = material.get_shader_parameter("border_style")
+		material.set_shader_parameter("width_pixels",appearance.nation_width if style == 2 else (appearance.province_width if style == 0 else appearance.ocean_width))
+		material.set_shader_parameter("distant_scale",appearance.distant_scale)
