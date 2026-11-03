@@ -7,6 +7,7 @@ uniform bool height_enabled = true;
 uniform bool water_enabled = false;
 uniform sampler2D water_field : filter_linear, repeat_disable;
 uniform bool provinces_enabled = false;
+uniform bool province_fill = true;
 uniform int selected_province = 0;
 uniform int merge_ids[32];
 uniform int merge_count = 0;
@@ -35,7 +36,7 @@ void fragment() {
 		if (id > 0.5) {
 			bool ocean = texture(province_field, UV).b > 0.001;
 			vec3 tint = 0.3 + 0.6 * fract(sin(vec3(id, id + 17.0, id + 43.0)) * 43758.5453);
-			color = ocean ? vec3(0.27, 0.42, 0.61) : mix(color, tint * (0.45 + value * 0.7), 0.62);
+			color = ocean ? vec3(0.27, 0.42, 0.61) : (province_fill ? mix(color, tint * (0.45 + value * 0.7), 0.62) : color);
 			vec2 border_step = max(texel_size, fwidth(UV) * 1.25);
 			bool edge = province_id(UV + vec2(border_step.x, 0.0)) != id || province_id(UV + vec2(0.0, border_step.y)) != id;
 			if (ocean) edge = edge || province_id(UV - vec2(border_step.x, 0.0)) != id || province_id(UV - vec2(0.0, border_step.y)) != id;

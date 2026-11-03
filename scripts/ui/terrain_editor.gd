@@ -1290,6 +1290,13 @@ func build_terrain_surface() -> void:
 		_update_surface_status()
 
 func _build_province_controls() -> void:
+	_label("Province view")
+	var appearance := OptionButton.new()
+	appearance.name = "ProvinceAppearance"
+	appearance.add_item("Colored provinces")
+	appearance.add_item("Borders only — no province fill")
+	appearance.item_selected.connect(func(index: int): _terrain.set_province_fill(index == 0))
+	_form.add_child(appearance)
 	_label("Generate land regions, then ocean borders around the coastline. Lakes stay separate. Paint borders below.").autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_label("Target mainland provinces")
 	_province_count = SpinBox.new()

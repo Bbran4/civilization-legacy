@@ -22,6 +22,12 @@ func _ready() -> void:
 		provinces.text = "Provinces"
 		provinces.toggled.connect($Terrain.set_province_layer_visible)
 		toolbar.add_child(provinces)
+		var appearance := OptionButton.new()
+		appearance.name = "ProvinceAppearance"
+		appearance.add_item("Colored provinces")
+		appearance.add_item("Borders only")
+		appearance.item_selected.connect(func(index: int): $Terrain.set_province_fill(index == 0))
+		toolbar.add_child(appearance)
 	var back := Button.new()
 	back.name = "ReturnToEditor"
 	back.text = "Return to editor" if not return_requested.get_connections().is_empty() else "Exit map"
