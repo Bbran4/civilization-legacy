@@ -4,7 +4,9 @@ Shaded relief is now the default terrain presentation in both the editor and the
 runtime map. The accepted lighting calculation is unchanged: the same height
 samples, fixed light direction, ridge contrast and sea-datum treatment drive both.
 Trees, climate/biomes, ground paint and provinces stay disabled. Rivers/lakes are
-now an optional, separately generated overlay; see [Water layer](water-layer.md).
+now an optional, separately generated overlay; use [Terrain surface](terrain-surface.md)
+to build derived ground beneath it before entering Play map. Both views use that
+exact derived field when current. The original height samples remain intact.
 
 ## Using it
 

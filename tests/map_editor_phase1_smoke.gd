@@ -13,7 +13,7 @@ func check(ok: bool, message: String) -> void:
 
 func _run() -> void:
 	var layers := Manifest.default_layers()
-	check(layers.size() == 5 and layers[1].dependencies == ["heightmap", "climate"], "Layer contract exposes explicit dependencies.")
+	check(layers.size() == 6 and layers[1].dependencies == ["heightmap", "climate"], "Layer contract exposes explicit dependencies.")
 	var data := Manifest.capture(layers, "map.terrain.json", "heightmap")
 	check(Manifest.validate(data).is_empty(), "Default manifest validates.")
 	var bad := data.duplicate(true)

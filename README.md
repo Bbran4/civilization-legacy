@@ -12,18 +12,22 @@ the planned gameplay layer on top of that shared world.
 political map modes, scenarios, civilization simulation, skill trees and prestige
 are planned gameplay systems.
 
-## Current focus: heightmaps, rivers and lakes
+## Current focus: terrain, water and the finished surface
 
-Generate a template-based heightmap first, with output from **256 to 2050 pixels**
-on the longest edge. Then select **Rivers / lakes** and generate a separate water
-layer over the current terrain. Drainage detail, river density/width and lake
-filters are adjustable. Generating water never changes the saved height samples.
+1. Generate a template-based **Heightmap**, from **256 to 2050 pixels** on the
+   longest edge.
+2. Generate **Rivers / lakes** over that heightmap, with adjustable drainage
+   detail, river density/width and lake filters.
+3. Select **Terrain surface** and press **Build terrain surface** to shape beds
+   and banks. Editor and **Play map** use this derived ground with the water layer.
 
-Editor and **Play map** share shaded relief and the water overlay. Both layers
-have visibility/lock controls, and water is retained but marked stale if its source
-heightmap changes. Trees, climate, biomes and provinces remain disabled.
-See [water-layer workflow](docs/water-layer.md) and
-[heightmap focus](docs/heightmap-focus.md).
+Both original source layers stay intact. Visibility and locks support comparison;
+changing either source retains but hides the old surface until it is rebuilt.
+Old saves stay readable. Older water layers need explicit regeneration to supply
+water elevations before a surface can be built. Trees, climate, biomes, painting
+and provinces remain disabled in this focused workspace.
+See [terrain surface workflow](docs/terrain-surface.md),
+[water-layer workflow](docs/water-layer.md) and [heightmap focus](docs/heightmap-focus.md).
 
 ## Map Editor 2.0
 

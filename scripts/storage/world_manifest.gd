@@ -1,10 +1,10 @@
 extends RefCounted
 ## A sidecar references an existing terrain document; it never rewrites terrain data.
 const Layer = preload("res://scripts/domain/map_layer.gd")
-const VERSION = 1
+const VERSION = 2
 
 static func default_layers() -> Array:
-	return [Layer.new("heightmap", "Heightmap"), Layer.new("rivers", "Rivers / lakes", ["heightmap", "climate"]), Layer.new("climate", "Climate", ["heightmap"]), Layer.new("ground", "Ground paint", ["heightmap"]), Layer.new("trees", "Trees", ["heightmap", "climate", "rivers"])]
+	return [Layer.new("heightmap", "Heightmap"), Layer.new("rivers", "Rivers / lakes", ["heightmap", "climate"]), Layer.new("surface", "Terrain surface", ["heightmap", "rivers"]), Layer.new("climate", "Climate", ["heightmap"]), Layer.new("ground", "Ground paint", ["heightmap"]), Layer.new("trees", "Trees", ["heightmap", "climate", "rivers"])]
 
 static func capture(layers: Array, terrain_path: String, selected: String) -> Dictionary:
 	var entries: Array = []
@@ -13,15 +13,16 @@ static func capture(layers: Array, terrain_path: String, selected: String) -> Di
 	return {"format": "civilization-legacy-world", "version": VERSION, "terrain": terrain_path, "selected_layer": selected, "layers": entries}
 
 static func validate(data: Dictionary) -> String:
-	if data.get("format") != "civilization-legacy-world" or data.get("version") != VERSION:
+	if data.get("format") != "civilization-legacy-world" or data.get("version") not in [1, 1.0, VERSION, float(VERSION)]:
 		return "Unsupported world manifest."
 	if not data.get("terrain") is String or data.terrain.is_empty():
 		return "A world must reference a terrain save."
-	if not data.get("layers") is Array or data.layers.size() != default_layers().size():
+	if not data.get("layers") is Array or data.layers.size() != (5 if data.version == 1 else 6):
 		return "Invalid layer stack."
 	var ids: Array = []
 	for layer in default_layers():
-		ids.append(layer.id)
+		if data.version != 1 or layer.id != "surface":
+			ids.append(layer.id)
 	for entry in data.layers:
 		if not entry is Dictionary or not entry.get("id") in ids or not entry.get("visible") is bool or not entry.get("locked") is bool:
 			return "Invalid or duplicate layer state."
@@ -29,7 +30,7 @@ static func validate(data: Dictionary) -> String:
 	if not data.get("selected_layer") is String:
 		return "Invalid selected layer."
 	for layer in default_layers():
-		if layer.id == data.selected_layer:
+		if layer.id == data.selected_layer and (data.version != 1 or layer.id != "surface"):
 			return ""
 	return "Unknown selected layer."
 
@@ -68,4 +69,7 @@ static func load_file(path: String) -> Dictionary:
 	if not value is Dictionary:
 		return {"error": "Invalid world JSON."}
 	var error := validate(value)
+	if error.is_empty() and value.version == 1:
+		value.version = VERSION
+		value.layers.insert(2, Layer.new("surface", "Terrain surface").to_dict())
 	return {"error": error, "document": value}

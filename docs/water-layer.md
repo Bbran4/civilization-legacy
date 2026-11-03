@@ -11,7 +11,9 @@
 3. Use the visibility checkboxes to inspect terrain alone, water alone, or both.
    Lock the approved heightmap while generating water. Locking water also protects
    its source from being regenerated through the editor.
-4. **Play map** loads the same height and water data with the shared renderer.
+4. Select **Terrain surface** and press **Build terrain surface**. This third
+   layer shapes ground around the water without replacing either source.
+   **Play map** loads the same derived ground and water with the shared renderer.
    Editor raw-height inspection hides water and does not change gameplay shading.
    Visibility switches are authoring views; Play map presents the full valid map.
 5. Save terrain/world normally. **Export water PNG** writes transparent blue water
@@ -116,3 +118,14 @@ samples even when the rendered artwork is 2050 pixels. Rivers are visual channel
 they do not carve the terrain. Manual river/lake painting, vector editing,
 per-feature naming, deltas and waterfalls are future work. Visual/performance
 review and approved map benchmarks remain with the user.
+
+
+## Terrain integration
+
+See [Terrain surface](terrain-surface.md) for the third build step. Water snapshots
+now optionally carry version 2 hydraulic records: full-resolution water elevations,
+river profiles, feature IDs, destination links and lake levels/outlets. Existing
+version 1 artwork stays readable and exportable, but requires explicit water
+regeneration before building ground. Water generation still never edits source
+height samples. Feature names are stored data for future authoring/gameplay; a
+naming interface and combat integration are not implemented yet.

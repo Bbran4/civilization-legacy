@@ -2,8 +2,9 @@
 
 ## Active workspace
 
-The active application now offers Heightmap followed by an independent Rivers /
-lakes layer. Other layers remain disabled. See [Heightmap focus](heightmap-focus.md)
+The active application now offers Heightmap, independent Rivers / lakes, then
+a derived Terrain surface build. Other layers remain disabled. See
+[Terrain surface](terrain-surface.md) for the three-step workflow. See [Heightmap focus](heightmap-focus.md)
 and [Water layer](water-layer.md) for the active controls and generation pipeline. The remaining sections describe the broader
 editor foundation, retained for later reactivation and regression fixtures.
 
@@ -73,8 +74,8 @@ terrain document. External asset packaging is not added in this phase.
 The existing generator still computes coupled height/climate/hydrology/biome/tree
 outputs. The stack now shows which layers an operation affects. Regeneration
 checks the source and all transitive dependents, and names any locked blockers.
-Heightmap generation affects all five layers. Climate regeneration affects
-Climate, Rivers/lakes and Trees, so a height or ground lock does not block it.
+Heightmap generation affects all six layers. Climate regeneration affects
+Climate, Rivers/lakes, Terrain surface and Trees, so a height or ground lock does not block it.
 Trees also read river data. Tree and ground operations affect only their own layer.
 The dependency traversal terminates even if a future extension introduces a cycle.
 This is an impact/lock foundation; per-layer stale revisions and selective rebuild

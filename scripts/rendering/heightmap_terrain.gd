@@ -4,9 +4,12 @@ extends Node3D
 
 signal climate_changed
 signal vegetation_changed
+signal terrain_surface_changed
 signal water_layer_changed
 signal terrain_regenerated
 const WaterLayer = preload("res://scripts/domain/terrain_water_layer.gd")
+var terrain_surface: RefCounted
+var surface_layer_visible := true
 var water_layer: RefCounted
 var water_layer_visible := true
 var height_layer_visible := true
@@ -774,6 +777,8 @@ func cell_info(cell: int) -> Dictionary:
 
 
 func surface_height(uv: Vector2) -> float:
+	if heightmap_only and terrain_surface_current():
+		return ((Grid.sample(terrain_surface.heights, sample_size(), uv) - (0.2 if generator_version >= 3 else 0.0)) * elevation + height_offset) * relief_scale()
 	return detail.height_at(uv) if detail != null and detail.contains(uv) else base_surface_height(uv)
 
 
@@ -956,6 +961,7 @@ func set_shaded_relief(enabled: bool) -> void:
 	shaded_relief = enabled
 	if heightmap_only and map_renderer != null:
 		map_renderer.set_shaded_relief(enabled)
+		refresh_water_layer()
 
 func set_raw_height_view(enabled: bool) -> void:
 	set_shaded_relief(not enabled)
@@ -969,7 +975,9 @@ func water_layer_current() -> bool:
 
 func refresh_water_layer() -> void:
 	if heightmap_only and map_renderer != null:
-		map_renderer.set_height_layer_visible(height_layer_visible)
+		var derived := terrain_surface_current() and surface_layer_visible and shaded_relief
+		map_renderer.set_terrain_surface(terrain_surface, derived)
+		map_renderer.set_height_layer_visible(height_layer_visible or derived)
 		map_renderer.set_water_layer(water_layer, water_layer_visible and water_layer_current())
 
 func install_water_layer(layer: RefCounted) -> String:
@@ -986,4 +994,22 @@ func set_water_layer_visible(enabled: bool) -> void:
 
 func set_height_layer_visible(enabled: bool) -> void:
 	height_layer_visible = enabled
+	refresh_water_layer()
+
+func terrain_surface_current() -> bool:
+	return terrain_surface != null and water_layer_current() and water_layer.has_hydraulic_data() and terrain_surface.source_hash == water_source_hash and terrain_surface.water_hash == water_layer.hydraulic_fingerprint() and terrain_surface.size == sample_size()
+
+func install_terrain_surface(layer: RefCounted) -> String:
+	if layer == null or not water_layer_current() or layer.source_hash != water_source_hash or layer.water_hash != water_layer.hydraulic_fingerprint() or layer.size != sample_size():
+		return "The source maps changed. Build the terrain surface again."
+	var error: String = layer.validate_water(water_layer)
+	if not error.is_empty():
+		return error
+	terrain_surface = layer
+	refresh_water_layer()
+	terrain_surface_changed.emit()
+	return ""
+
+func set_surface_layer_visible(enabled: bool) -> void:
+	surface_layer_visible = enabled
 	refresh_water_layer()

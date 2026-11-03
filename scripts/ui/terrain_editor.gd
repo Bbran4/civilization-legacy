@@ -5,11 +5,17 @@ const MaterialPanel = preload("res://scripts/ui/terrain_material_panel.gd")
 const GroundBrush = preload("res://scripts/ui/terrain_brush.gd")
 const WorldProject = preload("res://scripts/storage/world_project.gd")
 const LayerGraph = preload("res://scripts/domain/map_layer_graph.gd")
+const TerrainSurface = preload("res://scripts/domain/terrain_surface.gd")
 const WaterLayer = preload("res://scripts/domain/terrain_water_layer.gd")
 const Manifest = preload("res://scripts/storage/world_manifest.gd")
 var layers: Array = Manifest.default_layers()
 var selected_layer := "heightmap"
 var _terrain_path := ""
+var _surface_status: Label
+var _surface_controls: Dictionary = {}
+var _surface_thread: Thread
+var _surface_busy := false
+var _surface_generate: Button
 var _water_controls: Dictionary = {}
 var _water_status: Label
 var _water_generate: Button
@@ -246,6 +252,12 @@ func _build_interface() -> void:
 		_build_water_controls()
 	else:
 		_label("Generated from height and climate. Independent river authoring is planned.").autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_context("surface")
+	_label("Terrain surface", 22)
+	if _terrain.heightmap_only:
+		_build_surface_controls()
+	else:
+		_label("Available in the focused terrain workspace.")
 	_context("climate")
 	_form = _contexts["heightmap"]
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("user://maps"))
@@ -328,6 +340,10 @@ func _sync_from_terrain() -> void:
 		_controls["mountain_detail"].set_value_no_signal(_terrain.mountain_detail)
 		_controls["heightmap_resolution"].set_value_no_signal(_terrain.resolution + 1)
 		_sync_water_controls()
+		if _surface_status != null:
+			for key in _surface_controls:
+				_surface_controls[key].set_value_no_signal(_terrain.terrain_surface.settings[key] if _terrain.terrain_surface != null else TerrainSurface.DEFAULTS[key])
+			_update_surface_status()
 	(_controls["map_seed"] as LineEdit).text = _terrain.map_seed
 	(_controls["map_size.x"] as SpinBox).set_value_no_signal(_terrain.map_size.x)
 	(_controls["map_size.y"] as SpinBox).set_value_no_signal(_terrain.map_size.y)
@@ -463,6 +479,11 @@ func _show_dialog(action: String) -> void:
 	_dialog.current_dir = ProjectSettings.globalize_path("user://maps")
 	_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE if action in ["load", "image", "load_world"] else FileDialog.FILE_MODE_SAVE_FILE
 	match action:
+		"export_surface":
+			_dialog.title = "Export terrain surface heightmap"
+			_dialog.filters = PackedStringArray(["*.png ; PNG images"])
+			_dialog.file_mode = FileDialog.FILE_MODE_SAVE_FILE
+			_dialog.current_file = "terrain-surface.png"
 		"export_water":
 			_dialog.title = "Export rivers / lakes (transparent PNG)"
 			_dialog.filters = PackedStringArray(["*.png ; PNG images"])
@@ -492,6 +513,11 @@ func _show_dialog(action: String) -> void:
 
 func _file_selected(path: String) -> void:
 	match _dialog_action:
+		"export_surface":
+			if not _terrain.terrain_surface_current():
+				_surface_status.text = "Build the current terrain surface before exporting."
+			else:
+				_surface_status.text = "Terrain surface exported." if _terrain.terrain_surface.export_image().save_png(path) == OK else "Could not export terrain surface."
 		"export_water":
 			if not _terrain.water_layer_current():
 				_water_status.text = "Generate water for the current heightmap before exporting."
@@ -717,7 +743,7 @@ func _build_shell() -> void:
 		lock.toggled.connect(func(value: bool): layer.locked = value; _stop_brush(); _update_dependency_status(); mark_dirty())
 		row.add_child(lock)
 		_layer_buttons[layer.id] = [eye, lock]
-		if _terrain.heightmap_only and layer.id not in ["heightmap", "rivers"]:
+		if _terrain.heightmap_only and layer.id not in ["heightmap", "rivers", "surface"]:
 			layer.visible = false
 			eye.set_pressed_no_signal(false)
 			eye.disabled = true
@@ -746,12 +772,12 @@ func _context(key: String) -> void:
 	_form = box
 
 func _select_layer(key: String) -> void:
-	if _terrain.heightmap_only and key not in ["heightmap", "rivers", "view"]:
+	if _terrain.heightmap_only and key not in ["heightmap", "rivers", "surface", "view"]:
 		key = "heightmap"
 	if selected_layer != key:
 		mark_dirty()
 	selected_layer = key
-	if key == "rivers" and _terrain.heightmap_only:
+	if key in ["rivers", "surface"] and _terrain.heightmap_only:
 		find_child("RawHeightView", true, false).button_pressed = false
 	for id in _layer_selectors:
 		_layer_selectors[id].set_pressed_no_signal(id == key)
@@ -766,7 +792,7 @@ func _stop_brush() -> void:
 		_brush.enabled.button_pressed = false
 
 func can_edit(key: String) -> bool:
-	if _terrain.heightmap_only and key not in ["heightmap", "rivers"]:
+	if _terrain.heightmap_only and key not in ["heightmap", "rivers", "surface"]:
 		return false
 	for layer in layers:
 		if layer.id == key:
@@ -775,8 +801,12 @@ func can_edit(key: String) -> bool:
 
 func regeneration_error(key: String) -> String:
 	if _terrain.heightmap_only:
-		if key not in ["heightmap", "rivers"] or not can_edit(key):
+		if key not in ["heightmap", "rivers", "surface"] or not can_edit(key):
 			return "Show and unlock the selected layer before generating."
+		if key in ["heightmap", "rivers"]:
+			for layer in layers:
+				if layer.id == "surface" and layer.locked:
+					return "Unlock Terrain surface before changing its source maps."
 		if key == "heightmap":
 			for layer in layers:
 				if layer.id == "rivers" and layer.locked:
@@ -790,7 +820,7 @@ func _update_dependency_status() -> void:
 	if _dependency_status == null:
 		return
 	if _terrain.heightmap_only:
-		_dependency_status.text = "HEIGHTMAP + WATER\nGenerate the heightmap first, then generate rivers / lakes. Other layers remain disabled."
+		_dependency_status.text = "TERRAIN WORKFLOW\n1. Generate heightmap\n2. Generate rivers / lakes\n3. Build terrain surface"
 		if _terrain.water_layer != null and not _terrain.water_layer_current():
 			_dependency_status.text += "\nWater needs regeneration."
 		return
@@ -807,13 +837,15 @@ func _update_dependency_status() -> void:
 
 func _apply_layer_visibility() -> void:
 	if _terrain.heightmap_only:
-		_terrain.visible = layers[0].visible or (layer_visible("rivers") and _terrain.water_layer_current())
+		_terrain.visible = (layer_visible("surface") and _terrain.terrain_surface_current()) or layers[0].visible or (layer_visible("rivers") and _terrain.water_layer_current())
 		_terrain.set_height_layer_visible(layers[0].visible)
 		for layer in layers:
-			if layer.id not in ["heightmap", "rivers"]:
+			if layer.id not in ["heightmap", "rivers", "surface"]:
 				layer.visible = false
 				_layer_buttons[layer.id][0].set_pressed_no_signal(false)
+		_terrain.set_surface_layer_visible(layer_visible("surface"))
 		_terrain.set_water_layer_visible(layer_visible("rivers"))
+		_update_surface_status()
 		_update_water_status()
 		return
 	for layer in layers:
@@ -910,6 +942,8 @@ func _setup_document_tracking() -> void:
 	_terrain.terrain_regenerated.connect(mark_dirty)
 	_terrain.climate_changed.connect(mark_dirty)
 	_terrain.vegetation_changed.connect(mark_dirty)
+	_terrain.terrain_surface_changed.connect(mark_dirty)
+	_terrain.terrain_surface_changed.connect(_apply_layer_visibility)
 	_terrain.water_layer_changed.connect(mark_dirty)
 	_terrain.water_layer_changed.connect(_apply_layer_visibility)
 	get_tree().auto_accept_quit = false
@@ -950,8 +984,12 @@ func _cancel_pending_action() -> void:
 
 
 func play_map() -> void:
-	if _water_busy:
-		_status.text = "Wait for water generation before opening Play map."
+	if _water_busy or _surface_busy:
+		_status.text = "Wait for map generation before opening Play map."
+		return
+	if _terrain.heightmap_only and _terrain.water_layer != null and not _terrain.terrain_surface_current():
+		_select_layer("surface")
+		_surface_status.text = "Build the terrain surface for the current source maps before Play map."
 		return
 	if _gameplay_map != null:
 		return
@@ -989,7 +1027,7 @@ func _request_app_close() -> void:
 
 
 func _build_water_controls() -> void:
-	_label("Generate this layer after the heightmap. Its water never changes terrain heights.").autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_label("Generate this layer after the heightmap. Then build Terrain surface to shape the ground beneath this water.").autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_label("Drainage detail")
 	var routing := OptionButton.new()
 	for samples in [257, 513, 1025]:
@@ -1113,9 +1151,92 @@ func generate_water_layer() -> void:
 		_update_water_status()
 
 func _exit_tree() -> void:
+	if _surface_thread != null and _surface_thread.is_started():
+		_surface_thread.wait_to_finish()
 	if _water_thread != null and _water_thread.is_started():
 		_water_thread.wait_to_finish()
 
 func _water_settings_changed() -> void:
 	if _water_status != null and not _water_busy:
 		_water_status.text = "Settings changed. Generate rivers / lakes to apply them."
+
+func _build_surface_controls() -> void:
+	_label("Step 3: shape riverbeds, lake basins and banks. Your source heightmap and water records are preserved.").autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	for key in TerrainSurface.DEFAULTS:
+		var row := HBoxContainer.new()
+		var title := Label.new()
+		title.text = {"river_depth": "Riverbed depth", "lake_depth": "Lake bed depth", "bank_width": "Bank width"}[key]
+		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(title)
+		var spin := SpinBox.new()
+		spin.min_value = 1 if key == "bank_width" else 0.001
+		spin.max_value = 12 if key == "bank_width" else 0.05
+		spin.step = 0.5 if key == "bank_width" else 0.001
+		spin.value = TerrainSurface.DEFAULTS[key]
+		spin.value_changed.connect(func(_value: float):
+			if _surface_status != null and not _surface_busy:
+				_surface_status.text = "Settings changed. Build terrain surface to apply them.")
+		row.add_child(spin)
+		_form.add_child(row)
+		_surface_controls[key] = spin
+	_button("Build terrain surface", build_terrain_surface, null, "BuildSurface")
+	_surface_generate = _form.get_child(_form.get_child_count() - 1)
+	_button("Export surface PNG…", func(): _show_dialog("export_surface"), null, "ExportSurface")
+	_surface_status = _label("Generate the two source maps first.", 13)
+	_surface_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+
+func _update_surface_status() -> void:
+	if _surface_status == null or _surface_busy:
+		return
+	var current: bool = _terrain.terrain_surface_current()
+	_layer_selectors["surface"].text = "Terrain surface *" if _terrain.terrain_surface != null and not current else "Terrain surface"
+	_surface_status.text = "Surface ready. Play map uses this ground and the water layer." if current else "Build after generating heightmap and water. Previous surfaces are retained but hidden when either source changes."
+
+func build_terrain_surface() -> void:
+	if _surface_busy or _water_busy:
+		return
+	var error := regeneration_error("surface")
+	if not error.is_empty() or not _terrain.water_layer_current():
+		_surface_status.text = error if not error.is_empty() else "Generate rivers / lakes for the current heightmap first."
+		return
+	var serial := _water_job_serial
+	var source: PackedFloat32Array = _terrain.map_renderer.normalized_heights.duplicate()
+	var size: Vector2i = _terrain.sample_size()
+	var fingerprint: String = _terrain.water_source_hash
+	var water: RefCounted = _terrain.water_layer
+	_surface_busy = true
+	_surface_generate.disabled = true
+	for control in _surface_controls.values():
+		control.apply()
+	await get_tree().process_frame
+	var choices: Dictionary = {}
+	for key in _surface_controls:
+		choices[key] = _surface_controls[key].value
+	_surface_status.text = "Shaping beds and banks…"
+	_surface_thread = Thread.new()
+	var started := _surface_thread.start(func():
+		var layer := TerrainSurface.new()
+		return {"error": layer.build(source, size, fingerprint, water, choices), "layer": layer})
+	if started != OK:
+		_surface_thread = null
+		_surface_busy = false
+		_surface_generate.disabled = false
+		_surface_status.text = "Could not start terrain surface build."
+		return
+	while _surface_thread.is_alive():
+		await get_tree().process_frame
+	var result: Dictionary = _surface_thread.wait_to_finish()
+	_surface_thread = null
+	_surface_busy = false
+	_surface_generate.disabled = false
+	if serial != _water_job_serial or not regeneration_error("surface").is_empty():
+		_surface_status.text = "The document or layer state changed. Build again."
+		return
+	if not result.error.is_empty():
+		_surface_status.text = result.error
+		return
+	error = _terrain.install_terrain_surface(result.layer)
+	if not error.is_empty():
+		_surface_status.text = error
+	else:
+		_update_surface_status()

@@ -26,10 +26,12 @@ func _run() -> void:
 	editor._water_controls.routing_resolution.select(0)
 	await editor.generate_water_layer()
 	check(terrain.water_layer_current() and terrain.water_layer.mask_size == terrain.sample_size(), "Maximum-resolution water matches the full heightmap raster.")
+	await editor.build_terrain_surface()
+	check(terrain.terrain_surface_current() and terrain.terrain_surface.heights.size() == 2050 * 2050, "Maximum surface builds at full output resolution.")
 	var path := "user://maximum-water.terrain.json"
 	check(Document.save_file(path, terrain).is_empty(), "Maximum-size height and water data fit the expanded bounded save format.")
 	var result := Document.load_file(path)
-	check(result.ok and Document.apply(terrain, result.document).is_empty() and terrain.water_layer_current(), "Maximum-resolution water and terrain restore together.")
+	check(result.ok and Document.apply(terrain, result.document).is_empty() and terrain.water_layer_current() and terrain.terrain_surface_current(), "Maximum-resolution water and terrain restore together.")
 	# Race protection: reject an in-flight result if the source changes.
 	var previous_layer = terrain.water_layer
 	editor.generate_water_layer()

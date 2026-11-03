@@ -1,6 +1,7 @@
 extends RefCounted
 ## Versioned terrain-only documents. Parse and validate completely before applying.
 
+const TerrainSurface = preload("res://scripts/domain/terrain_surface.gd")
 const WaterLayer = preload("res://scripts/domain/terrain_water_layer.gd")
 const PaintCatalog = preload("res://scripts/rendering/terrain_paint_catalog.gd")
 const PaintLayer = preload("res://scripts/rendering/terrain_paint_layer.gd")
@@ -66,6 +67,7 @@ static func capture(terrain: Node) -> Dictionary:
 	if source.has("error"):
 		return {}
 	return {"format": "civilization-legacy-terrain", "version": VERSION,
+		"terrain_surface": terrain.terrain_surface.snapshot() if terrain.terrain_surface != null else null,
 		"water_layer": terrain.water_layer.snapshot() if terrain.water_layer != null else null,
 		"heightmap_detail": {"version": 1, "coast": terrain.coast_detail, "mountains": terrain.mountain_detail},
 		"ground_palette": terrain.surface_catalog.snapshot(), "ground_paint": terrain.paint_layer.snapshot() if terrain.paint_layer != null else {"version": 1, "png": ""},
@@ -85,9 +87,16 @@ static func validate(document: Variant) -> String:
 		var detail: Variant = document.heightmap_detail
 		if not detail is Dictionary or not _within(detail.get("version", 1), [1, 1, true]) or not _within(detail.get("coast"), [0, 1]) or not _within(detail.get("mountains"), [0, 1]):
 			return "Invalid heightmap refinement settings."
+	var surface_cache: Dictionary = TerrainSurface.decode(document.get("terrain_surface"))
+	if not surface_cache.error.is_empty():
+		return surface_cache.error
 	var water: Dictionary = WaterLayer.decode(document.get("water_layer"))
 	if not water.error.is_empty():
 		return water.error
+	if surface_cache.layer != null:
+		var surface_error: String = surface_cache.layer.validate_water(water.layer)
+		if not surface_error.is_empty():
+			return surface_error
 	var settings: Variant = document.get("settings")
 	if not settings is Dictionary:
 		return "Terrain settings are missing."
@@ -181,6 +190,9 @@ static func apply(terrain: Node, document: Dictionary) -> String:
 		return error
 	if not terrain.heightmap_only and int(document.settings.resolution) > 1024:
 		return "High-resolution maps require the focused terrain renderer."
+	var surface_cache: Dictionary = TerrainSurface.decode(document.get("terrain_surface"))
+	if not surface_cache.error.is_empty():
+		return surface_cache.error
 	var water: Dictionary = WaterLayer.decode(document.get("water_layer"))
 	var ground_catalog: Resource = PaintCatalog.from_data(document.ground_palette) if document.version >= 10 else load("res://assets/terrain/default_ground_palette.tres")
 	var ground_resources: Dictionary = PaintLibrary.build(ground_catalog)
@@ -192,6 +204,7 @@ static func apply(terrain: Node, document: Dictionary) -> String:
 		return layer.error
 	# Dependencies and paint are valid before changing the live map.
 	var detail: Dictionary = document.get("heightmap_detail", {"coast": 0.75, "mountains": 0.8})
+	terrain.terrain_surface = surface_cache.layer
 	terrain.water_layer = water.layer
 	terrain.coast_detail = detail.coast
 	terrain.mountain_detail = detail.mountains

@@ -82,6 +82,8 @@ func _run() -> void:
 	check(disk.ok, "JSON numeric settings validate after parsing a saved water document.")
 	var mask: PackedByteArray = terrain.water_layer.mask_bytes.duplicate()
 	check(Document.apply(terrain, saved).is_empty() and terrain.water_layer_current() and terrain.water_layer.mask_bytes == mask, "Save/load restores exact water and height data.")
+	await editor.build_terrain_surface()
+	check(terrain.terrain_surface_current(), "Derived surface builds before play.")
 	editor.play_map()
 	await process_frame
 	check(editor._gameplay_map.get_node("Terrain").water_layer_current() and editor._gameplay_map.get_node("Terrain").map_renderer.material.get_shader_parameter("water_enabled") and editor._gameplay_map.get_node("Terrain").water_layer.mask_bytes == mask, "Gameplay receives the same independent water overlay.")

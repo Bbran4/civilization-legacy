@@ -4,6 +4,8 @@ const SHADER = preload("res://scripts/rendering/terrain_map.gdshader")
 var surface: MeshInstance3D
 var material := ShaderMaterial.new()
 var shaded_relief := true
+var _base_texture: ImageTexture
+var rendered_heights := PackedFloat32Array()
 var normalized_heights := PackedFloat32Array()
 
 func _init(target: MeshInstance3D) -> void:
@@ -20,7 +22,8 @@ func set_heightfield(samples: PackedFloat32Array, size: Vector2i, extent: Vector
 	plane.size = extent
 	surface.mesh = plane
 	surface.material_override = material
-	material.set_shader_parameter("height_field", ImageTexture.create_from_image(Image.create_from_data(size.x, size.y, false, Image.FORMAT_RF, normalized_heights.to_byte_array())))
+	_base_texture = ImageTexture.create_from_image(Image.create_from_data(size.x, size.y, false, Image.FORMAT_RF, normalized_heights.to_byte_array()))
+	set_terrain_surface(null, false)
 	material.set_shader_parameter("texel_size", Vector2.ONE / Vector2(size))
 	set_shaded_relief(shaded_relief)
 
@@ -37,3 +40,7 @@ func set_water_layer(layer: RefCounted, enabled: bool) -> void:
 
 func set_height_layer_visible(enabled: bool) -> void:
 	material.set_shader_parameter("height_enabled", enabled)
+
+func set_terrain_surface(layer: RefCounted, enabled: bool) -> void:
+	rendered_heights = layer.heights if enabled and layer != null else normalized_heights
+	material.set_shader_parameter("height_field", layer.texture() if enabled and layer != null else _base_texture)

@@ -33,7 +33,7 @@ func _run() -> void:
 	check(terrain.climate == null and terrain.biomes == null and terrain.hydrology == null and terrain.vegetation_view == null and terrain.hydrology_view == null and terrain.provinces == null, "No climate, biomes, trees, rivers, lakes or province generators run.")
 	check(terrain.detail == null and not terrain.get_node("Water").visible, "Heightmap uses one raster plane, with water and LOD relief disabled.")
 	for layer in editor.layers:
-		if layer.id not in ["heightmap", "rivers"]:
+		if layer.id not in ["heightmap", "rivers", "surface"]:
 			check(not layer.visible and editor._layer_selectors[layer.id].disabled and not editor.can_edit(layer.id), "Other layers are visibly inactive and cannot be edited.")
 	var image: Image = terrain.heightmap_image()
 	check(image.get_size() == terrain.sample_size() and image.get_width() == 1025, "Export uses the detailed canonical sample grid.")
