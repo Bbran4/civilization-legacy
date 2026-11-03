@@ -229,6 +229,11 @@ func _build_interface() -> void:
 	_tree_status = _label("", 12, Color("a9bdc8"))
 	_tree_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_context("ground")
+	_section("NATURAL GROUND")
+	_label("Generate the natural ground appearance from the heightmap, rivers and lakes first. Manual paint remains available below after you review it.", 13, Color("a9bdc8")).autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_button("Generate natural ground appearance", generate_natural_ground, null, "GenerateNaturalGround")
+	_label("Trees are deliberately not placed by this step.", 12, Color("8fa7b3"))
+	_section("MANUAL TERRAIN PAINT")
 	_brush = GroundBrush.new()
 	add_child(_brush)
 	_brush.configure(self)
@@ -800,7 +805,7 @@ func _build_shell() -> void:
 		lock.toggled.connect(func(value: bool): layer.locked = value; _stop_brush(); _update_dependency_status(); mark_dirty())
 		row.add_child(lock)
 		_layer_buttons[layer.id] = [eye, lock]
-		if _terrain.heightmap_only and layer.id not in ["heightmap", "rivers", "surface", "provinces"]:
+		if _terrain.heightmap_only and layer.id not in ["heightmap", "rivers", "surface", "provinces", "ground"]:
 			layer.visible = false
 			eye.set_pressed_no_signal(false)
 			eye.disabled = true
@@ -829,7 +834,7 @@ func _context(key: String) -> void:
 	_form = box
 
 func _select_layer(key: String) -> void:
-	if _terrain.heightmap_only and key not in ["heightmap", "rivers", "surface", "provinces", "view"]:
+	if _terrain.heightmap_only and key not in ["heightmap", "rivers", "surface", "provinces", "ground", "view"]:
 		key = "heightmap"
 	if selected_layer != key:
 		mark_dirty()
@@ -904,7 +909,7 @@ func _apply_layer_visibility() -> void:
 		_terrain.visible = (layer_visible("provinces") and _terrain.province_layer_current()) or (layer_visible("surface") and _terrain.terrain_surface_current()) or layers[0].visible or (layer_visible("rivers") and _terrain.water_layer_current())
 		_terrain.set_height_layer_visible(layers[0].visible)
 		for layer in layers:
-			if layer.id not in ["heightmap", "rivers", "surface", "provinces"]:
+			if layer.id not in ["heightmap", "rivers", "surface", "provinces", "ground"]:
 				layer.visible = false
 				_layer_buttons[layer.id][0].set_pressed_no_signal(false)
 		_terrain.set_province_layer_visible(layer_visible("provinces"))
@@ -913,6 +918,9 @@ func _apply_layer_visibility() -> void:
 		_terrain.set_water_layer_visible(layer_visible("rivers"))
 		_update_surface_status()
 		_update_water_status()
+		if _terrain.paint_layer != null:
+			_terrain.paint_layer.editor_visible = layer_visible("ground")
+			_terrain.update_painted_surface()
 		return
 	for layer in layers:
 		match layer.id:
@@ -1310,6 +1318,23 @@ func build_terrain_surface() -> void:
 		_surface_status.text = error
 	else:
 		_update_surface_status()
+
+func generate_natural_ground() -> void:
+	if _surface_busy or _water_busy or _province_busy:
+		return
+	if not _terrain.water_layer_current():
+		_surface_status.text = "Generate rivers / lakes first, then generate natural ground appearance."
+		_select_layer("rivers")
+		return
+	if _terrain.terrain_surface_current():
+		_terrain.set_surface_layer_visible(true)
+		if _layer_buttons.has("surface"):
+			_layer_buttons["surface"][0].set_pressed_no_signal(true)
+		_update_surface_status()
+		return
+	await build_terrain_surface()
+	if _terrain.terrain_surface_current():
+		_terrain.set_surface_layer_visible(true)
 
 func _build_province_controls() -> void:
 	_label("Province view")
