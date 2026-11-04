@@ -3,7 +3,9 @@ const Provinces = preload("res://scripts/domain/world_provinces.gd")
 const Water = preload("res://scripts/domain/terrain_water_layer.gd")
 const Document = preload("res://scripts/storage/terrain_document.gd")
 var failures := 0
-func _initialize() -> void: _run.call_deferred()
+func _initialize() -> void:
+	DirAccess.make_dir_recursive_absolute("res://.test-runtime")
+	_run.call_deferred()
 func check(ok: bool, message: String) -> void:
 	if not ok:
 		failures += 1
@@ -42,12 +44,12 @@ func _run() -> void:
 		if original[i] == 1: valid = valid and layer.ids[i] == 1
 		elif band[i] != 0:
 			coastal += 1
-			valid = valid and layer.ids[i] > 1
+			valid = valid and layer.ids[i] > 1 and layer.records[layer.ids[i]-1].kind == "ocean"
 		elif classes[i] == 2:
 			deep += 1
 			valid = valid and layer.ids[i] == 0 and layer.sea_mask[i] == 1
 	check(valid and deep > 1000 and coastal > 100, "Coastal IDs stop at the sea band and deep ocean remains unassigned.")
-	check(layer.ids[lake] == 0 and layer.ids[inland] == 0 and layer.sea_mask[lake] == 0 and layer.sea_mask[inland] == 0, "Lakes and inland water stay unassigned and are not deep-ocean background.")
+	check(layer.ids[lake] == 0 and layer.ids[inland] > 0 and layer.records[layer.ids[inland]-1].kind == "inland_water" and layer.sea_mask[lake] == 0 and layer.sea_mask[inland] == 0, "Generated lakes stay unassigned; inland-water provinces are separate from deep ocean.")
 	check(layer.validate_coverage(base, 0.2, water).is_empty(), "Coverage validates both coastal zones and borderless sea.")
 	var texture: Image = layer.texture().get_image()
 	check(texture.get_pixel(0, 0).r == 0 and texture.get_pixel(0, 0).g == 0 and absf(texture.get_pixel(0, 0).b - 2.0 / 255) < 0.00001, "Deep water texture carries background classification but no province ID.")
@@ -60,10 +62,18 @@ func _run() -> void:
 	copy.generate_oceans(base, water, 12, "coastal_band", 128)
 	var wider := 0
 	for i in range(copy.ids.size()):
-		if copy.ids[i] > 1: wider += 1
+		if copy.ids[i] > 0 and copy.records[copy.ids[i]-1].kind == "ocean": wider += 1
 	check(wider > coastal, "Coastal reach changes zone extent rather than partitioning the whole ocean.")
-	var legacy_regions: RefCounted = layer.editable_copy()
-	legacy_regions.generate_oceans(base, water, 6, "coastal")
+	var legacy_regions := Provinces.new()
+	legacy_regions.size = layer.size
+	legacy_regions.source_hash = layer.source_hash
+	legacy_regions.ids = original.duplicate()
+	legacy_regions.ids[inland] = 1
+	legacy_regions.records.append({"id":1,"kind":"land","name":"Mainland"})
+	legacy_regions._index_regions()
+	var legacy_base := base.duplicate()
+	legacy_base[inland] = 0.6
+	legacy_regions.generate_oceans(legacy_base, water, 6, "coastal")
 	var legacy_data: Dictionary = legacy_regions.snapshot()
 	legacy_data.version = 3
 	legacy_data.erase("sea_mask")
@@ -93,6 +103,10 @@ func _run() -> void:
 	await process_frame
 	var terrain = world.get_node("Terrain")
 	var editor = world.get_node("Interface/Editor")
+	if DisplayServer.get_name() == "headless":
+		terrain.resolution = 255
+		terrain.regenerate()
+		editor._sync_from_terrain()
 	await editor.generate_water_layer()
 	await editor.build_terrain_surface()
 	editor._select_layer("provinces")
@@ -104,8 +118,8 @@ func _run() -> void:
 	for i in range(land_ids.size()):
 		if land_ids[i] > 0: kept = kept and land_ids[i] == terrain.province_layer.ids[i]
 	check(kept, "Coastal ocean rebuild preserves all authored land IDs.")
-	check(Document.save_file("user://coastal-seas.terrain.json", terrain).is_empty(), "Coastal maps save to disk.")
-	var disk := Document.load_file("user://coastal-seas.terrain.json")
+	check(Document.save_file("res://.test-runtime/coastal_seas_smoke-coastal-seas.terrain.json", terrain).is_empty(), "Coastal maps save to disk.")
+	var disk := Document.load_file("res://.test-runtime/coastal_seas_smoke-coastal-seas.terrain.json")
 	check(disk.ok and Document.apply(terrain, disk.document).is_empty() and terrain.province_layer.ocean_style == "coastal_band", "Full map restores coastal/open-water data without regeneration.")
 	if DisplayServer.get_name() != "headless":
 		await process_frame

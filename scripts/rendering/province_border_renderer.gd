@@ -104,8 +104,9 @@ func _append(group: Dictionary,pixels: PackedVector2Array,size: Vector2i) -> voi
 		if i == 0 and not closed: continue
 		var before: Vector2 = normals[i-1] if i > 0 else normals[-1]
 		var after: Vector2 = normals[i]
+		if before.distance_squared_to(after) < 0.00000001: continue
 		for side in [-1.0,1.0]:
-			_vertex(group,points[i],Vector2.ZERO,arcs[i],0.0)
+			_vertex(group,points[i],after,arcs[i],0.0)
 			_vertex(group,points[i],before,arcs[i],side)
 			_vertex(group,points[i],after,arcs[i],side)
 func _vertex(group: Dictionary,point: Vector2,normal: Vector2,arc: float,side: float) -> void:
@@ -136,6 +137,7 @@ func set_water(texture: Texture2D) -> void:
 	for child in root.get_children(): _bind_geography(child.material_override)
 
 func _bind_relief(material: ShaderMaterial) -> void:
+	material.set_shader_parameter("map_extent",extent)
 	material.set_shader_parameter("relief_vertices",relief_texture)
 	material.set_shader_parameter("relief_amount",relief_amount)
 func set_relief(texture: Texture2D, amount: float) -> void:

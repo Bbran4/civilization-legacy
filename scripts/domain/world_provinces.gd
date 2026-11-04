@@ -12,6 +12,8 @@ var border_revision := 0
 var border_geometry: RefCounted
 var requested_count := 64
 var ocean_generated := false
+var inland_generated := false
+var land_includes_sea_datum := false
 var requested_oceans := 24
 var ocean_style := "coastal_band"
 var coastal_reach := 64.0
@@ -33,6 +35,8 @@ func generate(base: PackedFloat32Array, surface: RefCounted, water: RefCounted, 
 	ids.resize(base.size())
 	ids.fill(0)
 	ocean_generated = false
+	inland_generated = false
+	land_includes_sea_datum = false
 	sea_mask.clear()
 	impassable.clear()
 	records.clear()
@@ -42,8 +46,9 @@ func generate(base: PackedFloat32Array, surface: RefCounted, water: RefCounted, 
 	var land := PackedByteArray()
 	land.resize(base.size())
 	var candidates := PackedInt32Array()
+	var classes := classify(base,0.2,water.mask_bytes,size)
 	for i in range(base.size()):
-		if base[i] >= 0.2 and water.mask_bytes[i * 4 + 1] == 0:
+		if classes[i] == 1:
 			land[i] = 1
 			candidates.append(i)
 	var distance := PackedInt32Array()
@@ -82,6 +87,8 @@ func generate(base: PackedFloat32Array, surface: RefCounted, water: RefCounted, 
 				return "Too many disconnected land regions."
 			_seed(pixel, distance)
 			_grow(land, distance, growth_heights, water.mask_bytes)
+	var inland_error := _generate_inland(classes)
+	if not inland_error.is_empty(): return inland_error
 	return _index_regions()
 
 func build_connections(water: RefCounted) -> void:
@@ -272,7 +279,7 @@ func texture() -> ImageTexture:
 		for i in range(ids.size()):
 			bytes[i * 4] = ids[i] & 255
 			bytes[i * 4 + 1] = (ids[i] >> 8) & 255
-			bytes[i * 4 + 2] = 3 if blocked(i) else (2 if ids[i] == 0 and sea_mask.size() == ids.size() and sea_mask[i] != 0 else (1 if ids[i] > 0 and records[ids[i] - 1].get("kind", "land") == "ocean" else 0))
+			bytes[i * 4 + 2] = 3 if blocked(i) else (2 if ids[i] == 0 and sea_mask.size() == ids.size() and sea_mask[i] != 0 else (1 if ids[i] > 0 and records[ids[i] - 1].get("kind", "land") != "land" else 0))
 			bytes[i * 4 + 3] = 255
 		_image = Image.create_from_data(size.x, size.y, false, Image.FORMAT_RGBA8, bytes)
 		_texture = ImageTexture.create_from_image(_image)
@@ -287,10 +294,10 @@ func snapshot() -> Dictionary:
 	var blocked_values := PackedFloat32Array()
 	blocked_values.resize(impassable.size())
 	for i in range(impassable.size()): blocked_values[i] = impassable[i]
-	return {"version": 7, "nations":nations.duplicate(true), "impassable": Payload.encode(blocked_values) if not blocked_values.is_empty() else null, "coastal_reach": coastal_reach, "sea_mask": Payload.encode(sea_values) if not sea_values.is_empty() else null, "ocean_style": ocean_style, "ocean_generated": ocean_generated, "requested_oceans": requested_oceans, "source_hash": source_hash, "size": [size.x, size.y], "requested_count": requested_count, "ids": Payload.encode(values), "records": records.duplicate(true)}
+	return {"version": 8, "inland_generated":inland_generated, "land_includes_sea_datum":land_includes_sea_datum, "nations":nations.duplicate(true), "impassable": Payload.encode(blocked_values) if not blocked_values.is_empty() else null, "coastal_reach": coastal_reach, "sea_mask": Payload.encode(sea_values) if not sea_values.is_empty() else null, "ocean_style": ocean_style, "ocean_generated": ocean_generated, "requested_oceans": requested_oceans, "source_hash": source_hash, "size": [size.x, size.y], "requested_count": requested_count, "ids": Payload.encode(values), "records": records.duplicate(true)}
 static func decode(data: Variant) -> Dictionary:
 	if data == null: return {"error": "", "layer": null}
-	if not data is Dictionary or data.get("version") not in [1, 1.0, 2, 2.0, 3, 3.0, 4, 4.0, 5, 5.0, 6, 6.0, 7, 7.0] or not data.get("source_hash") is String or data.source_hash.length() != 64 or not data.get("size") is Array or data.size.size() != 2 or not data.get("records") is Array or data.records.size() > 65535:
+	if not data is Dictionary or data.get("version") not in [1, 1.0, 2, 2.0, 3, 3.0, 4, 4.0, 5, 5.0, 6, 6.0, 7, 7.0, 8, 8.0] or not data.get("source_hash") is String or data.source_hash.length() != 64 or not data.get("size") is Array or data.size.size() != 2 or not data.get("records") is Array or data.records.size() > 65535:
 		return {"error": "Invalid province document."}
 	for v in data.size:
 		if not (v is int or v is float) or not is_finite(float(v)) or v != int(v) or v < 3 or v > 2050: return {"error": "Invalid province dimensions."}
@@ -301,6 +308,12 @@ static func decode(data: Variant) -> Dictionary:
 	var layer: RefCounted = load("res://scripts/domain/world_provinces.gd").new()
 	layer.size = Vector2i(data.size[0], data.size[1])
 	layer.source_hash = data.source_hash
+	layer.land_includes_sea_datum = true
+	if int(data.version) >= 8:
+		if not data.get("land_includes_sea_datum") is bool: return {"error":"Invalid sea-datum ownership policy."}
+		layer.land_includes_sea_datum = data.land_includes_sea_datum
+		if not data.get("inland_generated") is bool: return {"error":"Invalid inland-water coverage state."}
+		layer.inland_generated = data.inland_generated
 	if int(data.version) >= 7:
 		if not data.get("nations") is Array or data.nations.size() > 256: return {"error":"Invalid nation palette."}
 		for i in range(data.nations.size()):
@@ -347,7 +360,7 @@ static func decode(data: Variant) -> Dictionary:
 		if not record is Dictionary or record.get("id") != i + 1 or not record.get("name") is String or record.name.length() > 128: return {"error": "Invalid province identity."}
 		if int(data.version) >= 2 and not record.get("kind", "land") is String: return {"error": "Invalid region kind."}
 		var kind: String = record.get("kind", "land") if int(data.version) >= 2 else "land"
-		if kind not in ["land", "ocean"] or (kind == "land" and ocean_seen and int(data.version) < 5) or (kind == "ocean" and not layer.ocean_generated): return {"error": "Invalid land/ocean region order."}
+		if kind not in ["land", "ocean", "inland_water"] or (kind == "inland_water" and (int(data.version) < 8 or not layer.inland_generated)) or (kind == "land" and ocean_seen and int(data.version) < 5) or (kind == "ocean" and not layer.ocean_generated): return {"error": "Invalid land/ocean region order."}
 		ocean_seen = ocean_seen or kind == "ocean"
 		if int(data.version) >= 3 and not record.get("active") is bool: return {"error": "Invalid absorbed province state."}
 		if int(data.version) >= 6 and not record.get("allow_fragments",false) is bool: return {"error": "Invalid land part policy."}
@@ -360,7 +373,7 @@ static func decode(data: Variant) -> Dictionary:
 func validate_coverage(samples: PackedFloat32Array, land_datum: float, water: RefCounted) -> String:
 	if samples.size() != ids.size() or water.mask_size != size:
 		return "Province coverage dimensions do not match terrain."
-	var classes := classify(samples, land_datum, water.mask_bytes, size)
+	var classes := classify(samples, land_datum, water.mask_bytes, size, land_includes_sea_datum)
 	var band := coastal_band(classes, size, coastal_reach) if ocean_generated and ocean_style == "coastal_band" else PackedByteArray()
 	for i in range(ids.size()):
 		var expected: int = classes[i]
@@ -371,17 +384,20 @@ func validate_coverage(samples: PackedFloat32Array, land_datum: float, water: Re
 			if sea_mask.size() != ids.size() or (sea_mask[i] != 0) != (classes[i] == 2): return "Open ocean mask does not match sea coverage."
 			if expected == 2 and band[i] == 0: expected = 0
 		if expected == 2 and not ocean_generated: expected = 0
-		var actual := 0 if ids[i] == 0 else (2 if records[ids[i] - 1].kind == "ocean" else 1)
-		if actual != expected: return "Region coverage must keep land, ocean and lakes separate."
+		if expected == 3 and not inland_generated: expected = 0
+		var actual := 0 if ids[i] == 0 else (2 if records[ids[i] - 1].kind == "ocean" else (3 if records[ids[i] - 1].kind == "inland_water" else 1))
+		if actual != expected: return "Region coverage must keep land, ocean, inland water and generated lakes separate."
 	return ""
 
-static func classify(samples: PackedFloat32Array, datum: float, mask: PackedByteArray, dimensions: Vector2i) -> PackedByteArray:
+static func classify(samples: PackedFloat32Array, datum: float, mask: PackedByteArray, dimensions: Vector2i, include_datum_as_land: bool = false) -> PackedByteArray:
+	# Compare in the source float32 domain, matching the shader sea threshold.
+	if not include_datum_as_land: datum = PackedFloat32Array([datum])[0]
 	var classes := PackedByteArray()
 	classes.resize(samples.size())
 	var queue := PackedInt32Array()
 	for i in range(samples.size()):
 		if mask[i * 4 + 1] > 0: continue
-		if samples[i] >= datum:
+		if samples[i] > datum or (include_datum_as_land and samples[i] == datum):
 			classes[i] = 1
 		elif i < dimensions.x or i >= samples.size() - dimensions.x or i % dimensions.x == 0 or i % dimensions.x == dimensions.x - 1:
 			classes[i] = 2
@@ -391,9 +407,11 @@ static func classify(samples: PackedFloat32Array, datum: float, mask: PackedByte
 		var i := queue[cursor]
 		cursor += 1
 		for next in [i - 1 if i % dimensions.x > 0 else -1, i + 1 if i % dimensions.x < dimensions.x - 1 else -1, i - dimensions.x, i + dimensions.x]:
-			if next >= 0 and next < samples.size() and classes[next] == 0 and samples[next] < datum and mask[next * 4 + 1] == 0:
+			if next >= 0 and next < samples.size() and classes[next] == 0 and (samples[next] < datum or (not include_datum_as_land and samples[next] == datum)) and mask[next * 4 + 1] == 0:
 				classes[next] = 2
 				queue.append(next)
+	for i in range(samples.size()):
+		if classes[i] == 0 and mask[i*4+1] == 0: classes[i] = 3
 	return classes
 
 func editable_copy() -> RefCounted:
@@ -406,6 +424,8 @@ func editable_copy() -> RefCounted:
 	copy.nations.assign(nations.duplicate(true))
 	copy.requested_count = requested_count
 	copy.ocean_generated = ocean_generated
+	copy.inland_generated = inland_generated
+	copy.land_includes_sea_datum = land_includes_sea_datum
 	copy.requested_oceans = requested_oceans
 	copy.ocean_style = ocean_style
 	copy.coastal_reach = coastal_reach
@@ -415,7 +435,9 @@ func editable_copy() -> RefCounted:
 
 func generate_oceans(base: PackedFloat32Array, water: RefCounted, count: int = 24, style: String = "coastal_band", reach: float = 64.0) -> String:
 	if not is_finite(reach) or reach < 8 or reach > 256 or style not in ["open", "coastal", "coastal_band"] or count < 1 or count > 256 or base.size() != ids.size() or water.mask_size != size: return "Invalid ocean region inputs."
-	var classes := classify(base, 0.2, water.mask_bytes, size)
+	var classes := classify(base, 0.2, water.mask_bytes, size, land_includes_sea_datum)
+	var inland_error := _generate_inland(classes)
+	if not inland_error.is_empty(): return inland_error
 	var band := coastal_band(classes, size, reach) if style == "coastal_band" else PackedByteArray()
 	sea_mask.clear()
 	if style == "coastal_band":
@@ -525,7 +547,7 @@ func paint_segment(a: Vector2, b: Vector2, radius: float, target: int, changes: 
 
 func _id_color(id: int, pixel: int = -1) -> Color:
 	if id == 0: return Color8(0,0,3 if pixel >= 0 and blocked(pixel) else 0,255)
-	return Color8(id & 255, (id >> 8) & 255, 1 if records[id - 1].kind == "ocean" else 0, 255)
+	return Color8(id & 255, (id >> 8) & 255, 1 if records[id - 1].kind != "land" else 0, 255)
 
 static func coastal_band(classes: PackedByteArray, dimensions: Vector2i, reach: float) -> PackedByteArray:
 	var limit := maxf(1.0, reach * maxi(dimensions.x, dimensions.y) / 1025.0)
@@ -684,3 +706,26 @@ func nation_color(id: int) -> Color:
 	if id <= 0 or id > nations.size(): return Color(0,0,0,0)
 	var c: Array = nations[id-1].color
 	return Color(c[0],c[1],c[2],1)
+
+# One connected region per enclosed low-elevation basin, independently of coastal
+# reach. Existing basin identities survive an ocean-only regeneration.
+func _generate_inland(classes: PackedByteArray) -> String:
+	for i in range(ids.size()):
+		if classes[i] != 3 or ids[i] != 0: continue
+		if records.size() >= 65535: return "Too many inland-water regions."
+		var id := records.size()+1
+		records.append({"id":id,"name":"Inland water "+str(id),"kind":"inland_water","active":true,"nation_id":0})
+		var queue := PackedInt32Array([i])
+		ids[i] = id
+		var cursor := 0
+		while cursor < queue.size():
+			var pixel := queue[cursor]
+			cursor += 1
+			for next in _neighbors(pixel):
+				if classes[next] == 3 and ids[next] == 0:
+					ids[next] = id
+					queue.append(next)
+	inland_generated = true
+	_texture = null
+	_image = null
+	return ""

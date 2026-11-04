@@ -4,7 +4,9 @@ const History = preload("res://scripts/domain/province_edit_history.gd")
 const Water = preload("res://scripts/domain/terrain_water_layer.gd")
 const Document = preload("res://scripts/storage/terrain_document.gd")
 var failures := 0
-func _initialize() -> void: _run.call_deferred()
+func _initialize() -> void:
+	DirAccess.make_dir_recursive_absolute("res://.test-runtime")
+	_run.call_deferred()
 func check(ok: bool, message: String) -> void:
 	if not ok:
 		failures += 1
@@ -52,7 +54,7 @@ func _run() -> void:
 	enclosed[10 * 32 + 10] = 0.1
 	water.mask_bytes[1 * 32 * 4 + 1] = 255
 	var classification := Provinces.classify(enclosed, 0.2, water.mask_bytes, layer.size)
-	check(classification[10 * 32 + 10] == 0 and classification[32] == 0 and classification[0] == 2, "Ocean flood excludes inland water and explicit lakes.")
+	check(classification[10 * 32 + 10] == 3 and classification[32] == 0 and classification[0] == 2, "Ocean flood excludes inland water and explicit lakes.")
 	water.mask_bytes[1 * 32 * 4 + 1] = 0
 	var history := History.new()
 	check(history.begin(layer, 1), "A target region can begin a stroke.")
@@ -107,6 +109,10 @@ func _run() -> void:
 	await process_frame
 	var terrain = world.get_node("Terrain")
 	var editor = world.get_node("Interface/Editor")
+	if DisplayServer.get_name() == "headless":
+		terrain.resolution = 255
+		terrain.regenerate()
+		editor._sync_from_terrain()
 	await editor.generate_water_layer()
 	await editor.build_terrain_surface()
 	editor._select_layer("provinces")
@@ -119,8 +125,8 @@ func _run() -> void:
 	for i in range(land_ids.size()):
 		if land_ids[i] > 0: land_kept = land_kept and terrain.province_layer.ids[i] == land_ids[i]
 	check(land_kept, "Ocean generation does not replace authored land IDs.")
-	check(Document.save_file("user://oceans.terrain.json", terrain).is_empty(), "Mixed ocean/land maps save.")
-	var disk := Document.load_file("user://oceans.terrain.json")
+	check(Document.save_file("res://.test-runtime/ocean_border_paint_smoke-oceans.terrain.json", terrain).is_empty(), "Mixed ocean/land maps save.")
+	var disk := Document.load_file("res://.test-runtime/ocean_border_paint_smoke-oceans.terrain.json")
 	check(disk.ok and Document.apply(terrain, disk.document).is_empty() and terrain.province_layer.ocean_generated, "Ocean kinds and coverage restore from disk.")
 	# Exercise the actual brush adapter against a known valid installed source.
 	var custom := fixture()

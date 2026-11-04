@@ -8,12 +8,18 @@ Godot world generation with layered map authoring.
 - **Ground paint** — an independent color layer over terrain shading.
 - **Rivers / lakes** — generated drainage and hydraulic elevations.
 - **Terrain surface** — the combined heightmap and hydraulic beds/banks.
-- **Provinces** — land/maritime regions, borders and nation assignments.
+- **Provinces** — land, enclosed inland-water and maritime regions, borders and nation assignments.
 
 Ground paint is composited after heightmap/combined-surface shading and before
 rivers, lakes, province colors and borders. Relief shading remains visible through
 paint. Raw height inspection still shows the original grayscale data. Paint is
 restricted visually to land; it cannot cover water or province overlays.
+
+Enclosed terrain basins at or below the sea datum receive one province per
+connected water body when provinces are generated. Generated hydraulic lakes
+remain separate. For an existing map, **Generate ocean borders** also fills missing
+inland-water provinces while preserving existing land and inland-water IDs.
+A full province rebuild replaces IDs and authored names, as before.
 
 ## Painting
 

@@ -89,14 +89,29 @@ float province_id(vec2 uv) {
     return chosen;
 }
 float geographic_outline(vec2 at) {
+    vec2 screen_dx = dFdx(at);
+    vec2 screen_dy = dFdy(at);
     float field = geographic_field(at);
     float gradient = length(vec2(dFdx(field),dFdy(field)));
     if (gradient < 0.0000001) return 0.0;
     vec2 dimensions = vec2(textureSize(geography_heights,0));
-    float pixels_per_sample = 1.0/max(length(dFdx(at)*dimensions),length(dFdy(at)*dimensions));
+    float pixels_per_sample = 1.0/max(length(screen_dx*dimensions),length(screen_dy*dimensions));
     float width = coast_width*mix(coast_distant_scale,1.0,smoothstep(0.5,3.0,pixels_per_sample));
     if (width <= 0.0) return 0.0;
-    return 1.0-smoothstep(max(0.0,width*0.5-0.5),width*0.5+0.5,abs(field)/gradient);
+    float ink = 1.0-smoothstep(max(0.0,width*0.5-0.5),width*0.5+0.5,abs(field)/gradient);
+    if (ink <= 0.0) return 0.0;
+    // Derivatives can spike at a ridge or a field extremum without any shoreline.
+    // Confirm an actual sign crossing within the stroke's screen-space footprint.
+    vec2 dx = screen_dx*(width*0.5+0.5);
+    vec2 dy = screen_dy*(width*0.5+0.5);
+    float low = field;
+    float high = field;
+    for (int y=-1;y<=1;y++) for (int x=-1;x<=1;x++) {
+        float neighbor = geographic_field(at+dx*float(x)+dy*float(y));
+        low = min(low,neighbor);
+        high = max(high,neighbor);
+    }
+    return low<=0.0 && high>=0.0 ? ink : 0.0;
 }
 vec3 province_tint(float id) {
     return 0.3 + 0.6 * fract(sin(vec3(id,id+17.0,id+43.0))*43758.5453);

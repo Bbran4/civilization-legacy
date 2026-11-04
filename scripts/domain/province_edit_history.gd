@@ -114,7 +114,7 @@ func merge(layer: RefCounted, keep: int, selected: Array[int]) -> Dictionary:
 	for id in selected:
 		if id < 1 or id > layer.records.size() or not layer.records[id - 1].active or layer.records[id - 1].kind != layer.records[keep - 1].kind:
 			cancel()
-			return {"error": "Merge only active provinces of the same land/ocean kind.", "layer": null}
+			return {"error": "Merge only active provinces of the same land, ocean or inland-water kind.", "layer": null}
 		unique[id] = true
 	if unique.size() < 2:
 		cancel()

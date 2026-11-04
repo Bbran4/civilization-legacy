@@ -82,3 +82,31 @@ outline placement, lakes and hidden water; `province_contour_alignment_smoke.gd`
 checks existing internal fill/contour agreement; `smooth_province_borders_smoke.gd`
 and `border_zoom_smoke.gd` check internal styles and width scaling. Exact Godot 4.7
 behavior and the user's particular saved map have not been reproduced here.
+
+
+## Border artifact fixes after relief
+
+Ribbon expansion now happens on the terrain surface rather than moving a flat
+depth strip in clip space. The fixed world-space lift has been replaced by a
+subpixel bias derived from the camera projection. The conversion from desired
+pixel width to surface width is bounded near grazing faces: a near-zero projected
+normal cannot produce enormous world offsets or needle-like triangles. Collinear
+relief-grid subdivisions do not produce redundant bevels.
+
+Geographic outline coverage verifies a real field sign crossing inside the stroke
+footprint; a sharp slope/field derivative alone is not a shoreline. Screen
+derivatives are evaluated before divergent clipping. Regression checks cover
+all-land sharp fields (zero ghost-outline pixels), deep zoom (attached borders,
+zero stray pixels), grazing terrain (zero spikes in the fixture), width scaling,
+and the existing coastline/fill alignment. These checks do not establish that
+every possible map/view combination is artifact-free.
+
+
+`border_artifacts_smoke.gd` passes on Godot 4.5.1 OpenGL Compatibility: its all-land
+sharp-field fixture produces zero ghost-outline pixels, its deep-zoom fixture has
+242 attached border pixels and zero stray pixels in the examined band, and its
+grazing-slope fixture produces zero examined spikes. Existing border-width,
+coast/fill alignment and zoom-relief checks pass. The engine emits generic OpenGL
+initialization and certificate-store diagnostics in this environment; successful
+assertions are reported separately. Rendered captures of a read-only loaded saved
+map were inspected as an additional visual check.

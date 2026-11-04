@@ -618,7 +618,7 @@ func _show_cell_info(info: Dictionary) -> void:
 			if _terrain.province_layer.is_impassable(point / _terrain.map_size): _cell_label.text += "\nImpassable land (unassigned)"
 			if _province_selected > 0:
 				var record: Dictionary = _terrain.province_layer.records[_province_selected - 1]
-				var kind_text := "Land province" if record.kind == "land" else "Coastal sea province"
+				var kind_text := "Land province" if record.kind == "land" else ("Inland-water province" if record.kind == "inland_water" else "Coastal sea province")
 				_cell_label.text += "\n%s · %s (ID %d)\n%d map pixels, %d neighbors" % [record.name, kind_text, record.id, record.pixels, record.neighbors.size()]
 				if not record.neighbors.is_empty():
 					var names: Array[String] = []
@@ -1186,7 +1186,7 @@ func _build_province_controls() -> void:
 	appearance.item_selected.connect(func(index: int): _terrain.set_province_fill(index == 0))
 	_form.add_child(appearance)
 	_build_border_appearance_controls()
-	_label("Generate land regions, then ocean borders around the coastline. Lakes stay separate. Paint borders below.").autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_label("Generate land and enclosed inland-water regions, then coastal sea regions. Generated lakes stay separate.").autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_label("Target mainland provinces")
 	_province_count = SpinBox.new()
 	_province_count.min_value = 1
@@ -1250,6 +1250,7 @@ func _sync_nation_choices() -> void:
 	if _province_nation == null: return
 	_province_nation.clear()
 	_province_nation.add_item("Unassigned",0)
+	_province_nation.disabled = _terrain.province_layer == null or _province_selected <= 0 or _terrain.province_layer.records[_province_selected-1].kind != "land" or not can_edit("provinces")
 	if _terrain.province_layer == null: return
 	for nation in _terrain.province_layer.nations:
 		_province_nation.add_item(nation.name,nation.id)
@@ -1310,12 +1311,14 @@ func _update_province_status() -> void:
 	_layer_selectors["provinces"].text = "Provinces *" if _terrain.province_layer != null and not current else "Provinces"
 	if current:
 		var oceans := 0
+		var inland := 0
 		var active := 0
 		for record in _terrain.province_layer.records:
 			if not record.get("active", true): continue
 			active += 1
 			if record.kind == "ocean": oceans += 1
-		_province_status.text = "%d land · %d ocean regions. Ocean generation preserves land IDs; land regeneration replaces all IDs and names." % [active - oceans, oceans]
+			if record.kind == "inland_water": inland += 1
+		_province_status.text = "%d land · %d inland water · %d ocean regions. Ocean generation preserves land and inland-water IDs; province regeneration replaces all IDs and names." % [active - oceans - inland, inland, oceans]
 	else:
 		_province_status.text = "Build the terrain surface, then generate provinces. Old data is retained but hidden when the source changes."
 	if not current:

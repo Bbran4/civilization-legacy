@@ -4,7 +4,9 @@ const History = preload("res://scripts/domain/province_edit_history.gd")
 const Water = preload("res://scripts/domain/terrain_water_layer.gd")
 const Document = preload("res://scripts/storage/terrain_document.gd")
 var failures := 0
-func _initialize() -> void: _run.call_deferred()
+func _initialize() -> void:
+	DirAccess.make_dir_recursive_absolute("res://.test-runtime")
+	_run.call_deferred()
 func check(ok: bool, message: String) -> void:
 	if not ok:
 		failures += 1
@@ -95,7 +97,7 @@ func _run() -> void:
 	var inland := base.duplicate()
 	inland[15 * 64 + 15] = 0.1
 	var classes := Provinces.classify(inland, 0.2, water.mask_bytes, layer.size)
-	check(classes[5] == 0 and classes[15 * 64 + 15] == 0, "Lakes and enclosed inland water remain unassigned.")
+	check(classes[5] == 0 and classes[15 * 64 + 15] == 3, "Generated lakes and enclosed low-elevation water have distinct classes.")
 	water.mask_bytes[5 * 4 + 1] = 0
 	var world := (load("res://scenes/main.tscn") as PackedScene).instantiate()
 	world.get_node("Terrain").resolution = 255 if DisplayServer.get_name() == "headless" else 1024
@@ -103,6 +105,10 @@ func _run() -> void:
 	await process_frame
 	var editor = world.get_node("Interface/Editor")
 	var terrain = world.get_node("Terrain")
+	if DisplayServer.get_name() == "headless":
+		terrain.resolution = 255
+		terrain.regenerate()
+		editor._sync_from_terrain()
 	await editor.generate_water_layer()
 	await editor.build_terrain_surface()
 	editor._select_layer("provinces")
@@ -139,8 +145,8 @@ func _run() -> void:
 	await editor.generate_ocean_borders()
 	check(not terrain.province_layer.records[old_id - 1].active and terrain.province_layer.ids[pixel] == target, "Maritime generation preserves authored multi-island province assignments.")
 	check(terrain.province_layer.ocean_style == "coastal_band", "Ocean worker installs the selected maritime mode.")
-	check(Document.save_file("user://maritime.terrain.json", terrain).is_empty(), "Maritime maps save through the world terrain format.")
-	var saved := Document.load_file("user://maritime.terrain.json")
+	check(Document.save_file("res://.test-runtime/island_maritime_smoke-maritime.terrain.json", terrain).is_empty(), "Maritime maps save through the world terrain format.")
+	var saved := Document.load_file("res://.test-runtime/island_maritime_smoke-maritime.terrain.json")
 	check(saved.ok and Document.apply(terrain, saved.document).is_empty() and terrain.province_layer.ocean_style == "coastal_band", "Maritime mode and regions restore through disk.")
 	check(not terrain.province_layer.records[old_id - 1].active and terrain.province_layer.ids[pixel] == target, "Disk restoration preserves absorbed island records and IDs.")
 	if DisplayServer.get_name() != "headless":

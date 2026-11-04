@@ -8,4 +8,4 @@ float geographic_field(vec2 at) {
     float lake = geography_has_water ? texture(geography_water, at).g : 0.0;
     return min(coast, (0.5 - lake) * 0.1);
 }
-bool geographic_land(vec2 at) { return geographic_field(at) >= 0.0; }
+bool geographic_land(vec2 at) { return geographic_field(at) > 0.0; }
