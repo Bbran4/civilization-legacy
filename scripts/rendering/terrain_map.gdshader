@@ -1,6 +1,8 @@
 shader_type spatial;
 render_mode unshaded, cull_disabled;
 #include "res://scripts/rendering/map_geography.gdshaderinc"
+#include "res://scripts/rendering/map_relief.gdshaderinc"
+uniform vec2 map_extent = vec2(192.0);
 uniform float coast_width = 4.5;
 uniform float coast_distant_scale = 0.35;
 uniform sampler2D height_field : filter_linear, repeat_disable;
@@ -99,6 +101,7 @@ float geographic_outline(vec2 at) {
 vec3 province_tint(float id) {
     return 0.3 + 0.6 * fract(sin(vec3(id,id+17.0,id+43.0))*43758.5453);
 }
+void vertex() { VERTEX.y = relief_height(UV); }
 void fragment() {
 	float h = texture(height_field, UV).r;
 	float value = h;
@@ -107,6 +110,10 @@ void fragment() {
 		float dy = texture(height_field, UV + vec2(0.0, texel_size.y)).r - texture(height_field, UV - vec2(0.0, texel_size.y)).r;
 		float resolution_scale = float(max(textureSize(height_field, 0).x, textureSize(height_field, 0).y)) / 1025.0;
 		vec3 n = normalize(vec3(-dx * 45.0 * resolution_scale, 1.0, -dy * 45.0 * resolution_scale));
+		vec2 mesh_step = 1.0/vec2(textureSize(relief_vertices,0)-1);
+		float hx = (relief_height(UV+vec2(mesh_step.x,0.0))-relief_height(UV-vec2(mesh_step.x,0.0)))/(2.0*mesh_step.x*map_extent.x);
+		float hz = (relief_height(UV+vec2(0.0,mesh_step.y))-relief_height(UV-vec2(0.0,mesh_step.y)))/(2.0*mesh_step.y*map_extent.y);
+		n = normalize(mix(n,normalize(vec3(-hx,1.0,-hz)),relief_amount));
 		float light = 0.55 + 0.45 * max(dot(n, normalize(vec3(-0.6, 0.8, -0.4))), 0.0);
 		value = h < 0.2 ? h * 0.35 : clamp(0.25 + h * 0.7, 0.0, 1.0) * light;
 	}

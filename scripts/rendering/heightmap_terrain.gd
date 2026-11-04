@@ -249,11 +249,7 @@ func effective_graph_points() -> int:
 
 
 func height_bounds() -> Vector2:
-	var bounds: Vector2 = Vector2(_sample_min, _sample_max) * relief_scale()
-	if show_water:
-		bounds.x = minf(bounds.x, sea_level * relief_scale())
-		bounds.y = maxf(bounds.y, sea_level * relief_scale())
-	return bounds
+	return map_renderer.visible_bounds() if map_renderer != null else Vector2.ZERO
 
 
 func _geometry_key() -> String:
@@ -380,7 +376,7 @@ func heightmap_image() -> Image:
 
 
 func is_flat_map_mode() -> bool:
-	return true
+	return not shaded_relief
 
 
 func _mesh_node(node_name: String) -> MeshInstance3D:
@@ -449,7 +445,7 @@ func ray_surface_hit(ray_origin: Vector3, ray_direction: Vector3) -> Variant:
 	var origin: Vector3 = to_local(ray_origin)
 	var direction: Vector3 = global_transform.basis.inverse() * ray_direction
 	var extent: Vector2 = display_size()
-	if heightmap_only:
+	if map_renderer == null or map_renderer.visible_relief == 0.0:
 		var hit: Variant = Plane(Vector3.UP, 0.0).intersects_ray(origin, direction)
 		if hit != null and absf(hit.x) <= extent.x * 0.5 and absf(hit.z) <= extent.y * 0.5:
 			return to_global(hit)
@@ -471,7 +467,7 @@ func ray_surface_hit(ray_origin: Vector3, ray_direction: Vector3) -> Variant:
 	if enter > leave:
 		return null
 	var previous_t: float = enter
-	var steps: int = resolution * 2 + 16
+	var steps: int = maxi(32,ceili(Vector2(direction.x,direction.z).length()*(leave-enter)/minf(extent.x/(map_renderer.mesh_size.x-1),extent.y/(map_renderer.mesh_size.y-1))*2.0))
 	for step_index in range(steps + 1):
 		var t: float = lerpf(enter, leave, float(step_index) / steps)
 		var point: Vector3 = origin + direction * t
@@ -521,6 +517,7 @@ func _regenerate_heightmap_only(surface: MeshInstance3D, water: MeshInstance3D, 
 		map_renderer = MapRenderer.new(surface)
 	map_renderer.set_shaded_relief(shaded_relief)
 	map_renderer.set_heightfield(height_samples, sample_size(), display_size(), height_offset, elevation, generator_version)
+	map_renderer.set_relief(1.0-overview_blend)
 	_land_material = map_renderer.material
 	water_source_hash = WaterLayer.fingerprint(height_samples, sample_size(), map_size, height_offset, elevation, generator_version)
 	refresh_water_layer()
@@ -532,6 +529,8 @@ func set_shaded_relief(enabled: bool) -> void:
 	if heightmap_only and map_renderer != null:
 		map_renderer.set_shaded_relief(enabled)
 		refresh_water_layer()
+	var rig := get_parent().get_node_or_null("CameraRig")
+	if rig != null and rig.is_node_ready(): rig._apply_zoom()
 
 func set_raw_height_view(enabled: bool) -> void:
 	set_shaded_relief(not enabled)
@@ -613,7 +612,8 @@ func set_border_appearance(settings: Dictionary) -> String:
 	return ""
 
 func set_overview_blend(value: float) -> void:
-	overview_blend = value
+	overview_blend = clampf(value,0.0,1.0)
+	if map_renderer != null: map_renderer.set_relief(1.0-overview_blend)
 
 func set_heightmap_view(_enabled: bool) -> void:
 	heightmap_view = true
@@ -628,4 +628,4 @@ func point_info(point: Vector2) -> Dictionary:
 	return info
 
 func visible_surface_height(uv: Vector2) -> float:
-	return surface_height(uv)
+	return map_renderer.visible_height(uv) if map_renderer != null else 0.0

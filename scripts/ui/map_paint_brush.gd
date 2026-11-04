@@ -65,8 +65,8 @@ func handle_input(event: InputEvent) -> bool:
 func _apply(screen: Vector2) -> void:
 	var terrain = editor._terrain
 	var camera: Camera3D = editor._camera_rig.get_node("Camera3D")
-	# The generation overview is a flat plane, even when relief shading is active.
-	var hit: Variant = Plane(Vector3.UP,0).intersects_ray(terrain.to_local(camera.project_ray_origin(screen)),terrain.global_basis.inverse()*camera.project_ray_normal(screen))
+	var hit: Variant = terrain.ray_surface_hit(camera.project_ray_origin(screen),camera.project_ray_normal(screen))
+	if hit != null: hit = terrain.to_local(hit)
 	if hit == null: last = Vector2.INF; return
 	var point: Vector2 = Vector2(hit.x,hit.z)+terrain.map_size*0.5
 	if point.x < 0 or point.y < 0 or point.x > terrain.map_size.x or point.y > terrain.map_size.y: last = Vector2.INF; return

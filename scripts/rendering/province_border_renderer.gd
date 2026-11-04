@@ -1,8 +1,13 @@
 extends RefCounted
+const Grid = preload("res://scripts/domain/heightmap_grid.gd")
 const Paths = preload("res://scripts/rendering/province_border_paths.gd")
 const Ribbon = preload("res://scripts/rendering/province_border_ribbon.gdshader")
 const Appearance = preload("res://scripts/domain/border_appearance.gd")
 var appearance: Dictionary = Appearance.DEFAULTS.duplicate()
+var relief_texture: Texture2D
+var relief_amount := 0.0
+var relief_grid := Vector2i.ZERO
+var relief_margin := 1.0
 var geography_heights: Texture2D
 var geography_water: Texture2D
 var _smooth := true
@@ -58,6 +63,7 @@ func update(layer: RefCounted,world_extent: Vector2,enabled: bool) -> void:
 		var material := ShaderMaterial.new()
 		material.shader = Ribbon
 		_bind_geography(material)
+		_bind_relief(material)
 		material.set_shader_parameter("province_field",layer.texture())
 		material.set_shader_parameter("land_border",group.land)
 		material.set_shader_parameter("unassigned_border",group.unassigned)
@@ -69,12 +75,20 @@ func update(layer: RefCounted,world_extent: Vector2,enabled: bool) -> void:
 		var instance := MeshInstance3D.new()
 		instance.name = "Border_" + key.replace("/","_")
 		instance.mesh = mesh
+		instance.extra_cull_margin = relief_margin
 		instance.material_override = material
 		instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		root.add_child(instance)
 func _append(group: Dictionary,pixels: PackedVector2Array,size: Vector2i) -> void:
 	var points := PackedVector2Array()
-	for p in pixels: points.append((p/Vector2(size)-Vector2.ONE*0.5)*extent)
+	for p in pixels:
+		var world := (p/Vector2(size)-Vector2.ONE*0.5)*extent
+		if not points.is_empty():
+			var previous := points[-1]
+			if relief_grid != Vector2i.ZERO:
+				for uv in Grid.split_surface_segment(previous/extent+Vector2.ONE*0.5,world/extent+Vector2.ONE*0.5,relief_grid): points.append((uv-Vector2.ONE*0.5)*extent)
+				continue
+		points.append(world)
 	if points.size() < 2: return
 	var closed := points[0].is_equal_approx(points[-1])
 	var arcs := PackedFloat32Array([0.0])
@@ -120,3 +134,19 @@ func set_geography(texture: Texture2D) -> void:
 func set_water(texture: Texture2D) -> void:
 	geography_water = texture
 	for child in root.get_children(): _bind_geography(child.material_override)
+
+func _bind_relief(material: ShaderMaterial) -> void:
+	material.set_shader_parameter("relief_vertices",relief_texture)
+	material.set_shader_parameter("relief_amount",relief_amount)
+func set_relief(texture: Texture2D, amount: float) -> void:
+	relief_texture = texture
+	relief_amount = amount
+	for child in root.get_children(): _bind_relief(child.material_override)
+func set_relief_grid(size: Vector2i) -> void:
+	if size != relief_grid:
+		relief_grid = size
+		revision = -1
+
+func set_relief_margin(margin: float) -> void:
+	relief_margin = margin
+	for child in root.get_children(): child.extra_cull_margin = margin

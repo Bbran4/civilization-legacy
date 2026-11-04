@@ -102,3 +102,24 @@ static func sample_normal(values: PackedVector3Array, size: Vector2i, uv: Vector
 	var c: Vector3 = values[(y + 1) * size.x + x]
 	var d: Vector3 = values[(y + 1) * size.x + x + 1]
 	return a + (b - a) * fx + (c - a) * fy if fx + fy <= 1.0 else d + (c - d) * (1.0 - fx) + (b - d) * (1.0 - fy)
+
+## Split a UV-space line at every grid edge and triangle diagonal. Returned points
+## exclude a and include b, so consumers can join consecutive segments directly.
+static func split_surface_segment(a: Vector2, b: Vector2, size: Vector2i) -> PackedVector2Array:
+	var start := a*Vector2(size-Vector2i.ONE)
+	var finish := b*Vector2(size-Vector2i.ONE)
+	var times: Array[float] = [1.0]
+	for axis in range(3):
+		var first := start[axis] if axis < 2 else start.x+start.y
+		var last := finish[axis] if axis < 2 else finish.x+finish.y
+		if absf(last-first) < 0.000001: continue
+		for line in range(floori(minf(first,last))+1,ceili(maxf(first,last))):
+			var t := (line-first)/(last-first)
+			if t > 0.000001 and t < 0.999999: times.append(t)
+	times.sort()
+	var result := PackedVector2Array()
+	var previous := -1.0
+	for t in times:
+		if t-previous > 0.000001: result.append(a.lerp(b,t))
+		previous = t
+	return result

@@ -39,8 +39,12 @@ script = ExtResource("1_terrain")
 terrain_template = "Old World"
 map_seed = "1324865"
 surface_smoothing = 0
+map_size = Vector2(1024, 512)
+resolution = 1024
+elevation = 12.0
 land_noise = SubResource("Noise_land")
 mountain_noise = SubResource("Noise_mountains")
+island_enabled = false
 
 [node name="CameraRig" type="Node3D" parent="." unique_id=787485630]
 transform = Transform3D(1, 0, 0, 0, 0.57357645, 0.81915206, 0, -0.81915206, 0.57357645, 0, 0, 0)

@@ -35,6 +35,24 @@ There is no separate painter window or appearance file. The earlier standalone
 painter and its preview renderer have been removed. Texture brushes, biome
 simulation and tree placement are not part of this initial ground-color layer.
 
+## Zoom-based 3D terrain
+
+The full map starts flat and top-down. Zooming from 1× to 3× smoothly tilts the
+camera and raises the terrain; beyond 3× the terrain uses full relief. Right-drag
+to rotate/tilt, middle-drag or WASD to move, and press F to return to the flat
+full-map overview. Raw height inspection stays flat at every zoom.
+
+Paint, rivers/lakes and provinces use the same map coordinates throughout.
+Visible water is raised to saved hydraulic elevations. Ground painting, province
+editing and inspection pick the displayed surface. Borders and brush/split
+previews follow its triangles. Existing saves work without regeneration.
+
+The overview uses a simple plane; close views reuse a prepared relief grid capped
+at 513 samples per longest axis. Full-resolution source heights remain unchanged.
+Fine features smaller than the display grid can be softened; this is a bounded
+mesh implementation, without tiled distance LOD. Lighting retains the shared
+shader's directional relief shading; dynamic cast shadows are not implemented.
+
 ## Storage
 
 Terrain document version 12 includes `map_paint`. Earlier saves load with a
@@ -53,6 +71,10 @@ paints through the editor brush, verifies generation data stays unchanged, check
 undo/lock/visibility, saves and reloads terrain/world JSON, and rejects malformed
 paint. Add `-- --capture` without `--headless` to capture a rendered preview under
 `.test-runtime/`.
+
+`zoom_relief_smoke.gd` additionally checks zoom transitions, displayed-surface
+picking, tilted painting, raw-view restoration, hydraulic elevations, and exact
+triangle splits for draped lines.
 
 The available local test engine is Godot 4.5.1 Mono. The project retains its existing
 4.7 configuration; exact 4.7 behavior has not been verified. Historical reference

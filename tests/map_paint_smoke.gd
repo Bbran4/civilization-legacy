@@ -91,11 +91,14 @@ func _run() -> void:
 	var legacy_bytes := FileAccess.get_file_as_bytes(legacy_path)
 	var migrated := Manifest.load_file(legacy_path)
 	check(migrated.error.is_empty() and migrated.document.layers.size() == 5 and migrated.document.layers[1].id == "paint" and FileAccess.get_file_as_bytes(legacy_path) == legacy_bytes,"Legacy manifest gains paint without modifying source")
-	if "--capture" in OS.get_cmdline_user_args():
+	if "--capture" in OS.get_cmdline_user_args() or "--capture3d" in OS.get_cmdline_user_args():
 		editor._select_layer("paint")
 		terrain.map_paint.begin_stroke()
 		terrain.map_paint.stamp(Vector2(0.5,0.5),terrain.map_size,70,Color("718a52"))
 		terrain.map_paint.refresh()
+		if "--capture3d" in OS.get_cmdline_user_args():
+			editor._camera_rig._zoom = 1.7
+			editor._camera_rig._apply_zoom()
 		await process_frame
 		await RenderingServer.frame_post_draw
 		root.get_texture().get_image().save_png("res://.test-runtime/map-paint-preview.png")

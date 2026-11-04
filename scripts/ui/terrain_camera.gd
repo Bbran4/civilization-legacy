@@ -73,6 +73,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			_zoom *= 1.12 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0 / 1.12
 			_apply_zoom()
 			if anchor != null:
+				var local_anchor: Vector3 = terrain.to_local(anchor)
+				local_anchor.y = terrain.visible_surface_height(Vector2(local_anchor.x,local_anchor.z)/terrain.display_size()+Vector2.ONE*0.5)
+				anchor = terrain.to_global(local_anchor)
 				var after: Variant = Plane(Vector3.UP, anchor.y).intersects_ray(_camera.project_ray_origin(event.position), _camera.project_ray_normal(event.position))
 				if after != null:
 					var shift: Vector3 = anchor - after

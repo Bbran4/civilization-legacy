@@ -1,6 +1,7 @@
 shader_type spatial;
 render_mode unshaded, cull_disabled, depth_draw_never, shadows_disabled;
 #include "res://scripts/rendering/map_geography.gdshaderinc"
+#include "res://scripts/rendering/map_relief.gdshaderinc"
 uniform sampler2D province_field : filter_nearest, repeat_disable;
 uniform bool land_border = true;
 uniform bool unassigned_border = false;
@@ -12,6 +13,7 @@ uniform float reference_width = 1.0;
 uniform float dash_length = 2.4;
 void vertex() {
 	map_uv = UV2;
+	VERTEX.y = relief_height(UV2)+0.06;
 	vec2 normal = COLOR.rg * 2.0 - 1.0;
 	vec4 clip = PROJECTION_MATRIX * MODELVIEW_MATRIX * vec4(VERTEX,1.0);
 	vec4 neighbor = PROJECTION_MATRIX * MODELVIEW_MATRIX * vec4(VERTEX + vec3(normal.x,0.0,normal.y),1.0);
