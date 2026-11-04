@@ -175,16 +175,14 @@ void fragment() {
 	if (provinces_enabled && shaded_relief) {
 		float id = province_id(UV);
 		int zone = int(round(texture(province_field, UV).b * 255.0));
-		// Keep unassigned terrain visually distinct from generated regions:
-		// coastal sea band, impassable land, and ordinary/unassigned water.
-		if (id < 0.5 && zone == 2) color = vec3(0.10, 0.30, 0.46);
-		if (id < 0.5 && zone == 3) color = vec3(0.24, 0.24, 0.27);
-		if (id < 0.5 && zone == 0 && !geographic_land(UV)) color = vec3(0.055, 0.16, 0.24);
+		// Unassigned water has no political overlay. Borders-only preserves the
+		// original material for both assigned and unassigned geography.
+		if (province_fill && id < 0.5 && zone == 3) color = vec3(0.24, 0.24, 0.27);
 		if (id > 0.5) {
 			bool ocean = texelFetch(province_kinds,ivec2(int(id)%256,int(id)/256),0).r > 0.5;
 			vec4 nation = texelFetch(nation_colors,ivec2(int(id)%256,int(id)/256),0);
 			vec3 tint = nation.a > 0.5 ? nation.rgb : province_tint(id);
-			color = ocean ? vec3(0.27, 0.42, 0.61) : (province_fill ? mix(color, tint * (0.65 + value * 0.35), nation.a > 0.5 ? 0.82 : 0.62) : color);
+			if (province_fill) color = ocean ? mix(color,vec3(0.27,0.42,0.61),0.45) : mix(color,tint*(0.65+value*0.35),nation.a > 0.5 ? 0.82 : 0.62);
 			if (!vector_borders) {
 			vec2 border_step = max(texel_size, fwidth(UV) * 1.25);
 			bool edge = province_id(UV + vec2(border_step.x, 0.0)) != id || province_id(UV + vec2(0.0, border_step.y)) != id;
@@ -207,12 +205,9 @@ void fragment() {
 	if (provinces_enabled && shaded_relief && vector_borders) color = mix(color,vec3(0.055,0.065,0.07),geographic_outline(UV));
 	ALBEDO = color;
 	float shadow_weight = shaded_relief ? map_shadow_strength*relief_amount : 0.0;
-	// Keep political colors legible while retaining relief/cast-shadow depth.
-	if (provinces_enabled) shadow_weight *= 0.7;
 	EMISSION = color*(1.0-shadow_weight);
 }
 void light() {
 	float strength = shaded_relief ? map_shadow_strength*relief_amount : 0.0;
-	if (provinces_enabled) strength *= 0.7;
 	if (LIGHT_IS_DIRECTIONAL) DIFFUSE_LIGHT += vec3(strength*ATTENUATION);
 }

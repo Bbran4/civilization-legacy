@@ -35,6 +35,12 @@ variation** chooses a new reproducible variation without touching geography or
 manual paint. Choose **Borders only** in Provinces to inspect the full terrain
 appearance without political-color fills.
 
+Ocean provinces preserve the original water colors in **Borders only** mode.
+With fills enabled, only assigned sea provinces receive a tint; unassigned water
+always keeps its original depth colors. Large enclosed sea-level basins also
+support ocean provinces. For older worlds flooded as a lake, regenerate rivers/
+lakes, terrain surface and provinces, then generate ocean borders.
+
 Textures sit beneath manual paint, water and province overlays, work in both the
 flat overview and 3D relief, and save with the world. Ground paint visibility and
 locking apply to generated textures too. Raw-height view and height exports remain
@@ -95,7 +101,7 @@ model dependencies. There is no manual tree-planting/erasing brush yet.
 Terrain and trees share warm sunlight and cool sky fill in the editor and gameplay.
 Mountains and individual trees cast real sun shadows over the displayed terrain.
 Valleys also receive subtle local shading. Shadows fade in with 3D relief; the
-flat overview skips shadow rendering. Political fills use a gentler shadow strength.
+flat overview skips shadow rendering. Province visibility never changes shadow strength.
 Oblique views gain a light distance haze; the top-down overview stays clear.
 Water uses a calmer palette with a depth gradient for open sea. Province fills
 and border lines retain their readability, and raw-height inspection stays neutral.

@@ -1224,7 +1224,7 @@ func _build_province_controls() -> void:
 	_coastal_reach.step = 4
 	_coastal_reach.value = 64
 	_form.add_child(_coastal_reach)
-	_label("Light-blue coastal sea zones have borders. Dark-blue open ocean stays continuous and unassigned.", 12).autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_label("Coastal provinces stop at the selected reach. Unassigned water keeps its original colors. Borders only preserves all water colors. Large enclosed seas also support ocean provinces.", 12).autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_button("Generate ocean borders", generate_ocean_borders, null, "GenerateOceans")
 	_label("Click the map to inspect and name a land or ocean region.").autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_province_name = LineEdit.new()

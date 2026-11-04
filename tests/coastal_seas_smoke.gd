@@ -137,7 +137,11 @@ func _run() -> void:
 		check(player.province_layer.ids == terrain.province_layer.ids and player.province_layer.sea_mask == terrain.province_layer.sea_mask, "Gameplay uses identical coastal zones and borderless open-ocean mask.")
 		var image := root.get_texture().get_image()
 		if not output.is_empty(): image.save_png(output.path_join("coastal-seas-gameplay.png"))
-		# Project actual raster samples into the GPU capture to verify the two sea colors.
+		toggle.button_pressed = false
+		for frame in range(3): await process_frame
+		await RenderingServer.frame_post_draw
+		var original_image := root.get_texture().get_image()
+		# Compare against actual water artwork, not a hardcoded political backdrop.
 		var camera: Camera3D = editor._gameplay_map.get_node("CameraRig/Camera3D")
 		var blue := 0
 		var dark := 0
@@ -150,9 +154,11 @@ func _run() -> void:
 				var screen := Vector2i(camera.unproject_position(player.to_global(Vector3(local.x, 0, local.y))))
 				if screen.x < 0 or screen.y < 50 or screen.x >= image.get_width() or screen.y >= image.get_height(): continue
 				var c := image.get_pixelv(screen)
-				if player.province_layer.ids[i] == 0 and Vector3(c.r,c.g,c.b).distance_to(Vector3(0.16,0.21,0.27)) < 0.035: dark += 1
-				if player.province_layer.ids[i] > 0 and Vector3(c.r,c.g,c.b).distance_to(Vector3(0.27,0.42,0.61)) < 0.035: blue += 1
-		check(blue > 20 and dark > 20, "Actual GPU output has light coastal sea and uniform dark open ocean.")
+				var original_color := original_image.get_pixelv(screen)
+				var delta := Vector3(c.r-original_color.r,c.g-original_color.g,c.b-original_color.b).length()
+				if player.province_layer.ids[i] == 0 and delta < 0.005: dark += 1
+				if player.province_layer.ids[i] > 0 and delta > 0.02: blue += 1
+		check(blue > 20 and dark > 20, "Gameplay colors assigned seas and preserves original unassigned water colors.")
 		editor._return_from_map()
 		await process_frame
 	world.queue_free()

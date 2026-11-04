@@ -2,6 +2,7 @@ extends RefCounted
 ## Independently generated water artwork. Routing elevations never edit terrain.
 const FloatPayload = preload("res://scripts/storage/float_payload.gd")
 const Grid = preload("res://scripts/domain/heightmap_grid.gd")
+const Seas = preload("res://scripts/domain/sea_coverage.gd")
 const DEFAULTS = {"routing_resolution": 513, "density": 1.0, "width": 1.5, "lake_depth": 0.01, "lake_area": 0.01}
 const RIVER_COLOR = Color("397fa8")
 const LAKE_COLOR = Color("286789")
@@ -134,23 +135,7 @@ func _route() -> void:
 	filled = bed.duplicate()
 	downstream.resize(count)
 	downstream.fill(-1)
-	ocean.resize(count)
-	ocean.fill(0)
-	var queue := PackedInt32Array()
-	for y in range(routing_size.y):
-		for x in range(routing_size.x):
-			var i := y * routing_size.x + x
-			if (x == 0 or y == 0 or x == routing_size.x - 1 or y == routing_size.y - 1) and bed[i] < SEA:
-				ocean[i] = 1
-				queue.append(i)
-	var cursor := 0
-	while cursor < queue.size():
-		var i := queue[cursor]
-		cursor += 1
-		for neighbor in _neighbors(i):
-			if ocean[neighbor] == 0 and bed[neighbor] < SEA:
-				ocean[neighbor] = 1
-				queue.append(neighbor)
+	ocean = Seas.mask(bed,routing_size,SEA)
 	_seen = ocean.duplicate()
 	_heap.clear()
 	_order.clear()

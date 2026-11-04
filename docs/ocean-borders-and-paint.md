@@ -6,10 +6,10 @@ After generating Heightmap, Rivers / lakes, Terrain surface and land Provinces:
 
 1. In Provinces, choose Target ocean regions (1-256).
 2. Choose Coastal seas + borderless open ocean, then Generate ocean borders.
-   Coastal sea reach limits the light-blue bordered envelope. Deep ocean receives
-   no IDs or borders; see [Coastal seas](coastal-seas.md). Sea connected to a map edge is partitioned into
-   connected ocean regions, following the exact existing coastline. Explicit lake
-   pixels and enclosed inland water remain excluded.
+   Coastal reach limits the assigned envelope. Deep ocean receives no IDs or
+   borders; see [Coastal seas](coastal-seas.md). Edge-connected water and large
+   enclosed sea-level basins are partitioned using the same workflow. Ordinary
+   generated lakes and smaller inland-water basins remain separate.
 3. Click an ocean region to inspect/name it just like a land province. The optional
    Provinces view in Play map presents the same land and ocean IDs.
 
@@ -18,8 +18,10 @@ Running it again replaces only ocean IDs/names/borders. Regenerating land provin
 still replaces the entire region layer. The target count is approximate because
 separate ocean components can require additional regions. Ocean regions are a
 political/map-data overlay, not a modification to elevation or water generation.
-Sea colors and borders appear only with Provinces visible; terrain-only relief is
-unchanged. Borders maintain readable screen width when the map is zoomed out.
+Original water colors remain visible in unassigned water and throughout Borders
+only mode. Filled mode tints assigned seas only. Large enclosed sea-level basins
+use the same ocean province workflow; see [current sea rules](coastal-seas.md).
+Borders maintain readable screen width when the map is zoomed out.
 
 ## Paint a border
 

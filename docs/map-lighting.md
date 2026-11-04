@@ -24,7 +24,8 @@ pixels; bias/normal bias avoid the visible stripes observed with lower bias on
 flat ground. The camera fits shadow distance to its existing depth range, turns
 shadow rendering off in flat/raw overview, and restores it in relief. Shadow
 opacity blends with relief. Maximum attenuation is 52% for ground/foliage and
-36.4% for political fills. Separate unshaded border ribbons remain crisp. This
+political fills alike, so toggling provinces cannot change the underlying water's
+shadow brightness in borders-only or unassigned areas. Border ribbons remain crisp. This
 adds an actual shadow rendering pass; large-world frame-time cost is unmeasured.
 
 Distance haze blends at most 10%, reduced by the viewing angle and relief blend.

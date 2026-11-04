@@ -1,6 +1,8 @@
 extends RefCounted
 ## Independent connected land regions over the final terrain; no scenario ownership.
 const Payload = preload("res://scripts/storage/float_payload.gd")
+const Seas = preload("res://scripts/domain/sea_coverage.gd")
+var enclosed_seas := true
 var source_hash := ""
 var size := Vector2i.ZERO
 var ids := PackedInt32Array()
@@ -37,6 +39,7 @@ func generate(base: PackedFloat32Array, surface: RefCounted, water: RefCounted, 
 	ocean_generated = false
 	inland_generated = false
 	land_includes_sea_datum = false
+	enclosed_seas = true
 	sea_mask.clear()
 	impassable.clear()
 	records.clear()
@@ -294,10 +297,10 @@ func snapshot() -> Dictionary:
 	var blocked_values := PackedFloat32Array()
 	blocked_values.resize(impassable.size())
 	for i in range(impassable.size()): blocked_values[i] = impassable[i]
-	return {"version": 8, "inland_generated":inland_generated, "land_includes_sea_datum":land_includes_sea_datum, "nations":nations.duplicate(true), "impassable": Payload.encode(blocked_values) if not blocked_values.is_empty() else null, "coastal_reach": coastal_reach, "sea_mask": Payload.encode(sea_values) if not sea_values.is_empty() else null, "ocean_style": ocean_style, "ocean_generated": ocean_generated, "requested_oceans": requested_oceans, "source_hash": source_hash, "size": [size.x, size.y], "requested_count": requested_count, "ids": Payload.encode(values), "records": records.duplicate(true)}
+	return {"version": 9, "enclosed_seas":enclosed_seas, "inland_generated":inland_generated, "land_includes_sea_datum":land_includes_sea_datum, "nations":nations.duplicate(true), "impassable": Payload.encode(blocked_values) if not blocked_values.is_empty() else null, "coastal_reach": coastal_reach, "sea_mask": Payload.encode(sea_values) if not sea_values.is_empty() else null, "ocean_style": ocean_style, "ocean_generated": ocean_generated, "requested_oceans": requested_oceans, "source_hash": source_hash, "size": [size.x, size.y], "requested_count": requested_count, "ids": Payload.encode(values), "records": records.duplicate(true)}
 static func decode(data: Variant) -> Dictionary:
 	if data == null: return {"error": "", "layer": null}
-	if not data is Dictionary or data.get("version") not in [1, 1.0, 2, 2.0, 3, 3.0, 4, 4.0, 5, 5.0, 6, 6.0, 7, 7.0, 8, 8.0] or not data.get("source_hash") is String or data.source_hash.length() != 64 or not data.get("size") is Array or data.size.size() != 2 or not data.get("records") is Array or data.records.size() > 65535:
+	if not data is Dictionary or data.get("version") not in [1, 1.0, 2, 2.0, 3, 3.0, 4, 4.0, 5, 5.0, 6, 6.0, 7, 7.0, 8, 8.0, 9, 9.0] or not data.get("source_hash") is String or data.source_hash.length() != 64 or not data.get("size") is Array or data.size.size() != 2 or not data.get("records") is Array or data.records.size() > 65535:
 		return {"error": "Invalid province document."}
 	for v in data.size:
 		if not (v is int or v is float) or not is_finite(float(v)) or v != int(v) or v < 3 or v > 2050: return {"error": "Invalid province dimensions."}
@@ -309,6 +312,10 @@ static func decode(data: Variant) -> Dictionary:
 	layer.size = Vector2i(data.size[0], data.size[1])
 	layer.source_hash = data.source_hash
 	layer.land_includes_sea_datum = true
+	layer.enclosed_seas = false
+	if int(data.version) >= 9:
+		if not data.get("enclosed_seas") is bool: return {"error":"Invalid enclosed-sea policy."}
+		layer.enclosed_seas = data.enclosed_seas
 	if int(data.version) >= 8:
 		if not data.get("land_includes_sea_datum") is bool: return {"error":"Invalid sea-datum ownership policy."}
 		layer.land_includes_sea_datum = data.land_includes_sea_datum
@@ -373,7 +380,7 @@ static func decode(data: Variant) -> Dictionary:
 func validate_coverage(samples: PackedFloat32Array, land_datum: float, water: RefCounted) -> String:
 	if samples.size() != ids.size() or water.mask_size != size:
 		return "Province coverage dimensions do not match terrain."
-	var classes := classify(samples, land_datum, water.mask_bytes, size, land_includes_sea_datum)
+	var classes := classify(samples, land_datum, water.mask_bytes, size, land_includes_sea_datum, enclosed_seas)
 	var band := coastal_band(classes, size, coastal_reach) if ocean_generated and ocean_style == "coastal_band" else PackedByteArray()
 	for i in range(ids.size()):
 		var expected: int = classes[i]
@@ -389,11 +396,19 @@ func validate_coverage(samples: PackedFloat32Array, land_datum: float, water: Re
 		if actual != expected: return "Region coverage must keep land, ocean, inland water and generated lakes separate."
 	return ""
 
-static func classify(samples: PackedFloat32Array, datum: float, mask: PackedByteArray, dimensions: Vector2i, include_datum_as_land: bool = false) -> PackedByteArray:
+static func classify(samples: PackedFloat32Array, datum: float, mask: PackedByteArray, dimensions: Vector2i, include_datum_as_land: bool = false, regional_seas: bool = true) -> PackedByteArray:
 	# Compare in the source float32 domain, matching the shader sea threshold.
 	if not include_datum_as_land: datum = PackedFloat32Array([datum])[0]
 	var classes := PackedByteArray()
 	classes.resize(samples.size())
+	if regional_seas:
+		var sea := Seas.mask(samples,dimensions,datum,not include_datum_as_land)
+		for i in range(samples.size()):
+			# A legacy lake mask cannot turn a sea-level regional sea into a lake.
+			if sea[i] == 2 or (sea[i] != 0 and mask[i*4+1] == 0): classes[i] = 2
+			elif mask[i*4+1] != 0: classes[i] = 0
+			else: classes[i] = 1 if samples[i] > datum or (include_datum_as_land and samples[i] == datum) else 3
+		return classes
 	var queue := PackedInt32Array()
 	for i in range(samples.size()):
 		if mask[i * 4 + 1] > 0: continue
@@ -426,6 +441,7 @@ func editable_copy() -> RefCounted:
 	copy.ocean_generated = ocean_generated
 	copy.inland_generated = inland_generated
 	copy.land_includes_sea_datum = land_includes_sea_datum
+	copy.enclosed_seas = enclosed_seas
 	copy.requested_oceans = requested_oceans
 	copy.ocean_style = ocean_style
 	copy.coastal_reach = coastal_reach
@@ -435,7 +451,10 @@ func editable_copy() -> RefCounted:
 
 func generate_oceans(base: PackedFloat32Array, water: RefCounted, count: int = 24, style: String = "coastal_band", reach: float = 64.0) -> String:
 	if not is_finite(reach) or reach < 8 or reach > 256 or style not in ["open", "coastal", "coastal_band"] or count < 1 or count > 256 or base.size() != ids.size() or water.mask_size != size: return "Invalid ocean region inputs."
-	var classes := classify(base, 0.2, water.mask_bytes, size, land_includes_sea_datum)
+	enclosed_seas = true
+	var classes := classify(base, 0.2, water.mask_bytes, size, land_includes_sea_datum, enclosed_seas)
+	for i in range(ids.size()):
+		if classes[i] == 2 and ids[i] > 0 and records[ids[i]-1].kind == "inland_water": ids[i] = 0
 	var inland_error := _generate_inland(classes)
 	if not inland_error.is_empty(): return inland_error
 	var band := coastal_band(classes, size, reach) if style == "coastal_band" else PackedByteArray()
