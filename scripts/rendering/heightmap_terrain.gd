@@ -21,6 +21,8 @@ var water_source_hash := ""
 const HeightDetail = preload("res://scripts/domain/heightmap_detail.gd")
 const MapRenderer = preload("res://scripts/rendering/terrain_map_renderer.gd")
 const TerrainDocument = preload("res://scripts/storage/terrain_document.gd")
+const Texturing = preload("res://scripts/domain/terrain_texturing.gd")
+var texture_settings: Dictionary = Texturing.DEFAULTS.duplicate()
 var map_paint = preload("res://scripts/domain/map_paint.gd").new()
 var paint_layer_visible := true
 var map_renderer: RefCounted
@@ -544,6 +546,7 @@ func water_layer_current() -> bool:
 
 func refresh_water_layer() -> void:
 	if heightmap_only and map_renderer != null:
+		map_renderer.set_texturing(texture_settings,map_seed,paint_layer_visible)
 		var derived := terrain_surface_current() and surface_layer_visible and shaded_relief
 		map_renderer.set_terrain_surface(terrain_surface, derived)
 		map_renderer.set_paint(map_paint, paint_layer_visible)
@@ -629,3 +632,10 @@ func point_info(point: Vector2) -> Dictionary:
 
 func visible_surface_height(uv: Vector2) -> float:
 	return map_renderer.visible_height(uv) if map_renderer != null else 0.0
+
+func apply_automatic_textures(settings: Dictionary) -> String:
+	var error := Texturing.validate(settings)
+	if not error.is_empty(): return error
+	texture_settings = settings.duplicate()
+	refresh_water_layer()
+	return ""

@@ -1,4 +1,8 @@
 extends Node
+const Texturing = preload("res://scripts/domain/terrain_texturing.gd")
+var texture_enabled: CheckBox
+var texture_controls: Dictionary = {}
+var texture_status: Label
 var editor: Control
 var enabled: CheckBox
 var radius: SpinBox
@@ -9,7 +13,32 @@ var last := Vector2.INF
 func configure(owner_editor: Control) -> void:
 	editor = owner_editor
 	editor._label("Ground paint",22)
-	editor._label("Paint over terrain shading. Water and province overlays stay above it.",13).autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	editor._label("Automatic ground textures",16)
+	texture_enabled = CheckBox.new()
+	texture_enabled.name = "AutomaticTextures"
+	texture_enabled.text = "Auto-generate terrain textures"
+	editor._form.add_child(texture_enabled)
+	for entry in [["Variation seed","variation",0,2147483647,1],["Texture scale","scale",1,32,0.5],["Grass cover (%)","grass_cover",0,100,1],["Rock slope (°)","rock_angle",15,75,1],["Snow height (%)","snow_height",35,100,1]]:
+		var row: HBoxContainer = editor._row(entry[0])
+		var control := SpinBox.new()
+		control.name = "Texture_"+entry[1]
+		control.custom_minimum_size.x = 125
+		control.select_all_on_focus = true
+		control.min_value = entry[2]
+		control.max_value = entry[3]
+		control.step = entry[4]
+		control.value = Texturing.DEFAULTS[entry[1]]
+		row.add_child(control)
+		texture_controls[entry[1]] = control
+	editor._button("Generate textures",func(): apply_textures(true),null,"GenerateTextures")
+	editor._button("New texture variation",new_texture_variation,null,"NewTextureVariation")
+	texture_status = editor._label("",12)
+	texture_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	texture_enabled.toggled.connect(func(_value: bool):
+		if not editor._syncing: apply_textures(false))
+	editor._label("Grass, soil, sand, rock and snow follow the terrain automatically. Manual paint stays above them. Choose Borders only in Provinces to see the terrain without political colors.",12).autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	editor._label("Manual ground paint",16)
+	editor._label("Paint over generated textures. Water and province overlays stay above it.",13).autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	enabled = CheckBox.new()
 	enabled.text = "Enable ground brush"
 	editor._form.add_child(enabled)
@@ -77,3 +106,36 @@ func _apply(screen: Vector2) -> void:
 	terrain.map_paint.refresh()
 	last = point
 	editor.mark_dirty()
+
+func sync_textures() -> void:
+	var settings: Dictionary = editor._terrain.texture_settings
+	texture_enabled.set_pressed_no_signal(settings.enabled)
+	for key in texture_controls: texture_controls[key].set_value_no_signal(settings[key])
+	texture_status.text = "Automatic textures ready · variation %d" % settings.variation if settings.enabled else "Automatic textures off · original shading is visible."
+
+func apply_textures(force_enable: bool = true) -> void:
+	if not editor.can_edit("paint"):
+		texture_status.text = "Show and unlock Ground paint before changing textures."
+		texture_enabled.set_pressed_no_signal(editor._terrain.texture_settings.enabled)
+		return
+	_commit_textures(_read_texture_settings(force_enable))
+
+func _read_texture_settings(force_enable: bool) -> Dictionary:
+	var settings: Dictionary = Texturing.DEFAULTS.duplicate()
+	for key in texture_controls:
+		texture_controls[key].apply()
+		settings[key] = int(texture_controls[key].value) if key == "variation" else float(texture_controls[key].value)
+	settings.enabled = force_enable or texture_enabled.button_pressed
+	return settings
+
+func _commit_textures(settings: Dictionary) -> void:
+	var error: String = editor._terrain.apply_automatic_textures(settings)
+	if not error.is_empty(): texture_status.text = error; return
+	sync_textures()
+	editor.mark_dirty()
+
+func new_texture_variation() -> void:
+	if not editor.can_edit("paint"): apply_textures(true); return
+	var settings := _read_texture_settings(true)
+	settings.variation = (int(settings.variation)+1) % 2147483648
+	_commit_textures(settings)

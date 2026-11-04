@@ -1,5 +1,8 @@
 extends RefCounted
 ## Shared terrain presentation for authoring and runtime maps; no editor dependency.
+const Texturing = preload("res://scripts/domain/terrain_texturing.gd")
+const TextureLibrary = preload("res://scripts/rendering/procedural_ground_textures.gd")
+var _ground_library: RefCounted
 const Grid = preload("res://scripts/domain/heightmap_grid.gd")
 const MAX_RELIEF_CELLS = 512
 const Borders = preload("res://scripts/rendering/province_border_renderer.gd")
@@ -50,6 +53,7 @@ func set_heightfield(samples: PackedFloat32Array, size: Vector2i, extent: Vector
 	_height_size = size
 	_height_offset = height_offset
 	_elevation = elevation
+	material.set_shader_parameter("ground_height_scale",elevation*maxf(extent.x,extent.y)/192.0)
 	_datum = 0.2 if generator_version >= 3 else 0.0
 	_relief_dirty = true
 	_surface_layer = null
@@ -201,3 +205,19 @@ func visible_height(uv: Vector2) -> float:
 
 func visible_bounds() -> Vector2:
 	return mesh_bounds*visible_relief if shaded_relief else Vector2.ZERO
+
+func set_texturing(settings: Dictionary, world_seed: String, visible: bool) -> String:
+	var error := Texturing.validate(settings)
+	if not error.is_empty(): return error
+	var enabled: bool = settings.enabled and visible
+	material.set_shader_parameter("textures_enabled",enabled)
+	if not enabled: return ""
+	var key := world_seed+"/"+str(int(settings.variation))
+	if _ground_library == null or _ground_library.key != key:
+		_ground_library = TextureLibrary.new(world_seed,int(settings.variation))
+		for kind in _ground_library.textures: material.set_shader_parameter("ground_"+kind,_ground_library.textures[kind])
+	material.set_shader_parameter("ground_scale",settings.scale)
+	material.set_shader_parameter("ground_grass_cover",settings.grass_cover/100.0)
+	material.set_shader_parameter("ground_rock_slope",tan(deg_to_rad(settings.rock_angle)))
+	material.set_shader_parameter("ground_snow_line",settings.snow_height/100.0)
+	return ""

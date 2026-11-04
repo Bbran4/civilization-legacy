@@ -1,6 +1,7 @@
 extends RefCounted
 ## Versioned terrain-only documents. Parse and validate completely before applying.
 
+const Texturing = preload("res://scripts/domain/terrain_texturing.gd")
 const MapPaint = preload("res://scripts/domain/map_paint.gd")
 const BorderAppearance = preload("res://scripts/domain/border_appearance.gd")
 const WorldProvinces = preload("res://scripts/domain/world_provinces.gd")
@@ -8,7 +9,7 @@ const TerrainSurface = preload("res://scripts/domain/terrain_surface.gd")
 const WaterLayer = preload("res://scripts/domain/terrain_water_layer.gd")
 const Geography = preload("res://scripts/domain/terrain_geography.gd")
 const Recipe = preload("res://scripts/domain/heightmap_recipe.gd")
-const VERSION: int = 12
+const VERSION: int = 13
 const MAX_BYTES: int = 256 * 1024 * 1024
 const NUMBERS: Dictionary = {
 
@@ -65,6 +66,7 @@ static func capture(terrain: Node) -> Dictionary:
 	return {"format": "civilization-legacy-terrain", "version": VERSION,
 		"border_appearance": terrain.border_appearance.duplicate(),
 		"map_paint": terrain.map_paint.snapshot(),
+		"texture_settings": terrain.texture_settings.duplicate(),
 		"province_layer": terrain.province_layer.snapshot() if terrain.province_layer != null else null,
 		"terrain_surface": terrain.terrain_surface.snapshot() if terrain.terrain_surface != null else null,
 		"water_layer": terrain.water_layer.snapshot() if terrain.water_layer != null else null,
@@ -78,9 +80,12 @@ static func validate(document: Variant) -> String:
 	if not document is Dictionary:
 		return "The file must contain a terrain document object."
 	if document.get("format") != "civilization-legacy-terrain" or not _within(document.get("version"), [1, VERSION, true]):
-		return "This is not a supported Civilization Legacy terrain file (versions 1–12)."
+		return "This is not a supported Civilization Legacy terrain file (versions 1–13)."
 	if not _within(document.get("generator_version"), [1, 4, true]):
 		return "The terrain generator version is unsupported."
+	if document.version >= 13 and document.get("texture_settings") == null: return "Missing automatic terrain texture settings."
+	var texture_error := Texturing.validate(document.get("texture_settings",Texturing.legacy_defaults()))
+	if not texture_error.is_empty(): return texture_error
 	if document.version >= 12 and document.get("map_paint") == null: return "Missing ground paint layer."
 	var paint := MapPaint.decode(document.get("map_paint"))
 	if not paint.error.is_empty(): return paint.error
@@ -186,6 +191,7 @@ static func apply(terrain: Node, document: Dictionary) -> String:
 		return surface_cache.error
 	var water: Dictionary = WaterLayer.decode(document.get("water_layer"))
 	var detail: Dictionary = document.get("heightmap_detail", {"coast": 0.75, "mountains": 0.8})
+	terrain.texture_settings = document.get("texture_settings",Texturing.legacy_defaults()).duplicate()
 	terrain.map_paint = MapPaint.decode(document.get("map_paint")).layer
 	terrain.border_appearance = document.get("border_appearance",BorderAppearance.DEFAULTS).duplicate()
 	terrain.province_layer = province_cache.layer

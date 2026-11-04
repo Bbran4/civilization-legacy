@@ -324,6 +324,7 @@ func _button(title: String, action: Callable, parent: Node = null, node_name: St
 
 func _sync_from_terrain() -> void:
 	_syncing = true
+	_paint_brush.sync_textures()
 	_sync_border_appearance_controls()
 	if _terrain.heightmap_only:
 		if _province_count != null and _terrain.province_layer != null:

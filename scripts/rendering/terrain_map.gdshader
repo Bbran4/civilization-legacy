@@ -23,6 +23,7 @@ uniform sampler2D province_field : filter_nearest, repeat_disable;
 uniform sampler2D nation_colors : source_color, filter_nearest, repeat_disable;
 uniform bool smooth_borders = true;
 uniform sampler2D province_kinds : filter_nearest, repeat_disable;
+#include "res://scripts/rendering/automatic_ground.gdshaderinc"
 float sample_id(vec2 at) {
     vec2 c = round(texture(province_field, at).rg * 255.0);
     return c.r + c.g * 256.0;
@@ -133,6 +134,10 @@ void fragment() {
 		value = h < 0.2 ? h * 0.35 : clamp(0.25 + h * 0.7, 0.0, 1.0) * light;
 	}
 	vec3 color = height_enabled ? vec3(value) : vec3(0.02);
+	if (textures_enabled && shaded_relief) {
+		// Generated lake water remains an overlay: hiding it reveals the textured bed.
+		color = texture(geography_heights,UV).r > 0.2 ? automatic_ground(UV,h,value) : vec3(0.055,0.16,0.24);
+	}
 	// Appearance is above the height/surface shading and below every overlay.
 	if (paint_enabled && shaded_relief && geographic_land(UV)) {
 		vec4 paint = texture(paint_field,UV);

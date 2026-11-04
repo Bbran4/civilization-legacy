@@ -5,7 +5,7 @@ Godot world generation with layered map authoring.
 ## World layers
 
 - **Heightmap** — seeded terrain, templates, imported heightmaps and grayscale export.
-- **Ground paint** — an independent color layer over terrain shading.
+- **Ground paint** — automatic terrain textures with an independent manual color overlay.
 - **Rivers / lakes** — generated drainage and hydraulic elevations.
 - **Terrain surface** — the combined heightmap and hydraulic beds/banks.
 - **Provinces** — land, enclosed inland-water and maritime regions, borders and nation assignments.
@@ -20,6 +20,28 @@ connected water body when provinces are generated. Generated hydraulic lakes
 remain separate. For an existing map, **Generate ocean borders** also fills missing
 inland-water provinces while preserving existing land and inland-water IDs.
 A full province rebuild replaces IDs and authored names, as before.
+
+## Automatic terrain textures
+
+New worlds automatically generate seamless grass, soil, sand, rock and snow
+materials from the world seed. Placement follows terrain slope and elevation,
+shorelines and nearby water. These are visual rules, not a climate simulation.
+
+For an existing save, select **Ground paint → Generate textures**. Earlier saves
+keep their original appearance until you enable generation. Adjust texture scale,
+grass amount, rock slope or snow height, then generate again. **New texture
+variation** chooses a new reproducible variation without touching geography or
+manual paint. Choose **Borders only** in Provinces to inspect the full terrain
+appearance without political-color fills.
+
+Textures sit beneath manual paint, water and province overlays, work in both the
+flat overview and 3D relief, and save with the world. Ground paint visibility and
+locking apply to generated textures too. Raw-height view and height exports remain
+grayscale. Erasing manual paint reveals the generated textures below it.
+
+Only five small material tiles are generated; their mipmaps filter distant detail.
+Zooming and panning reuse the cached tiles. Source terrain changes automatically
+update placement, without baking or storing a world-sized texture image.
 
 ## Painting
 
@@ -38,8 +60,7 @@ paint and its visibility/lock state. Gameplay uses the same renderer and saved
 paint. Saves retain backups; world saves reference uniquely named terrain snapshots.
 
 There is no separate painter window or appearance file. The earlier standalone
-painter and its preview renderer have been removed. Texture brushes, biome
-simulation and tree placement are not part of this initial ground-color layer.
+painter and its preview renderer have been removed. Manual texture brushes, climate-based biomes and tree placement are not included.
 
 ## Zoom-based 3D terrain
 
@@ -61,7 +82,8 @@ shader's directional relief shading; dynamic cast shadows are not implemented.
 
 ## Storage
 
-Terrain document version 12 includes `map_paint`. Earlier saves load with a
+Terrain document version 13 includes `texture_settings`; missing settings in older
+saves default to disabled. Version 12 introduced `map_paint`. Earlier saves load with a
 transparent paint layer. World manifest version 5 includes the independent paint
 layer; earlier manifests gain it in memory without rewriting the original file.
 Retired legacy climate/tree/texture-palette metadata is ignored.
