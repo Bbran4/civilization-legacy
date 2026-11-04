@@ -12,8 +12,8 @@ from the world seed, variation, current source-height fingerprint, current water
 fingerprint and effective texture snow/rock limits. A deterministic permutation
 visits jittered cells throughout the map, preventing early-budget bias toward one
 edge. Per-cell seeds keep candidate transforms independent of rejection order.
-Noise makes forest patches; a spatial hash prevents crowded trunks/crowns. Broadleaf
-and conifer selection now follows shared regional warmth and elevation. Regional
+Noise makes forest patches; a spatial hash prevents crowded trunks/crowns. Seven
+species follow shared regional warmth, moisture and elevation. Regional
 moisture and warmth reduce tree suitability in arid or very cold areas. Local
 tree/snow limits fall in colder regions, keeping forests below the textured snowline.
 The shared field is owned by `domain/world_regions.gd`, not recomputed forest noise.
@@ -43,9 +43,18 @@ newly changed geography.
 
 ## Rendering and bounds
 
-Original low-poly meshes are built in code by `forest_meshes.gd`. Broadleaf and
-conifer instances are batched by species into an 8×8 spatial grid (at most 128
-MultiMesh draws), allowing chunk culling in close views. Per-instance color is
+Original low-poly meshes are built in code by `forest_meshes.gd`: oak, spruce,
+birch, stone pine, olive, acacia and palm. Each has distinct trunk/crown geometry;
+palm fronds use solid double-faced triangles rather than alpha-textured cards.
+The shared static mesh library contains 1,354 triangles total, maximum 246 per
+species mesh, as checked on the installed engine. `domain/tree_species.gd` owns
+smooth regional selection weights. Species are stylized, not geographic claims.
+
+Instances are batched by species into a 4×4 spatial grid (at most 112 MultiMesh
+draws), allowing chunk culling in close views. This replaces the old two-species
+8×8 grid to avoid multiplying the old draw-call limit by the species count.
+The culling grid is coarser; actual large-world frame-time cost is unmeasured.
+Per-instance color is
 explicitly initialized; vertex colors are passed explicitly to the fragment stage
 for Compatibility rendering. A shared material applies mild wind and directional
 shading. Tree batches cast dynamic directional shadows using their actual meshes
@@ -53,8 +62,12 @@ and displaced roots; ground and foliage receive them through the shared shadow
 light pass. Hidden overview batches do not cast shadows. See `map-lighting.md`.
 
 The forest shader uses the renderer's shared relief grid for root heights. Instance
-scale is accounted for, so roots do not float as the map rises/flattens. Culling
-bounds include crowns, wind and terrain relief.
+scale is accounted for, so roots do not float as the map rises/flattens. Instances
+vary in uniform size (0.70–1.30), shader height (0.82–1.25), width (0.86–1.15), lean,
+rotation, shade and wind. Normals account for height/width deformation. Culling
+bounds derive from each mesh plus its maximum shader deformation and wind;
+clearance uses the largest species envelope before climate selection to retain
+local-edit stability and protect water. Crowns may overlap in a forest.
 
 Orthographic zoom uses the nominal tree size in screen pixels: at 4 pixels or
 smaller all tree batches are hidden, at 12 pixels or larger they are fully visible,
@@ -96,3 +109,11 @@ Testing uses the locally available Godot 4.5.1 Mono/OpenGL Compatibility engine;
 exact project-target 4.7 behavior remains unverified. The engine emits certificate
 store and generic OpenGL startup diagnostics in this environment. The complete
 historical suite is not claimed.
+
+Tree-variety verification: `tree_variety_smoke.gd` checks bounded mesh geometry,
+shared resources, maximum deformed envelopes, regional mixes, an actual forest
+containing all seven species, the 112-batch cap and deterministic JSON reload.
+Its GPU gallery is `.test-runtime/tree-species-gallery.png`, with three size/shape
+examples per species. Variety, forest and cast-shadow GPU checks passed; regional
+editing/locality checks passed headless on the stated engine. No new saved settings
+are required; existing enabled forests derive the new species on reload/generation.

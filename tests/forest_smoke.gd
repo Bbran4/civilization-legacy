@@ -71,7 +71,7 @@ func _run() -> void:
 	editor._select_layer("trees")
 	var forest = terrain.forest_view
 	check(forest.positions.size() > 20 and forest.positions.size() <= 800,"Suitable ground receives a bounded forest")
-	check(forest.attempts <= forest.MAX_ATTEMPTS and forest.get_child_count() <= 128,"Candidate work and GPU batches are bounded")
+	check(forest.attempts <= forest.MAX_ATTEMPTS and forest.get_child_count() <= 112,"Candidate work and GPU batches are bounded")
 	var positions: PackedVector2Array = forest.positions.duplicate()
 	var scales: PackedFloat32Array = forest.scales.duplicate()
 	var kinds: PackedByteArray = forest.kinds.duplicate()

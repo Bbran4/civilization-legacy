@@ -1,11 +1,15 @@
 extends Node3D
 const Meshes = preload("res://scripts/rendering/forest_meshes.gd")
+const Species = preload("res://scripts/domain/tree_species.gd")
 const Settings = preload("res://scripts/domain/forest_settings.gd")
 const Regions = preload("res://scripts/domain/world_regions.gd")
 const MAX_ATTEMPTS = 160000
-const CHUNKS = 8
+const CHUNKS = 4
 var material := ShaderMaterial.new()
-var meshes: Array[ArrayMesh] = [Meshes.build(false),Meshes.build(true)]
+var meshes: Array[ArrayMesh] = Meshes.library()
+var shape_bounds: Array[Vector2] = []
+var max_radius := 0.0
+var species_counts := PackedInt32Array()
 var positions := PackedVector2Array()
 var kinds := PackedByteArray()
 var scales := PackedFloat32Array()
@@ -17,6 +21,15 @@ var cover_texture: ImageTexture
 var detail := 0.0
 func _init() -> void:
 	material.shader = preload("res://scripts/rendering/forest.gdshader")
+	material.set_shader_parameter("max_height_factor",Meshes.MAX_HEIGHT_FACTOR)
+	material.set_shader_parameter("max_width_factor",Meshes.MAX_WIDTH_FACTOR)
+	material.set_shader_parameter("bend_amount",Meshes.BEND)
+	material.set_shader_parameter("wind_amount",Meshes.WIND)
+	for mesh in meshes:
+		var bounds := Meshes.bounds(mesh)
+		shape_bounds.append(bounds)
+		max_radius = maxf(max_radius,bounds.x)
+	species_counts.resize(Species.NAMES.size())
 func refresh(terrain: Node) -> void:
 	var settings: Dictionary = terrain.tree_settings
 	var error := Settings.validate(settings)
@@ -67,6 +80,7 @@ func _build(terrain: Node, ceiling: float, max_slope: float) -> void:
 	positions.clear()
 	kinds.clear()
 	scales.clear()
+	species_counts.fill(0)
 	attempts = 0
 	for child in get_children():
 		remove_child(child)
@@ -95,7 +109,7 @@ func _build(terrain: Node, ceiling: float, max_slope: float) -> void:
 	var scale_factor := minf(maxf(extent.x,extent.y)/192.0,minf(extent.x,extent.y)/20.0)
 	var buckets: Dictionary = {}
 	var occupied: Dictionary = {}
-	var spacing: float = scale_factor*settings.size*1.2*0.6
+	var spacing: float = scale_factor*settings.size*1.3*0.84
 	var transforms: Array[Transform3D] = []
 	var custom := PackedColorArray()
 	var planted_slots := 0
@@ -107,16 +121,16 @@ func _build(terrain: Node, ceiling: float, max_slope: float) -> void:
 		var uv := (Vector2(cell%columns,cell/columns)+Vector2(rng.randf_range(0.18,0.82),rng.randf_range(0.18,0.82)))/Vector2(columns,rows)
 		var cover := patch.get_noise_2d(uv.x*3.0,uv.y*3.0)*0.5+0.5
 		if settings.coverage < 100 and cover < lerpf(0.64,0.36,settings.coverage/100.0): continue
-		var size: float = scale_factor*settings.size*rng.randf_range(0.75,1.2)
+		var size: float = scale_factor*settings.size*rng.randf_range(0.70,1.3)
 		var location := uv*extent
 		var bin := Vector2i((location/spacing).floor())
 		var crowded := false
 		for y in range(-1,2):
 			for x in range(-1,2):
 				for neighbor in occupied.get(bin+Vector2i(x,y),[]):
-					if Vector2(neighbor.x,neighbor.y).distance_to(location) < (neighbor.z+size)*0.28: crowded = true
+					if Vector2(neighbor.x,neighbor.y).distance_to(location) < (neighbor.z+size)*0.42: crowded = true
 		if crowded: continue
-		var site: Vector2 = terrain.map_renderer.forest_site(uv,size*0.34+scale_factor*0.12)
+		var site: Vector2 = terrain.map_renderer.forest_site(uv,size*max_radius+scale_factor*0.12)
 		if site.x < 0 or site.x >= ceiling or site.y > max_slope: continue
 		# Geometry-based slots and spacing are independent of climate acceptance.
 		# Editing a region changes only its trees, never reassigns distant slots.
@@ -130,10 +144,11 @@ func _build(terrain: Node, ceiling: float, max_slope: float) -> void:
 		if site.x >= local_ceiling: continue
 		var suitability := smoothstep(0.1,0.6,region.y)*smoothstep(0.05,0.3,region.x)
 		if rng.randf() > lerpf(0.12,1.0,suitability): continue
-		var kind := 1 if rng.randf() < clampf((1.0-region.x)*0.85+smoothstep(0.4,0.8,site.x)*0.2,0.08,0.95) else 0
+		var kind := Species.choose(region,site.x,rng.randf())
 		var index := positions.size()
 		positions.append(uv)
 		kinds.append(kind)
+		species_counts[kind] += 1
 		scales.append(size)
 		transforms.append(Transform3D(Basis(Vector3.UP,rng.randf()*TAU).scaled(Vector3.ONE*size),Vector3((uv.x-0.5)*extent.x,0,(uv.y-0.5)*extent.y)))
 		custom.append(Color(uv.x,uv.y,size,rng.randf()))
@@ -150,6 +165,7 @@ func _build(terrain: Node, ceiling: float, max_slope: float) -> void:
 		multimesh.instance_count = indices.size()
 		var rect := Rect2()
 		var height := 0.0
+		var radius := 0.0
 		for i in range(indices.size()):
 			var index: int = indices[i]
 			multimesh.set_instance_transform(i,transforms[index])
@@ -157,13 +173,14 @@ func _build(terrain: Node, ceiling: float, max_slope: float) -> void:
 			multimesh.set_instance_color(i,Color.WHITE)
 			var origin := Vector2(transforms[index].origin.x,transforms[index].origin.z)
 			rect = Rect2(origin,Vector2.ZERO) if i == 0 else rect.expand(origin)
-			height = maxf(height,scales[index]*1.5)
+			height = maxf(height,scales[index]*shape_bounds[bucket.z].y)
+			radius = maxf(radius,scales[index]*shape_bounds[bucket.z].x)
 		var instance := MultiMeshInstance3D.new()
 		instance.name = "Forest_%d_%d_%d" % [bucket.x,bucket.y,bucket.z]
 		instance.multimesh = multimesh
 		instance.material_override = material
 		instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
-		instance.set_meta("footprint",rect.grow(height))
+		instance.set_meta("footprint",rect.grow(radius))
 		instance.set_meta("height",height)
 		add_child(instance)
 	_build_cover(extent)

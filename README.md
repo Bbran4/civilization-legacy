@@ -9,7 +9,7 @@ Godot world generation with layered map authoring.
 - **Rivers / lakes** — generated drainage and hydraulic elevations.
 - **Terrain surface** — the combined heightmap and hydraulic beds/banks.
 - **Provinces** — land, enclosed inland-water and maritime regions, borders and nation assignments.
-- **Trees** — seeded broadleaf/conifer forests, kept separate from world geography.
+- **Trees** — seven regional tree species, kept separate from world geography.
 
 Ground paint is composited after heightmap/combined-surface shading and before
 rivers, lakes, province colors and borders. Relief shading remains visible through
@@ -88,10 +88,17 @@ painter and its preview renderer have been removed. Manual texture brushes and c
 
 ## Trees
 
-New worlds automatically plant clustered broadleaf and conifer trees. For an
+New worlds automatically plant clustered regional trees. For an
 existing world, select **Trees → Generate trees**. Adjust the tree budget, forest
 coverage, size, slope limit and tree line, then generate again. **New forest
 variation** changes the placement reproducibly. Settings save with the world.
+
+Oak, birch, spruce, stone pine, olive, acacia and palm have distinct silhouettes,
+bark and foliage colors. Each instance varies in size, crown width, height, lean
+and rotation. Cool wet regions favor spruce/birch, mild wet regions oak, mild dry
+regions olive/stone pine, hot dry regions acacia and hot wet regions palms. These
+are stylized regional mixes. The Trees panel shows actual species counts;
+**Adjust regional mix…** opens warmth/moisture controls.
 
 Trees avoid sea, rivers, lakes, steep slopes and high ground. Their eligibility also
 respects enabled terrain-texture snow/rock thresholds. The budget is an upper
