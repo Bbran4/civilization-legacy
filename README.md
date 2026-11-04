@@ -76,6 +76,13 @@ bound: available ground and spacing can leave fewer trees. Tree lock protects
 settings; world regeneration still updates placement so forests follow geography.
 Manual ground-color strokes do not remove or regenerate trees.
 
+Seeded regional warmth and moisture now guide both ground appearance and forests.
+Dry warm areas show more exposed soil and muted grass; moist regions favor greener
+ground and denser forests. Colder regions favor conifers and lower snowlines.
+The field follows map latitude and elevation; it does not change world geography.
+It is derived from the world seed, so changing texture variation keeps the regions
+in place. Existing saves regenerate this appearance automatically.
+
 The layer eye hides trees and forest shading. Raw height inspection hides them
 automatically. The overview shows forest shading; individual trees fade in as you
 zoom closer. Roots follow the same displayed terrain mesh through zoom. Zoom/pan

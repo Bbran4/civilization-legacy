@@ -37,8 +37,10 @@ their previous appearance until the user enables it; version 13 saves the choice
 ## Limits
 
 This is procedural albedo texturing with existing relief shading. It is not a
-climate/biome simulation, scanned-material library, texture painting brush, dynamic
-shadow system or vegetation pass. Snow uses height percentage, not temperature.
+physical climate simulation, scanned-material library, texture painting brush, dynamic
+shadow system or vegetation pass. Snow uses height percentage with a regional
+warmth offset. Regional warmth is a stylized latitude/elevation approximation,
+not weather or measured temperature; moisture is seeded, not simulated rainfall.
 Shore distance and wetness are local estimates rather than a baked hydrological
 soil model. Finite tiles repeat, although macro variation and mip filtering reduce
 repetition. There are no generated microgeometry or material normal maps yet.

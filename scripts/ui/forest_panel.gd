@@ -7,7 +7,7 @@ var status: Label
 func configure(owner_editor: Control) -> void:
 	editor = owner_editor
 	editor._label("Trees",22)
-	editor._label("Generate clustered broadleaf and conifer forests. Water, steep slopes and high snowy ground stay clear. Terrain texture rock/snow limits also apply.",13).autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	editor._label("Regional moisture controls density; colder regions favor conifers. Water, steep slopes and snowy ground stay clear. Terrain texture rock/snow limits also apply.",13).autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	enabled = CheckBox.new()
 	enabled.name = "AutomaticTrees"
 	enabled.text = "Show generated trees"

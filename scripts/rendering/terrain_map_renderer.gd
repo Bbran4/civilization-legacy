@@ -2,6 +2,8 @@ extends RefCounted
 ## Shared terrain presentation for authoring and runtime maps; no editor dependency.
 const Texturing = preload("res://scripts/domain/terrain_texturing.gd")
 const TextureLibrary = preload("res://scripts/rendering/procedural_ground_textures.gd")
+const Regions = preload("res://scripts/domain/world_regions.gd")
+var regions: RefCounted
 var _ground_library: RefCounted
 const Grid = preload("res://scripts/domain/heightmap_grid.gd")
 const MAX_RELIEF_CELLS = 512
@@ -224,6 +226,12 @@ func visible_bounds() -> Vector2:
 func set_texturing(settings: Dictionary, world_seed: String, visible: bool) -> String:
 	var error := Texturing.validate(settings)
 	if not error.is_empty(): return error
+	# Regions are shared with forests even when the ground appearance is hidden.
+	if regions == null or regions.seed_text != world_seed:
+		regions = Regions.new(world_seed)
+		material.set_shader_parameter("ground_regions",regions.texture)
+		material.set_shader_parameter("region_lapse",Regions.LAPSE)
+		material.set_shader_parameter("region_snow_cooling",Regions.SNOW_COOLING)
 	var enabled: bool = settings.enabled and visible
 	material.set_shader_parameter("textures_enabled",enabled)
 	if not enabled: return ""

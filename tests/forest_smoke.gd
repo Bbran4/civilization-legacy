@@ -81,6 +81,9 @@ func _run() -> void:
 		if uv.y > 0.82 or uv.distance_to(Vector2(0.18,0.3)) < 0.115: valid = false
 		var site: Vector2 = terrain.map_renderer.forest_site(uv,scales[i]*0.34+0.06)
 		if site.x <= 0.215 or site.x >= 0.78 or site.y > tan(deg_to_rad(26.25)): valid = false
+		var region: Vector2 = terrain.map_renderer.regions.sample(uv,site.x)
+		var local_line: float = minf(0.78-(1.0-region.x)*0.1,terrain.texture_settings.snow_height/100.0-(1.0-region.x)*0.14-0.04)
+		if site.x >= local_line: valid = false
 	check(valid,"Forests avoid sea, snowy ground, steep terrain and wet canopy footprints")
 	var wet := -1
 	for i in range(source.size()):
@@ -89,6 +92,13 @@ func _run() -> void:
 	if wet >= 0:
 		check(terrain.map_renderer.forest_site((Vector2(wet%size.x,wet/size.x)+Vector2.ONE*0.5)/Vector2(size),0.1).x < 0,"Trees reject inland lake water")
 	var builds: int = forest.layout_builds
+	var region_field = terrain.map_renderer.regions
+	var texture_variant: Dictionary = terrain.texture_settings.duplicate()
+	texture_variant.variation += 1
+	terrain.map_renderer.set_texturing(texture_variant,terrain.map_seed,true)
+	forest.refresh(terrain)
+	check(terrain.map_renderer.regions == region_field and forest.layout_builds == builds,"Texture variation reuses climate without moving forests")
+	terrain.map_renderer.set_texturing(terrain.texture_settings,terrain.map_seed,true)
 	var overview_cover: ImageTexture = forest.cover_texture
 	check(overview_cover != null and overview_cover.get_image().has_mipmaps(),"Forest overview has a filtered coverage mask")
 	var old_max: float = rig.max_zoom

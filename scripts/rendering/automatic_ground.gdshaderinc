@@ -11,6 +11,9 @@ uniform float ground_grass_cover = 0.72;
 uniform float ground_rock_slope = 0.7;
 uniform float ground_snow_line = 0.82;
 uniform float ground_height_scale = 12.0;
+uniform sampler2D ground_regions : filter_linear, repeat_disable;
+uniform float region_lapse = 0.65;
+uniform float region_snow_cooling = 0.14;
 vec2 ground_bank(vec2 at) {
     if (!geography_has_water) return vec2(0.0);
     // Soft local estimate, not a second coastline or hydrology classification.
@@ -36,6 +39,9 @@ vec3 automatic_ground(vec2 at, float height, float light) {
     vec3 normal = normalize(vec3(-dx,1.0,-dz));
     float variation = texture(ground_grass,world/90.0).a;
     float breakup = texture(ground_earth,world/17.0).a-0.5;
+    vec2 region = texture(ground_regions,at).rg;
+    float warmth = clamp(region.r-max(0.0,texture(geography_heights,at).r-0.2)*region_lapse,0.0,1.0);
+    float dryness = (1.0-smoothstep(0.25,0.6,region.g))*smoothstep(0.3,0.7,warmth);
     vec2 bank = ground_bank(at);
     float moisture = max(bank.r,bank.g);
     vec2 tile = world/ground_scale;
@@ -47,6 +53,7 @@ vec3 automatic_ground(vec2 at, float height, float light) {
     vec4 snow_tile = texture(ground_snow,tile);
     float grass = smoothstep(0.15,0.85,ground_grass_cover+(variation-0.5)*0.65+breakup*0.15+moisture*0.18+(grass_tile.a-earth_tile.a)*0.18);
     grass *= smoothstep(0.0,0.1,ground_grass_cover);
+    grass *= mix(0.4,1.0,smoothstep(0.12,0.55,region.g+moisture*0.4));
     // River edges expose damp soil; the outer bank retains a greener fringe.
     grass *= 1.0-smoothstep(0.12,0.7,bank.r)*0.75;
     vec2 shore_step = min(step_uv,vec2(0.4)/map_extent);
@@ -64,15 +71,21 @@ vec3 automatic_ground(vec2 at, float height, float light) {
     vec3 weights = pow(abs(normal),vec3(4.0));
     weights /= max(dot(weights,vec3(1.0)),0.0001);
     vec3 rock = texture(ground_rock,position.zy).rgb*weights.x+texture(ground_rock,position.xz).rgb*weights.y+texture(ground_rock,position.xy).rgb*weights.z;
-    float snow = smoothstep(ground_snow_line-0.04,ground_snow_line+0.055,height+(variation-0.5)*0.04+breakup*0.025+(snow_tile.a-0.5)*0.025);
+    float local_snow_line = ground_snow_line-(1.0-warmth)*region_snow_cooling;
+    float snow = smoothstep(local_snow_line-0.04,local_snow_line+0.055,height+(variation-0.5)*0.04+breakup*0.025+(snow_tile.a-0.5)*0.025);
     snow *= 1.0-smoothstep(1.0,2.5,slope)*0.65;
     if (ground_snow_line >= 0.999) snow = 0.0;
     // Layered weights sum to one, keeping transitions from brightening or darkening
     // just because several materials meet. Dampness changes albedo, never height.
     vec3 earth = earth_tile.rgb*mix(vec3(1.0),vec3(0.66,0.71,0.65),moisture);
-    vec3 color = mix(earth,grass_tile.rgb,grass);
+    earth = mix(earth,mix(earth,sand_tile.rgb,0.35),dryness);
+    vec3 grass_color = grass_tile.rgb*mix(vec3(0.83,0.94,0.90),vec3(1.0),warmth);
+    grass_color = mix(grass_color,grass_color*vec3(1.14,1.03,0.76),dryness*0.65);
+    vec3 color = mix(earth,grass_color,grass);
     color = mix(color,sand_tile.rgb*mix(1.0,0.78,moisture),beach);
     color = mix(color,rock,exposure);
+    // Wet ground stays darker even where the regional field promotes grass.
+    color *= mix(1.0,0.72,moisture);
     color = mix(color,snow_tile.rgb,snow);
     return color*(0.45+light*0.65);
 }

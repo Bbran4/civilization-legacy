@@ -13,7 +13,10 @@ fingerprint and effective texture snow/rock limits. A deterministic permutation
 visits jittered cells throughout the map, preventing early-budget bias toward one
 edge. Per-cell seeds keep candidate transforms independent of rejection order.
 Noise makes forest patches; a spatial hash prevents crowded trunks/crowns. Broadleaf
-and conifer selection varies with elevation and seed, not a simulated climate.
+and conifer selection now follows shared regional warmth and elevation. Regional
+moisture and warmth reduce tree suitability in arid or very cold areas. Local
+tree/snow limits fall in colder regions, keeping forests below the textured snowline.
+The shared field is owned by `domain/world_regions.gd`, not recomputed forest noise.
 
 `terrain_map_renderer.gd` owns dry-ground/physical-slope sampling. A lazily prepared
 summed-area mask rejects any forbidden source/water sample in a conservative canopy

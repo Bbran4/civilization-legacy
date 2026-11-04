@@ -3,6 +3,7 @@ const Style = preload("res://scripts/domain/terrain_texturing.gd")
 const Library = preload("res://scripts/rendering/procedural_ground_textures.gd")
 const Renderer = preload("res://scripts/rendering/terrain_map_renderer.gd")
 const Document = preload("res://scripts/storage/terrain_document.gd")
+const Regions = preload("res://scripts/domain/world_regions.gd")
 var failures := 0
 var camera: Camera3D
 func check(ok: bool,message: String) -> void:
@@ -23,6 +24,25 @@ func set_normalized(renderer: RefCounted, normalized: PackedFloat32Array, elevat
 	for i in range(world.size()): world[i] *= elevation
 	renderer.set_heightfield(world,Vector2i(3,3),Vector2(90,90),0,elevation,2)
 func _run() -> void:
+	var regions := Regions.new("regional-test")
+	var same_regions := Regions.new("regional-test")
+	var different_regions := Regions.new("another-world")
+	check(regions.texture.get_image().get_size() == Vector2i(128,128) and regions._bytes == same_regions._bytes and regions._bytes != different_regions._bytes,"Regional fields are bounded, seeded and reproducible")
+	var polar := 0.0
+	var equator := 0.0
+	var wettest := 0.0
+	var driest := 1.0
+	for i in range(32):
+		var x := (i+0.5)/32.0
+		polar += regions.sample(Vector2(x,0.02),0.3).x
+		equator += regions.sample(Vector2(x,0.5),0.3).x
+		var climate := regions.sample(Vector2(x,x),0.3)
+		wettest = maxf(wettest,climate.y)
+		driest = minf(driest,climate.y)
+	check(equator > polar+12.0 and wettest-driest > 0.2,"Regions contain cooler poles, warmer low latitudes and moisture variation")
+	check(regions.sample(Vector2(0.5,0.5),0.8).x < regions.sample(Vector2(0.5,0.5),0.3).x,"Elevation cools the shared regional field")
+	var corner := regions.sample(Vector2.ZERO,0.2)
+	check(corner == Vector2(regions._bytes[0],regions._bytes[1])/255.0,"CPU region sampling honors GPU texel-center/clamp semantics")
 	var library := Library.new("42",0)
 	var repeat := Library.new("42",0)
 	var other := Library.new("42",1)
@@ -58,6 +78,24 @@ func _run() -> void:
 		camera.current = true
 		var grass := sample(await capture())
 		check(grass.g > grass.r,"Gentle land receives grass")
+		var controlled_region := Image.create(2,2,false,Image.FORMAT_RGBA8)
+		controlled_region.fill(Color(0.9,0.9,0,1))
+		renderer.material.set_shader_parameter("ground_regions",ImageTexture.create_from_image(controlled_region))
+		var lush := sample(await capture())
+		controlled_region.fill(Color(0.9,0.05,0,1))
+		renderer.material.set_shader_parameter("ground_regions",ImageTexture.create_from_image(controlled_region))
+		var arid := sample(await capture())
+		check(lush.g-lush.r > arid.g-arid.r+0.02,"Shared regional moisture changes rendered grass/soil balance")
+		heights.fill(0.72)
+		set_normalized(renderer,heights,12)
+		controlled_region.fill(Color(0.95,0.7,0,1))
+		renderer.material.set_shader_parameter("ground_regions",ImageTexture.create_from_image(controlled_region))
+		var mild := sample(await capture())
+		controlled_region.fill(Color(0.15,0.7,0,1))
+		renderer.material.set_shader_parameter("ground_regions",ImageTexture.create_from_image(controlled_region))
+		var cold := sample(await capture())
+		check(cold.r+cold.g+cold.b > mild.r+mild.g+mild.b+0.15,"Cold regions lower the rendered snowline")
+		renderer.material.set_shader_parameter("ground_regions",renderer.regions.texture)
 		heights = PackedFloat32Array([0.1,0.24,0.5,0.1,0.24,0.5,0.1,0.24,0.5])
 		set_normalized(renderer,heights,12)
 		var sand_image := await capture()
@@ -176,9 +214,11 @@ func _run() -> void:
 	brush.apply_textures(true)
 	check(terrain.texture_settings.variation == 17 and terrain.height_samples == heights and terrain.water_source_hash == fingerprint and terrain.map_paint.image.get_data() == paint,"Generate textures preserves heights, source identity and manual paint")
 	var cached = terrain.map_renderer._ground_library
+	var cached_regions = terrain.map_renderer.regions
 	editor._camera_rig._zoom = 4
 	editor._camera_rig._apply_zoom()
 	check(terrain.map_renderer._ground_library == cached,"Zoom does not regenerate material tiles")
+	check(terrain.map_renderer.regions == cached_regions,"Zoom reuses the shared regional field")
 	editor._layer_buttons.paint[1].button_pressed = true
 	brush.texture_controls.variation.value = 18
 	brush.apply_textures(true)

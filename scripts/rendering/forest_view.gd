@@ -1,6 +1,7 @@
 extends Node3D
 const Meshes = preload("res://scripts/rendering/forest_meshes.gd")
 const Settings = preload("res://scripts/domain/forest_settings.gd")
+const Regions = preload("res://scripts/domain/world_regions.gd")
 const MAX_ATTEMPTS = 160000
 const CHUNKS = 8
 var material := ShaderMaterial.new()
@@ -115,7 +116,14 @@ func _build(terrain: Node, ceiling: float, max_slope: float) -> void:
 		if crowded: continue
 		var site: Vector2 = terrain.map_renderer.forest_site(uv,size*0.34+scale_factor*0.12)
 		if site.x < 0 or site.x >= ceiling or site.y > max_slope: continue
-		var kind := 1 if rng.randf() < smoothstep(0.35,0.8,site.x)*0.75+0.12 else 0
+		var region: Vector2 = terrain.map_renderer.regions.sample(uv,site.x)
+		var local_ceiling: float = settings.tree_line/100.0-(1.0-region.x)*0.1
+		if terrain.texture_settings.enabled and terrain.texture_settings.snow_height < 100.0:
+			local_ceiling = minf(local_ceiling,terrain.texture_settings.snow_height/100.0-(1.0-region.x)*Regions.SNOW_COOLING-0.04)
+		if site.x >= local_ceiling: continue
+		var suitability := smoothstep(0.1,0.6,region.y)*smoothstep(0.05,0.3,region.x)
+		if rng.randf() > lerpf(0.12,1.0,suitability): continue
+		var kind := 1 if rng.randf() < clampf((1.0-region.x)*0.85+smoothstep(0.4,0.8,site.x)*0.2,0.08,0.95) else 0
 		var index := positions.size()
 		if not occupied.has(bin): occupied[bin] = []
 		occupied[bin].append(index)
