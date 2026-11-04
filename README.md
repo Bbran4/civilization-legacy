@@ -9,6 +9,7 @@ Godot world generation with layered map authoring.
 - **Rivers / lakes** — generated drainage and hydraulic elevations.
 - **Terrain surface** — the combined heightmap and hydraulic beds/banks.
 - **Provinces** — land, enclosed inland-water and maritime regions, borders and nation assignments.
+- **Trees** — seeded broadleaf/conifer forests, kept separate from world geography.
 
 Ground paint is composited after heightmap/combined-surface shading and before
 rivers, lakes, province colors and borders. Relief shading remains visible through
@@ -60,7 +61,26 @@ paint and its visibility/lock state. Gameplay uses the same renderer and saved
 paint. Saves retain backups; world saves reference uniquely named terrain snapshots.
 
 There is no separate painter window or appearance file. The earlier standalone
-painter and its preview renderer have been removed. Manual texture brushes, climate-based biomes and tree placement are not included.
+painter and its preview renderer have been removed. Manual texture brushes and climate-based biomes are not included. Trees have their own layer below.
+
+## Trees
+
+New worlds automatically plant clustered broadleaf and conifer trees. For an
+existing world, select **Trees → Generate trees**. Adjust the tree budget, forest
+coverage, size, slope limit and tree line, then generate again. **New forest
+variation** changes the placement reproducibly. Settings save with the world.
+
+Trees avoid sea, rivers, lakes, steep slopes and high ground. Their eligibility also
+respects enabled terrain-texture snow/rock thresholds. The budget is an upper
+bound: available ground and spacing can leave fewer trees. Tree lock protects
+settings; world regeneration still updates placement so forests follow geography.
+Manual ground-color strokes do not remove or regenerate trees.
+
+The layer eye hides trees. Raw height inspection hides them automatically. Roots
+follow the same displayed terrain mesh through zoom, with smaller crowns in the
+flat overview. Zoom/pan reuses existing instances. The current models are original,
+procedurally built low-poly trees with slight wind sway; there are no external
+model dependencies. There is no manual tree-planting/erasing brush yet.
 
 ## Zoom-based 3D terrain
 
@@ -82,10 +102,11 @@ shader's directional relief shading; dynamic cast shadows are not implemented.
 
 ## Storage
 
-Terrain document version 13 includes `texture_settings`; missing settings in older
+Terrain document version 14 adds `tree_settings`; older saves keep trees disabled
+until generation is requested. Version 13 introduced `texture_settings`; missing settings in older
 saves default to disabled. Version 12 introduced `map_paint`. Earlier saves load with a
-transparent paint layer. World manifest version 5 includes the independent paint
-layer; earlier manifests gain it in memory without rewriting the original file.
+transparent paint layer. World manifest version 6 adds Trees; version 5 introduced the independent paint
+layer. Earlier manifests gain these in memory without rewriting the original file.
 Retired legacy climate/tree/texture-palette metadata is ignored.
 
 ## Verification

@@ -33,8 +33,8 @@ func _run() -> void:
 	terrain.set_province_fill(false)
 	editor._sync_from_terrain()
 	editor._select_layer("paint")
-	check(editor.layers.size() == 5 and editor.layers[1].id == "paint", "Paint is a separate layer above heightmap")
-	check(Graph.affected(editor.layers,"paint") == ["paint"], "Paint never invalidates generation")
+	check(editor.layers.size() == 6 and editor.layers[1].id == "paint", "Paint is a separate layer above heightmap")
+	check(Graph.affected(editor.layers,"paint") == ["paint","trees"], "Ground appearance can affect trees without invalidating geography")
 	var heights: PackedFloat32Array = terrain.height_samples.duplicate()
 	var fingerprint: String = terrain.water_source_hash
 	var brush = editor._paint_brush
@@ -82,7 +82,7 @@ func _run() -> void:
 	bad.map_paint = {"version":1,"png":"aW52YWxpZA=="}
 	check(not Document.apply(terrain,bad).is_empty(),"Malformed paint rejected before application")
 	check(editor.save_world("res://.test-runtime/map-paint.world.json").is_empty(),"World manifest includes paint layer")
-	check(Manifest.load_file("res://.test-runtime/map-paint.world.json").document.layers.size() == 5,"Manifest retains paint visibility and lock state")
+	check(Manifest.load_file("res://.test-runtime/map-paint.world.json").document.layers.size() == 6,"Manifest retains paint visibility and lock state")
 	check(editor.load_world("res://.test-runtime/map-paint.world.json").is_empty(),"World manifest reloads")
 	var legacy := Manifest.capture(Manifest._layers_for_version(4),"map-paint.terrain.json","surface")
 	legacy.version = 4
@@ -90,7 +90,7 @@ func _run() -> void:
 	check(Manifest.save_file(legacy_path,legacy).is_empty(),"Legacy four-layer manifest fixture")
 	var legacy_bytes := FileAccess.get_file_as_bytes(legacy_path)
 	var migrated := Manifest.load_file(legacy_path)
-	check(migrated.error.is_empty() and migrated.document.layers.size() == 5 and migrated.document.layers[1].id == "paint" and FileAccess.get_file_as_bytes(legacy_path) == legacy_bytes,"Legacy manifest gains paint without modifying source")
+	check(migrated.error.is_empty() and migrated.document.layers.size() == 6 and migrated.document.layers[1].id == "paint" and FileAccess.get_file_as_bytes(legacy_path) == legacy_bytes,"Legacy manifest gains paint without modifying source")
 	if "--capture" in OS.get_cmdline_user_args() or "--capture3d" in OS.get_cmdline_user_args():
 		editor._select_layer("paint")
 		terrain.map_paint.begin_stroke()

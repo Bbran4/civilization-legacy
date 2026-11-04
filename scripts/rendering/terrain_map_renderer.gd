@@ -28,6 +28,10 @@ var visible_relief := 0.0
 var _relief_mesh: PlaneMesh
 var _overview_mesh: PlaneMesh
 var _mesh_extent := Vector2.ZERO
+var _forest_clearance := PackedInt32Array()
+var _forest_clearance_dirty := true
+var _forest_input_valid := true
+var _forest_mask_key := ""
 var _height_size := Vector2i.ZERO
 var _height_offset := 0.0
 var _elevation := 1.0
@@ -51,6 +55,7 @@ func set_heightfield(samples: PackedFloat32Array, size: Vector2i, extent: Vector
 		normalized_heights[i] = clampf((samples[i] - height_offset) / elevation + (0.2 if generator_version >= 3 else 0.0), 0.0, 1.0)
 	map_extent = extent
 	_height_size = size
+	_forest_clearance_dirty = true
 	_height_offset = height_offset
 	_elevation = elevation
 	material.set_shader_parameter("ground_height_scale",elevation*maxf(extent.x,extent.y)/192.0)
@@ -58,6 +63,7 @@ func set_heightfield(samples: PackedFloat32Array, size: Vector2i, extent: Vector
 	_relief_dirty = true
 	_surface_layer = null
 	_water_layer = null
+	_forest_mask_key = ""
 	_water_visible = false
 	surface.material_override = material
 	_base_texture = ImageTexture.create_from_image(Image.create_from_data(size.x, size.y, false, Image.FORMAT_RF, normalized_heights.to_byte_array()))
@@ -75,6 +81,10 @@ func set_shaded_relief(enabled: bool) -> void:
 	set_relief(relief)
 
 func set_water_layer(layer: RefCounted, enabled: bool) -> void:
+	var mask_key: String = layer.hydraulic_fingerprint() if layer != null else ""
+	if mask_key != _forest_mask_key or _water_layer != layer:
+		_forest_mask_key = mask_key
+		_forest_clearance_dirty = true
 	if _water_layer != layer or _water_visible != enabled:
 		_water_layer = layer
 		_water_visible = enabled
@@ -221,3 +231,48 @@ func set_texturing(settings: Dictionary, world_seed: String, visible: bool) -> S
 	material.set_shader_parameter("ground_rock_slope",tan(deg_to_rad(settings.rock_angle)))
 	material.set_shader_parameter("ground_snow_line",settings.snow_height/100.0)
 	return ""
+
+func bind_relief_material(target: ShaderMaterial) -> void:
+	target.set_shader_parameter("relief_vertices",_relief_texture)
+	target.set_shader_parameter("relief_amount",visible_relief)
+
+# Return normalized elevation and physical slope, or a rejected site. Both root
+# and canopy footprint use the canonical source/water facts, even if water is hidden.
+func forest_site(uv: Vector2, radius: float) -> Vector2:
+	_prepare_forest_clearance()
+	if not _forest_input_valid: return Vector2(-1,-1)
+	var span := Vector2.ONE*radius/map_extent
+	if uv.x-span.x < 0 or uv.y-span.y < 0 or uv.x+span.x > 1 or uv.y+span.y > 1: return Vector2(-1,-1)
+	var low := Vector2i(((uv-span)*Vector2(_height_size)-Vector2.ONE*0.5).floor()).max(Vector2i.ZERO)
+	var high := Vector2i(((uv+span)*Vector2(_height_size)-Vector2.ONE*0.5).ceil()).min(_height_size-Vector2i.ONE)+Vector2i.ONE
+	var stride := _height_size.x+1
+	var forbidden := _forest_clearance[high.y*stride+high.x]-_forest_clearance[low.y*stride+high.x]-_forest_clearance[high.y*stride+low.x]+_forest_clearance[low.y*stride+low.x]
+	if forbidden > 0: return Vector2(-1,-1)
+	var delta := Vector2.ONE*maxf(0.6,radius)/map_extent
+	var scale := _elevation*maxf(map_extent.x,map_extent.y)/192.0
+	var dx := (_texture_sample(normalized_heights,_height_size,uv+Vector2(delta.x,0))-_texture_sample(normalized_heights,_height_size,uv-Vector2(delta.x,0)))*scale/(2.0*delta.x*map_extent.x)
+	var dz := (_texture_sample(normalized_heights,_height_size,uv+Vector2(0,delta.y))-_texture_sample(normalized_heights,_height_size,uv-Vector2(0,delta.y)))*scale/(2.0*delta.y*map_extent.y)
+	return Vector2(_texture_sample(normalized_heights,_height_size,uv),Vector2(dx,dz).length())
+
+# A summed-area mask makes conservative canopy-footprint checks constant-time.
+# Invalidation follows source heights and the water owner's content fingerprint,
+# rather than view visibility or a resource's object identity alone.
+func _prepare_forest_clearance() -> void:
+	if not _forest_clearance_dirty: return
+	_forest_clearance_dirty = false
+	_forest_input_valid = _height_size.x >= 3 and _height_size.y >= 3 and normalized_heights.size() == _height_size.x*_height_size.y
+	if _water_layer != null:
+		_forest_input_valid = _forest_input_valid and _water_layer.mask_size == _height_size and _water_layer.mask_bytes.size() == normalized_heights.size()*4
+	if not _forest_input_valid:
+		_forest_clearance.clear()
+		return
+	var stride := _height_size.x+1
+	_forest_clearance.resize(stride*(_height_size.y+1))
+	_forest_clearance.fill(0)
+	for y in range(_height_size.y):
+		var row := 0
+		for x in range(_height_size.x):
+			var i := y*_height_size.x+x
+			var wet: bool = _water_layer != null and (_water_layer.mask_bytes[i*4] > 8 or _water_layer.mask_bytes[i*4+1] > 8)
+			if wet or not is_finite(normalized_heights[i]) or normalized_heights[i] <= 0.215: row += 1
+			_forest_clearance[(y+1)*stride+x+1] = _forest_clearance[y*stride+x+1]+row

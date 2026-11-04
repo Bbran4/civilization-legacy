@@ -3,6 +3,8 @@ extends Control
 
 const WorldProject = preload("res://scripts/storage/world_project.gd")
 const LayerGraph = preload("res://scripts/domain/map_layer_graph.gd")
+const ForestPanel = preload("res://scripts/ui/forest_panel.gd")
+var _forest_panel: RefCounted
 const PaintBrush = preload("res://scripts/ui/map_paint_brush.gd")
 var _paint_brush: Node
 const ProvinceBorderBrush = preload("res://scripts/ui/province_border_brush.gd")
@@ -203,6 +205,9 @@ func _build_interface() -> void:
 	_paint_brush = PaintBrush.new()
 	add_child(_paint_brush)
 	_paint_brush.configure(self)
+	_context("trees")
+	_forest_panel = ForestPanel.new()
+	_forest_panel.configure(self)
 	_context("view")
 	_section("VIEW")
 	_number("Minimum zoom (×)", "min_zoom", 0.1, 1, 0.1, true)
@@ -325,6 +330,7 @@ func _button(title: String, action: Callable, parent: Node = null, node_name: St
 func _sync_from_terrain() -> void:
 	_syncing = true
 	_paint_brush.sync_textures()
+	_forest_panel.sync()
 	_sync_border_appearance_controls()
 	if _terrain.heightmap_only:
 		if _province_count != null and _terrain.province_layer != null:
@@ -690,11 +696,11 @@ func _build_shell() -> void:
 		row.add_child(eye)
 		var lock := CheckBox.new()
 		lock.text = "L"
-		lock.tooltip_text = "Protect this layer from editor changes"
+		lock.tooltip_text = "Lock tree settings; forests still follow regenerated terrain." if layer.id == "trees" else "Protect this layer from editor changes"
 		lock.toggled.connect(func(value: bool): layer.locked = value; _stop_brush(); _update_dependency_status(); mark_dirty())
 		row.add_child(lock)
 		_layer_buttons[layer.id] = [eye, lock]
-		if _terrain.heightmap_only and layer.id not in ["heightmap", "rivers", "surface", "provinces", "paint"]:
+		if _terrain.heightmap_only and layer.id not in ["heightmap", "rivers", "surface", "provinces", "paint", "trees"]:
 			layer.visible = false
 			eye.set_pressed_no_signal(false)
 			eye.disabled = true
@@ -723,12 +729,12 @@ func _context(key: String) -> void:
 	_form = box
 
 func _select_layer(key: String) -> void:
-	if _terrain.heightmap_only and key not in ["heightmap", "rivers", "surface", "provinces", "paint", "view"]:
+	if _terrain.heightmap_only and key not in ["heightmap", "rivers", "surface", "provinces", "paint", "trees", "view"]:
 		key = "heightmap"
 	if selected_layer != key:
 		mark_dirty()
 	selected_layer = key
-	if key in ["paint", "rivers", "surface", "provinces"] and _terrain.heightmap_only:
+	if key in ["paint", "rivers", "surface", "provinces", "trees"] and _terrain.heightmap_only:
 		find_child("RawHeightView", true, false).button_pressed = false
 	for id in _layer_selectors:
 		_layer_selectors[id].set_pressed_no_signal(id == key)
@@ -736,6 +742,7 @@ func _select_layer(key: String) -> void:
 		_contexts[id].visible = id == key
 	_update_dependency_status()
 	_stop_brush()
+	if key == "trees": _forest_panel.update_status()
 
 func _stop_brush() -> void:
 	if _paint_brush != null:
@@ -746,7 +753,7 @@ func _stop_brush() -> void:
 		_province_brush.enabled.button_pressed = false
 
 func can_edit(key: String) -> bool:
-	if _terrain.heightmap_only and key not in ["heightmap", "rivers", "surface", "provinces", "paint"]:
+	if _terrain.heightmap_only and key not in ["heightmap", "rivers", "surface", "provinces", "paint", "trees"]:
 		return false
 	for layer in layers:
 		if layer.id == key:
@@ -755,7 +762,7 @@ func can_edit(key: String) -> bool:
 
 func regeneration_error(key: String) -> String:
 	if _terrain.heightmap_only:
-		if key not in ["heightmap", "rivers", "surface", "provinces", "paint"] or not can_edit(key):
+		if key not in ["heightmap", "rivers", "surface", "provinces", "paint", "trees"] or not can_edit(key):
 			return "Show and unlock the selected layer before generating."
 		if key in ["heightmap", "rivers", "surface"]:
 			for layer in layers:
@@ -794,6 +801,7 @@ func _update_dependency_status() -> void:
 
 
 func _apply_layer_visibility() -> void:
+	_terrain.tree_layer_visible = layer_visible("trees")
 	_terrain.paint_layer_visible = layer_visible("paint")
 	_terrain.set_height_layer_visible(layer_visible("heightmap"))
 	_terrain.set_province_layer_visible(layer_visible("provinces"))
@@ -802,6 +810,7 @@ func _apply_layer_visibility() -> void:
 	_update_province_status()
 	_update_surface_status()
 	_update_water_status()
+	if _forest_panel != null: _forest_panel.update_status()
 
 func load_world(path: String) -> String:
 	var result: Dictionary = Manifest.load_file(path)

@@ -69,7 +69,7 @@ func _run() -> void:
 	file.close()
 	var bytes := FileAccess.get_file_as_bytes("res://.test-runtime/world_provinces_smoke-v2.world.json")
 	var migration := Manifest.load_file("res://.test-runtime/world_provinces_smoke-v2.world.json")
-	check(migration.error.is_empty() and migration.document.layers.size() == 5 and bytes == FileAccess.get_file_as_bytes("res://.test-runtime/world_provinces_smoke-v2.world.json"), "V2 manifests migrate without rewriting prior files.")
+	check(migration.error.is_empty() and migration.document.layers.size() == 6 and bytes == FileAccess.get_file_as_bytes("res://.test-runtime/world_provinces_smoke-v2.world.json"), "V2 manifests migrate without rewriting prior files.")
 	var world := (load("res://scenes/main.tscn") as PackedScene).instantiate()
 	world.get_node("Terrain").resolution = 255
 	root.add_child(world)

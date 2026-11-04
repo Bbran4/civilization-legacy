@@ -433,9 +433,9 @@ func hydraulic_fingerprint() -> String:
 	if _hydraulic_hash.is_empty():
 		var context := HashingContext.new()
 		context.start(HashingContext.HASH_SHA256)
-		context.update(source_hash.to_utf8_buffer())
-		context.update(mask_bytes)
-		context.update(surface_levels.to_byte_array())
+		if not source_hash.is_empty(): context.update(source_hash.to_utf8_buffer())
+		if not mask_bytes.is_empty(): context.update(mask_bytes)
+		if not surface_levels.is_empty(): context.update(surface_levels.to_byte_array())
 		for river in river_features:
 			context.update((river.id + ":" + river.receiver + ":" + river.from_lake + ":" + river.get("internal_lake", "")).to_utf8_buffer())
 			context.update(river.profile.to_byte_array())

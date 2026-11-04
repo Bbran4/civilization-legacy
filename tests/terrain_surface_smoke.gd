@@ -75,7 +75,7 @@ func _run() -> void:
 	file.close()
 	var bytes := FileAccess.get_file_as_bytes("res://.test-runtime/terrain_surface_smoke-legacy.world.json")
 	var migrated := Manifest.load_file("res://.test-runtime/terrain_surface_smoke-legacy.world.json")
-	check(migrated.error.is_empty() and migrated.document.layers.size() == 5 and migrated.document.layers[0].locked and bytes == FileAccess.get_file_as_bytes("res://.test-runtime/terrain_surface_smoke-legacy.world.json"), "Old manifest gains surface state in memory without rewriting old saves.")
+	check(migrated.error.is_empty() and migrated.document.layers.size() == 6 and migrated.document.layers[0].locked and bytes == FileAccess.get_file_as_bytes("res://.test-runtime/terrain_surface_smoke-legacy.world.json"), "Old manifest gains surface state in memory without rewriting old saves.")
 	var world := (load("res://scenes/main.tscn") as PackedScene).instantiate()
 	root.add_child(world)
 	await process_frame

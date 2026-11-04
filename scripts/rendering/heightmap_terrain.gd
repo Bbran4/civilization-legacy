@@ -21,6 +21,11 @@ var water_source_hash := ""
 const HeightDetail = preload("res://scripts/domain/heightmap_detail.gd")
 const MapRenderer = preload("res://scripts/rendering/terrain_map_renderer.gd")
 const TerrainDocument = preload("res://scripts/storage/terrain_document.gd")
+const ForestSettings = preload("res://scripts/domain/forest_settings.gd")
+const ForestView = preload("res://scripts/rendering/forest_view.gd")
+var tree_settings: Dictionary = ForestSettings.DEFAULTS.duplicate()
+var tree_layer_visible := true
+var forest_view: Node3D
 const Texturing = preload("res://scripts/domain/terrain_texturing.gd")
 var texture_settings: Dictionary = Texturing.DEFAULTS.duplicate()
 var map_paint = preload("res://scripts/domain/map_paint.gd").new()
@@ -555,6 +560,12 @@ func refresh_water_layer() -> void:
 		map_renderer.set_provinces(province_layer, province_layer_visible and province_layer_current() and shaded_relief)
 		map_renderer.set_height_layer_visible(height_layer_visible or derived)
 		map_renderer.set_water_layer(water_layer if water_layer_current() else null, water_layer_visible and water_layer_current())
+		if not Engine.is_editor_hint():
+			if forest_view == null and tree_settings.enabled:
+				forest_view = ForestView.new()
+				forest_view.name = "GeneratedForest"
+				add_child(forest_view,false,Node.INTERNAL_MODE_BACK)
+			if forest_view != null: forest_view.refresh(self)
 
 func install_water_layer(layer: RefCounted) -> String:
 	if layer == null or layer.source_hash != water_source_hash or layer.mask_size != sample_size():
@@ -617,6 +628,7 @@ func set_border_appearance(settings: Dictionary) -> String:
 func set_overview_blend(value: float) -> void:
 	overview_blend = clampf(value,0.0,1.0)
 	if map_renderer != null: map_renderer.set_relief(1.0-overview_blend)
+	if forest_view != null: forest_view.update_presentation(self)
 
 func set_heightmap_view(_enabled: bool) -> void:
 	heightmap_view = true
@@ -637,5 +649,12 @@ func apply_automatic_textures(settings: Dictionary) -> String:
 	var error := Texturing.validate(settings)
 	if not error.is_empty(): return error
 	texture_settings = settings.duplicate()
+	refresh_water_layer()
+	return ""
+
+func apply_tree_settings(settings: Dictionary) -> String:
+	var error := ForestSettings.validate(settings)
+	if not error.is_empty(): return error
+	tree_settings = settings.duplicate()
 	refresh_water_layer()
 	return ""

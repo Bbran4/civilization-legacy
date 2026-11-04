@@ -32,7 +32,7 @@ func _run() -> void:
 	var editor = world.get_node("Interface/Editor")
 	check(terrain.heightmap_only and terrain.heightmap_view and terrain.resolution == 1024 and terrain.effective_graph_points() == 20000, "Main scene opens in detailed heightmap focus.")
 	for layer in editor.layers:
-		if layer.id not in ["heightmap", "paint", "rivers", "surface", "provinces"]:
+		if layer.id not in ["heightmap", "paint", "rivers", "surface", "provinces", "trees"]:
 			check(not layer.visible and editor._layer_selectors[layer.id].disabled and not editor.can_edit(layer.id), "Other layers are visibly inactive and cannot be edited.")
 	var image: Image = terrain.heightmap_image()
 	check(image.get_size() == terrain.sample_size() and image.get_width() == 1025, "Export uses the detailed canonical sample grid.")
