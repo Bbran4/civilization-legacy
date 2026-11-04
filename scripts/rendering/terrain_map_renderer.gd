@@ -149,6 +149,11 @@ func set_paint(layer: RefCounted, enabled: bool) -> void:
 	material.set_shader_parameter("paint_enabled",enabled and layer != null)
 	material.set_shader_parameter("paint_field",layer.texture if layer != null else null)
 
+func set_forest_overview(cover: Texture2D, amount: float, enabled: bool) -> void:
+	material.set_shader_parameter("forest_cover",cover)
+	material.set_shader_parameter("forest_overview",amount)
+	material.set_shader_parameter("forest_enabled",enabled and cover != null)
+
 func set_relief(amount: float) -> void:
 	relief = clampf(amount,0.0,1.0)
 	visible_relief = relief if shaded_relief and relief > 0.001 else 0.0

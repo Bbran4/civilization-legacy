@@ -11,6 +11,9 @@ uniform bool shaded_relief = true;
 uniform bool paint_enabled = false;
 uniform sampler2D paint_field : source_color, filter_linear, repeat_disable;
 uniform bool height_enabled = true;
+uniform bool forest_enabled = false;
+uniform float forest_overview = 0.0;
+uniform sampler2D forest_cover : filter_linear_mipmap, repeat_disable;
 uniform bool water_enabled = false;
 uniform sampler2D water_field : filter_linear, repeat_disable;
 uniform bool provinces_enabled = false;
@@ -137,6 +140,11 @@ void fragment() {
 	if (textures_enabled && shaded_relief) {
 		// Generated lake water remains an overlay: hiding it reveals the textured bed.
 		color = texture(geography_heights,UV).r > 0.2 ? automatic_ground(UV,h,value) : vec3(0.055,0.16,0.24);
+	}
+	// Forest overview follows actual placements, below paint and political/water overlays.
+	if (forest_enabled && shaded_relief && geographic_land(UV)) {
+		float cover = texture(forest_cover,UV).r*forest_overview;
+		color = mix(color,color*vec3(0.48,0.70,0.45),cover*0.65);
 	}
 	// Appearance is above the height/surface shading and below every overlay.
 	if (paint_enabled && shaded_relief && geographic_land(UV)) {

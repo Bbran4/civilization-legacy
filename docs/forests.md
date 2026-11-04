@@ -39,17 +39,28 @@ for Compatibility rendering. A shared material applies mild wind and directional
 shading. Trees do not cast dynamic shadows in this implementation.
 
 The forest shader uses the renderer's shared relief grid for root heights. Instance
-scale is accounted for, so roots do not float as the map rises/flattens. Geometry
-shrinks in the overview without changing placement. Culling bounds include crowns,
-wind and terrain relief. Zoom updates a shared material rather than rebuilding
-placements or transforms.
+scale is accounted for, so roots do not float as the map rises/flattens. Culling
+bounds include crowns, wind and terrain relief.
+
+Orthographic zoom uses the nominal tree size in screen pixels: at 4 pixels or
+smaller all tree batches are hidden, at 12 pixels or larger they are fully visible,
+and a smooth crossfade connects the two. Opaque screen-door fading avoids sorting
+transparent crowns. Perspective views currently use full geometry. The camera
+sets its size before publishing presentation changes, avoiding a one-step lag.
+
+A mipmapped coverage mask, derived from accepted placements and capped at 1024
+pixels on its longest side, shades the distant ground. It fades away as trees
+appear, below manual paint, water and political overlays, with a geographic land
+clip. The Trees eye and raw-height view hide both representations. Zoom changes
+uniforms and batch visibility, never placements, transforms or coverage pixels.
+No additional saved data or migration is needed.
 
 The saved tree budget is at most 20,000 and placement visits at most 160,000
 candidates. Actual counts may be lower. The clearance cache is at most one
 `(sample_width + 1) × (sample_height + 1)` Int32 buffer, bounded by the supported terrain
 resolution. Generation is synchronous. No measured CPU/frame-time/peak-memory
 performance claim is made; dense forests and large source grids can still take
-longer to prepare. Tiled/billboard distance LOD and manual tree editing are future
+longer to prepare. Billboard geometry and manual tree editing are future
 work. The models are stylized baseline assets, not scanned or photorealistic trees.
 
 ## Executed validation
@@ -60,7 +71,9 @@ variation, root relief binding, raw view, visibility/locking, JSON/world reload,
 legacy migration, malformed choices and unchanged source geography. Its GPU path
 compares visible/hidden forest captures and checks colored leaves rather than black
 silhouettes. Cache regressions cover same-resource water-mask changes, hidden water,
-and re-binding a mask after source rebuild.
+and re-binding a mask after source rebuild. Zoom checks cover both endpoints,
+the midpoint, reuse of the mask/layout, layer hiding and zero-budget cleanup.
+GPU captures check the overview shading and close-up colored tree geometry.
 
 The forest GPU check completed with zero failures. Existing map-paint, automatic
 texture, zoom-relief, terrain-surface and world-province smoke checks also passed.

@@ -12,6 +12,8 @@ var key := ""
 var layout_builds := 0
 var attempts := 0
 var _bounds := Vector2(INF,INF)
+var cover_texture: ImageTexture
+var detail := 0.0
 func _init() -> void:
 	material.shader = preload("res://scripts/rendering/forest.gdshader")
 func refresh(terrain: Node) -> void:
@@ -20,9 +22,11 @@ func refresh(terrain: Node) -> void:
 	if not error.is_empty():
 		push_error(error)
 		visible = false
+		terrain.map_renderer.set_forest_overview(null,0.0,false)
 		return
 	if not settings.enabled or not terrain.tree_layer_visible or not terrain.shaded_relief:
 		visible = false
+		terrain.map_renderer.set_forest_overview(null,0.0,false)
 		return
 	var water_key: String = terrain.water_layer.hydraulic_fingerprint() if terrain.water_layer_current() else ""
 	var ceiling: float = settings.tree_line/100.0
@@ -37,6 +41,17 @@ func refresh(terrain: Node) -> void:
 	update_presentation(terrain)
 func update_presentation(terrain: Node) -> void:
 	visible = terrain.tree_settings.enabled and terrain.tree_layer_visible and terrain.shaded_relief
+	var camera := get_viewport().get_camera_3d()
+	if camera != null and camera.projection == Camera3D.PROJECTION_ORTHOGONAL:
+		var extent: Vector2 = terrain.display_size()
+		var tree_size: float = minf(maxf(extent.x,extent.y)/192.0,minf(extent.x,extent.y)/20.0)*terrain.tree_settings.size
+		var pixels: float = tree_size*get_viewport().get_visible_rect().size.y/maxf(0.001,camera.size)
+		detail = smoothstep(4.0,12.0,pixels)
+	else:
+		detail = 1.0
+	material.set_shader_parameter("tree_detail",detail)
+	terrain.map_renderer.set_forest_overview(cover_texture,1.0-detail,visible)
+	for child in get_children(): child.visible = detail > 0.0
 	terrain.map_renderer.bind_relief_material(material)
 	var bounds: Vector2 = terrain.map_renderer.mesh_bounds
 	if bounds != _bounds:
@@ -55,7 +70,9 @@ func _build(terrain: Node, ceiling: float, max_slope: float) -> void:
 		remove_child(child)
 		child.queue_free()
 	var settings: Dictionary = terrain.tree_settings
-	if settings.count == 0 or settings.coverage == 0: return
+	if settings.count == 0 or settings.coverage == 0:
+		cover_texture = null
+		return
 	var extent: Vector2 = terrain.display_size()
 	var budget := mini(MAX_ATTEMPTS,int(settings.count)*12)
 	var columns := clampi(ceili(sqrt(budget*extent.x/extent.y)),1,budget)
@@ -136,7 +153,30 @@ func _build(terrain: Node, ceiling: float, max_slope: float) -> void:
 		instance.set_meta("footprint",rect.grow(height))
 		instance.set_meta("height",height)
 		add_child(instance)
+	_build_cover(extent)
 	_bounds = Vector2(INF,INF)
+
+func _build_cover(extent: Vector2) -> void:
+	# One bounded, derived mask; only rebuilt when placements change. Mips keep
+	# distant crowns stable instead of shimmering as subpixel geometry.
+	var dimensions := Vector2i((extent/extent[extent.max_axis_index()]*1024.0).ceil())
+	dimensions = dimensions.max(Vector2i(2,2))
+	var image := Image.create(dimensions.x,dimensions.y,false,Image.FORMAT_R8)
+	image.fill(Color.BLACK)
+	for i in range(positions.size()):
+		var center := positions[i]*Vector2(dimensions)-Vector2.ONE*0.5
+		# A soft neighborhood, rather than a tiny crown dot, reads as forest
+		# coverage at map scale. The ground shader clips it to dry geography.
+		var radius := (Vector2.ONE*scales[i]*1.5/extent*Vector2(dimensions)).max(Vector2.ONE)
+		var low := Vector2i((center-radius).floor()).max(Vector2i.ZERO)
+		var high := Vector2i((center+radius).ceil()).min(dimensions-Vector2i.ONE)
+		for y in range(low.y,high.y+1):
+			for x in range(low.x,high.x+1):
+				var distance := ((Vector2(x,y)-center)/radius).length()
+				var strength := 1.0-smoothstep(0.25,1.0,distance)
+				if strength > image.get_pixel(x,y).r: image.set_pixel(x,y,Color(strength,0,0))
+	image.generate_mipmaps()
+	cover_texture = ImageTexture.create_from_image(image)
 static func _gcd(a: int,b: int) -> int:
 	while b != 0:
 		var next := a%b

@@ -133,8 +133,8 @@ func _apply_zoom() -> void:
 	var limits: Vector2 = zoom_limits()
 	_zoom = clampf(_zoom, limits.x, limits.y)
 	if is_instance_valid(_camera):
-		_apply_pose()
 		_camera.size = _fit_size / _zoom
+		_apply_pose()
 		_camera.h_offset = -0.5 * _camera.size * panel_balance / maxf(1.0, get_viewport().get_visible_rect().size.y)
 		_fit_depth()
 	zoom_changed.emit()

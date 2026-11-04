@@ -89,6 +89,28 @@ func _run() -> void:
 	if wet >= 0:
 		check(terrain.map_renderer.forest_site((Vector2(wet%size.x,wet/size.x)+Vector2.ONE*0.5)/Vector2(size),0.1).x < 0,"Trees reject inland lake water")
 	var builds: int = forest.layout_builds
+	var overview_cover: ImageTexture = forest.cover_texture
+	check(overview_cover != null and overview_cover.get_image().has_mipmaps(),"Forest overview has a filtered coverage mask")
+	var old_max: float = rig.max_zoom
+	rig.max_zoom = 2048.0
+	rig._zoom = 1.0
+	rig._apply_zoom()
+	check(forest.detail == 0.0,"Full overview uses forest shading instead of tiny meshes")
+	var no_meshes := true
+	for child in forest.get_children():
+		if child.visible: no_meshes = false
+	check(no_meshes,"Overview skips individual tree draws")
+	var unit_size: float = minf(96.0/192.0,72.0/20.0)*terrain.tree_settings.size
+	var pixel_height: float = root.get_visible_rect().size.y
+	rig._zoom = rig._fit_size/(unit_size*pixel_height/8.0)
+	rig._apply_zoom()
+	check(absf(forest.detail-0.5) < 0.01,"Mid-range zoom crossfades forest shading and geometry")
+	check(absf(float(terrain.map_renderer.material.get_shader_parameter("forest_overview"))-0.5) < 0.01,"Ground and trees share complementary fade amounts")
+	rig._zoom = rig._fit_size/8.0
+	rig._apply_zoom()
+	check(forest.detail == 1.0,"Close zoom shows complete tree geometry")
+	check(forest.cover_texture == overview_cover and forest.layout_builds == builds,"Zoom reuses both placements and overview mask")
+	rig.max_zoom = old_max
 	terrain.map_paint.begin_stroke()
 	terrain.map_paint.stamp(Vector2(0.5,0.5),terrain.map_size,4,Color(0.2,0.5,0.2))
 	terrain.map_paint.refresh()
@@ -118,6 +140,7 @@ func _run() -> void:
 	editor._layer_buttons.trees[1].button_pressed = false
 	editor._layer_buttons.trees[0].button_pressed = false
 	check(not forest.visible,"Tree layer visibility works")
+	check(not terrain.map_renderer.material.get_shader_parameter("forest_enabled"),"Hiding Trees also hides overview shading")
 	editor._layer_buttons.trees[0].button_pressed = true
 	check(forest.visible,"Tree layer restores visibility")
 	var save_error: String = editor.save_world("res://.test-runtime/forest.world.json")
@@ -141,6 +164,7 @@ func _run() -> void:
 	var empty := current.duplicate()
 	empty.count = 0
 	check(terrain.apply_tree_settings(empty).is_empty() and forest.positions.is_empty() and forest.get_child_count() == 0,"Zero budget removes the rendered forest")
+	check(forest.cover_texture == null and not terrain.map_renderer.material.get_shader_parameter("forest_enabled"),"Zero budget also clears overview shading")
 	check(terrain.apply_tree_settings(current).is_empty(),"Restore tree budget")
 	var legacy := Manifest.capture(Manifest._layers_for_version(5),"forest.terrain.json","paint")
 	legacy.version = 5
@@ -153,7 +177,26 @@ func _run() -> void:
 		rig._reset_view()
 		await process_frame
 		await RenderingServer.frame_post_draw
-		root.get_texture().get_image().save_png("res://.test-runtime/forest-overview.png")
+		var overview := root.get_texture().get_image()
+		overview.save_png("res://.test-runtime/forest-overview.png")
+		editor._layer_buttons.trees[0].button_pressed = false
+		for i in range(3): await process_frame
+		await RenderingServer.frame_post_draw
+		var bare := root.get_texture().get_image()
+		var shaded_pixels := 0
+		# Exclude panels and checkbox pixels; only compare the map area.
+		for y in range(160,mini(760,overview.get_height())):
+			for x in range(260,mini(900,overview.get_width())):
+				var a := overview.get_pixel(x,y)
+				var b := bare.get_pixel(x,y)
+				if Vector3(a.r,a.g,a.b).distance_to(Vector3(b.r,b.g,b.b)) > 0.015: shaded_pixels += 1
+		check(shaded_pixels > 50,"Overview renders forest coverage without individual tree geometry")
+		editor._layer_buttons.trees[0].button_pressed = true
+		rig._zoom = rig._fit_size/(unit_size*pixel_height/8.0)
+		rig._apply_zoom()
+		await process_frame
+		await RenderingServer.frame_post_draw
+		root.get_texture().get_image().save_png("res://.test-runtime/forest-transition.png")
 		var uv: Vector2 = forest.positions[forest.positions.size()/2]
 		rig.max_zoom = 2048.0
 		rig.closest_view_size = 1.0

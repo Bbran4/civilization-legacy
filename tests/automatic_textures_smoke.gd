@@ -68,6 +68,19 @@ func _run() -> void:
 		set_normalized(renderer,heights,12)
 		var snow := sample(await capture())
 		check(snow.r+snow.g+snow.b > (grass.r+grass.g+grass.b)*1.3,"High elevations receive snow")
+		var previous := Color.BLACK
+		var first_snow := Color.BLACK
+		var last_snow := Color.BLACK
+		var max_jump := 0.0
+		for i in range(25):
+			heights.fill(0.76+i*0.005)
+			set_normalized(renderer,heights,12)
+			var transition := sample(await capture())
+			if i == 0: first_snow = transition
+			else: max_jump = maxf(max_jump,Vector3(transition.r-previous.r,transition.g-previous.g,transition.b-previous.b).length())
+			previous = transition
+			last_snow = transition
+		check(max_jump < 0.08 and last_snow.r+last_snow.g+last_snow.b > first_snow.r+first_snow.g+first_snow.b+0.25,"Snowline blends continuously across a rendered elevation sweep")
 		heights = PackedFloat32Array([0.21,0.7,0.99,0.21,0.7,0.99,0.21,0.7,0.99])
 		set_normalized(renderer,heights,100)
 		settings.snow_height = 100.0
@@ -78,6 +91,41 @@ func _run() -> void:
 		renderer.set_texturing(settings,"42",true)
 		var vegetation := sample(await capture())
 		check(vegetation.g-vegetation.r > rock.g-rock.r+0.02,"Slope threshold controls exposed rock")
+		# Render a real mask boundary on flat ground. Compare only ground pixels;
+		# the overlay itself must not be mistaken for a bank-material change.
+		heights.fill(0.4)
+		set_normalized(renderer,heights,12)
+		var dry := await capture()
+		var bank_water = load("res://scripts/domain/terrain_water_layer.gd").new()
+		bank_water.mask_size = Vector2i(128,128)
+		var bank_mask := Image.create(128,128,false,Image.FORMAT_RGBA8)
+		bank_mask.fill(Color(0,0,0,0))
+		for y in range(128):
+			for x in range(61,67): bank_mask.set_pixel(x,y,Color(1,0,0,1))
+		bank_water.mask_bytes = bank_mask.get_data()
+		renderer.set_water_layer(bank_water,true)
+		var river_banks := await capture()
+		river_banks.save_png("res://.test-runtime/material-river-banks.png")
+		var near := Vector2(0.53,0.5)
+		var far := Vector2(0.65,0.5)
+		var dry_near := sample(dry,near)
+		var damp := sample(river_banks,near)
+		check(damp.r+damp.g+damp.b < dry_near.r+dry_near.g+dry_near.b-0.015,"Dry riverbank soil darkens beside the water")
+		check(sample(dry,far).is_equal_approx(sample(river_banks,far)),"Bank material influence remains local")
+		var horizontal = load("res://scripts/domain/terrain_water_layer.gd").new()
+		horizontal.mask_size = Vector2i(128,128)
+		bank_mask.rotate_90(CLOCKWISE)
+		horizontal.mask_bytes = bank_mask.get_data()
+		renderer.set_water_layer(horizontal,true)
+		var horizontal_banks := await capture()
+		var h_dry := sample(dry,Vector2(0.5,0.53))
+		var h_damp := sample(horizontal_banks,Vector2(0.5,0.53))
+		check(h_damp.r+h_damp.g+h_damp.b < h_dry.r+h_dry.g+h_dry.b-0.015,"Banks also appear beside horizontal rivers")
+		renderer.set_water_layer(bank_water,true)
+		renderer.set_water_layer(bank_water,false)
+		check(sample(await capture(),near).is_equal_approx(damp),"Hiding water artwork preserves geographic bank placement")
+		renderer.set_water_layer(null,false)
+		check(sample(await capture(),near).is_equal_approx(dry_near),"Removing water clears derived bank materials")
 		var paint = load("res://scripts/domain/map_paint.gd").new()
 		paint.image.fill(Color(1,0,1,1))
 		paint.refresh()

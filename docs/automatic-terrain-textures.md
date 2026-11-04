@@ -14,9 +14,16 @@ their previous appearance until the user enables it; version 13 saves the choice
   coarse material-variation field; RGB carries albedo.
 - `rendering/automatic_ground.gdshaderinc` owns continuous placement/blending from
   existing terrain/geography textures. Gentle land blends grass and earth;
-  geographic shoreline distance estimates supply sand; broad world-scale slope
-  supplies exposed rock; altitude supplies snow. Nearby water increases greenery.
+  geographic shoreline distance estimates supply slope-limited sand with varying
+  width; broad world-scale slope supplies exposed rock; altitude supplies snow.
+  Seeded macro variation and tile alpha break up material edges, including a softer
+  snowline. Two differently oriented grass/earth samples reduce obvious repetition.
   Rock uses triplanar coordinates to reduce stretching on steep faces.
+- A nine-point local water estimate includes diagonal banks. River edges expose
+  darker damp soil with greener outer fringes; lake shores gain damp sand. Reach
+  respects both world units and the water mask resolution. This is appearance only:
+  water visibility does not redefine the geographic bank input, while removing the
+  mask removes its bank influence. Paint and political/water overlays retain priority.
 - `terrain_map_renderer.gd` retains one library per world seed/variation. Changing
   seed/variation replaces the library; scale and coverage settings only update
   uniforms. Hidden/disabled textures do not trigger generation. Zoom does not
@@ -37,8 +44,9 @@ soil model. Finite tiles repeat, although macro variation and mip filtering redu
 repetition. There are no generated microgeometry or material normal maps yet.
 
 Generation is synchronous but bounded to five small images. The material adds five
-samplers (fourteen total in the current combined shader), so the tested Compatibility
-hardware supports the full shader. Runtime CPU/frame-time/memory benchmarks have
+samplers, and the tested Compatibility hardware supports the full combined shader.
+The blending pass adds texture reads for bank sampling and grass/earth detail;
+it adds no textures, CPU bakes or saved settings. Runtime CPU/frame-time/memory benchmarks have
 not been claimed. Color/contrast and visual thresholds remain art-direction choices.
 
 ## Verification
@@ -48,6 +56,9 @@ changed variations, bounded tiles/mipmaps, invalid settings, GPU grass/sand/rock
 placement, paint/water priority, raw grayscale, cached-library reuse, UI locking and
 visibility, JSON reload, legacy appearance and fail-before-apply behavior. Captured
 flat and close-up views are under `.test-runtime/` for visual inspection.
+The blending regression also renders a 25-step snowline elevation sweep and
+vertical/horizontal river masks: nearby dry bank pixels darken, distant ground
+stays unchanged, hiding water preserves banks, and removing its mask clears them.
 
 Executed on locally available Godot 4.5.1 Mono with OpenGL Compatibility; exact
 project-target 4.7 behavior remains unverified. The engine emits certificate-store
@@ -59,3 +70,6 @@ Executed checks for this change: automatic texture checks pass headless and with
 GPU rendering; `map_paint_smoke.gd` and `zoom_relief_smoke.gd` pass with graphics;
 `git diff --check` is clean. The GPU checks also confirm that hiding generated water
 reveals the textured bed rather than leaving a duplicate water layer underneath.
+
+For the blending refinement, GPU `automatic_textures_smoke.gd` and headless
+`forest_smoke.gd` / `map_paint_smoke.gd` completed with zero failures on that engine.

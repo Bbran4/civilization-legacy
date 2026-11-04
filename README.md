@@ -76,9 +76,10 @@ bound: available ground and spacing can leave fewer trees. Tree lock protects
 settings; world regeneration still updates placement so forests follow geography.
 Manual ground-color strokes do not remove or regenerate trees.
 
-The layer eye hides trees. Raw height inspection hides them automatically. Roots
-follow the same displayed terrain mesh through zoom, with smaller crowns in the
-flat overview. Zoom/pan reuses existing instances. The current models are original,
+The layer eye hides trees and forest shading. Raw height inspection hides them
+automatically. The overview shows forest shading; individual trees fade in as you
+zoom closer. Roots follow the same displayed terrain mesh through zoom. Zoom/pan
+reuses existing placements and coverage. The current models are original,
 procedurally built low-poly trees with slight wind sway; there are no external
 model dependencies. There is no manual tree-planting/erasing brush yet.
 
