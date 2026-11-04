@@ -2,6 +2,8 @@ shader_type spatial;
 render_mode unshaded, cull_disabled;
 #include "res://scripts/rendering/map_geography.gdshaderinc"
 #include "res://scripts/rendering/map_relief.gdshaderinc"
+#include "res://scripts/rendering/map_lighting.gdshaderinc"
+varying vec3 map_world_position;
 uniform vec2 map_extent = vec2(192.0);
 uniform float coast_width = 4.5;
 uniform float coast_distant_scale = 0.35;
@@ -120,36 +122,57 @@ float geographic_outline(vec2 at) {
 vec3 province_tint(float id) {
     return 0.3 + 0.6 * fract(sin(vec3(id,id+17.0,id+43.0))*43758.5453);
 }
-void vertex() { VERTEX.y = relief_height(UV); }
+void vertex() {
+    VERTEX.y = relief_height(UV);
+    map_world_position = (MODEL_MATRIX*vec4(VERTEX,1.0)).xyz;
+}
 void fragment() {
 	float h = texture(height_field, UV).r;
 	float value = h;
+	vec3 illumination = vec3(1.0);
 	if (shaded_relief) {
 		float dx = texture(height_field, UV + vec2(texel_size.x, 0.0)).r - texture(height_field, UV - vec2(texel_size.x, 0.0)).r;
 		float dy = texture(height_field, UV + vec2(0.0, texel_size.y)).r - texture(height_field, UV - vec2(0.0, texel_size.y)).r;
 		float resolution_scale = float(max(textureSize(height_field, 0).x, textureSize(height_field, 0).y)) / 1025.0;
 		vec3 n = normalize(vec3(-dx * 45.0 * resolution_scale, 1.0, -dy * 45.0 * resolution_scale));
 		vec2 mesh_step = 1.0/vec2(textureSize(relief_vertices,0)-1);
-		float hx = (relief_height(UV+vec2(mesh_step.x,0.0))-relief_height(UV-vec2(mesh_step.x,0.0)))/(2.0*mesh_step.x*map_extent.x);
-		float hz = (relief_height(UV+vec2(0.0,mesh_step.y))-relief_height(UV-vec2(0.0,mesh_step.y)))/(2.0*mesh_step.y*map_extent.y);
+		float right = relief_height(UV+vec2(mesh_step.x,0.0));
+		float left = relief_height(UV-vec2(mesh_step.x,0.0));
+		float back = relief_height(UV+vec2(0.0,mesh_step.y));
+		float front = relief_height(UV-vec2(0.0,mesh_step.y));
+		float hx = (right-left)/(2.0*mesh_step.x*map_extent.x);
+		float hz = (back-front)/(2.0*mesh_step.y*map_extent.y);
 		n = normalize(mix(n,normalize(vec3(-hx,1.0,-hz)),relief_amount));
-		float light = 0.55 + 0.45 * max(dot(n, normalize(vec3(-0.6, 0.8, -0.4))), 0.0);
+		illumination = map_light(normalize(mat3(MODEL_MATRIX)*n));
+		float cavity = max(0.0,(right+left+back+front)*0.25-relief_height(UV));
+		float neighborhood = max(0.001,min(mesh_step.x*map_extent.x,mesh_step.y*map_extent.y));
+		illumination *= 1.0-min(0.14,cavity/neighborhood*0.9)*relief_amount;
+		float light = dot(illumination,vec3(0.2126,0.7152,0.0722));
 		value = h < 0.2 ? h * 0.35 : clamp(0.25 + h * 0.7, 0.0, 1.0) * light;
 	}
 	vec3 color = height_enabled ? vec3(value) : vec3(0.02);
 	if (textures_enabled && shaded_relief) {
 		// Generated lake water remains an overlay: hiding it reveals the textured bed.
-		color = texture(geography_heights,UV).r > 0.2 ? automatic_ground(UV,h,value) : vec3(0.055,0.16,0.24);
+		float source_height = texture(geography_heights,UV).r;
+		color = source_height > 0.2 ? automatic_ground(UV,h,value) : mix(vec3(0.035,0.105,0.16),vec3(0.07,0.21,0.28),smoothstep(0.02,0.2,source_height));
 	}
 	// Forest overview follows actual placements, below paint and political/water overlays.
 	if (forest_enabled && shaded_relief && geographic_land(UV)) {
-		float cover = texture(forest_cover,UV).r*forest_overview;
+		float footprint = texture(forest_cover,UV).r;
+		float cover = footprint*forest_overview;
 		color = mix(color,color*vec3(0.48,0.70,0.45),cover*0.65);
+		// Soft ground contact, not an engine shadow map or moving cast shadow.
+		color *= 1.0-footprint*(1.0-forest_overview)*0.12*relief_amount;
 	}
 	// Appearance is above the height/surface shading and below every overlay.
 	if (paint_enabled && shaded_relief && geographic_land(UV)) {
 		vec4 paint = texture(paint_field,UV);
 		color = mix(color,paint.rgb*(0.55+value*0.65),paint.a);
+	}
+	if (shaded_relief) {
+		float brightness = max(dot(illumination,vec3(0.2126,0.7152,0.0722)),0.001);
+		color *= illumination/brightness;
+		color = map_haze(color,map_world_position,relief_amount);
 	}
 	if (provinces_enabled && shaded_relief) {
 		float id = province_id(UV);
@@ -180,8 +203,8 @@ void fragment() {
 	}
 	if (water_enabled && (shaded_relief || !height_enabled)) {
 		vec2 water = texture(water_field, UV).rg;
-		color = mix(color, vec3(0.223529, 0.498039, 0.658824), water.r);
-		color = mix(color, vec3(0.156863, 0.403922, 0.537255), water.g);
+		color = mix(color, map_haze(vec3(0.20,0.44,0.56),map_world_position,shaded_relief ? relief_amount : 0.0), water.r);
+		color = mix(color, map_haze(vec3(0.15,0.36,0.46),map_world_position,shaded_relief ? relief_amount : 0.0), water.g);
 	}
 	if (provinces_enabled && shaded_relief && vector_borders) color = mix(color,vec3(0.055,0.065,0.07),geographic_outline(UV));
 	ALBEDO = color;

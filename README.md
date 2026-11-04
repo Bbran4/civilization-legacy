@@ -90,6 +90,15 @@ reuses existing placements and coverage. The current models are original,
 procedurally built low-poly trees with slight wind sway; there are no external
 model dependencies. There is no manual tree-planting/erasing brush yet.
 
+## Lighting and atmosphere
+
+Terrain and trees share warm sunlight and cool sky fill in the editor and gameplay.
+Valleys receive subtle shading, and forests have soft ground contact shading.
+Oblique views gain a light distance haze; the top-down overview stays clear.
+Water uses a calmer palette with a depth gradient for open sea. Province fills
+and border lines retain their readability, and raw-height inspection stays neutral.
+These effects use the map shaders, without volumetric fog or dynamic cast shadows.
+
 ## Zoom-based 3D terrain
 
 The full map starts flat and top-down. Zooming from 1× to 3× smoothly tilts the

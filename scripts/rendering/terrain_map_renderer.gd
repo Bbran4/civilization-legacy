@@ -3,6 +3,8 @@ extends RefCounted
 const Texturing = preload("res://scripts/domain/terrain_texturing.gd")
 const TextureLibrary = preload("res://scripts/rendering/procedural_ground_textures.gd")
 const Regions = preload("res://scripts/domain/world_regions.gd")
+const Lighting = preload("res://scripts/rendering/map_lighting.gd")
+var lighting := Lighting.new()
 var regions: RefCounted
 var _ground_library: RefCounted
 const Grid = preload("res://scripts/domain/heightmap_grid.gd")
@@ -47,6 +49,7 @@ var _relief_dirty := true
 func _init(target: MeshInstance3D) -> void:
 	surface = target
 	material.shader = SHADER
+	lighting.bind(material)
 	borders = Borders.new(surface)
 	surface.material_override = material
 
@@ -248,6 +251,11 @@ func set_texturing(settings: Dictionary, world_seed: String, visible: bool) -> S
 func bind_relief_material(target: ShaderMaterial) -> void:
 	target.set_shader_parameter("relief_vertices",_relief_texture)
 	target.set_shader_parameter("relief_amount",visible_relief)
+	lighting.bind(target)
+
+func update_lighting(sun: DirectionalLight3D, environment: Environment, camera: Camera3D, focus: Vector3) -> void:
+	lighting.update(sun,environment,camera,focus)
+	lighting.bind(material)
 
 # Return normalized elevation and physical slope, or a rejected site. Both root
 # and canopy footprint use the canonical source/water facts, even if water is hidden.

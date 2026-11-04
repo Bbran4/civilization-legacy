@@ -24,16 +24,10 @@ var _zoom: float = 1.0
 	set(value):
 		closest_view_size = clampf(value, 0.5, 128.0)
 		_apply_zoom()
-var _sun_shadows_enabled: bool = true
-var _sun_shadow_opacity: float = 1.0
 @onready var _camera: Camera3D = $Camera3D
 
 
 func _ready() -> void:
-	var sun = get_parent().get_node_or_null("Sun")
-	if sun is DirectionalLight3D:
-		_sun_shadows_enabled = sun.shadow_enabled
-		_sun_shadow_opacity = sun.shadow_opacity
 	_reset_view()
 	get_parent().get_node("Terrain").terrain_regenerated.connect(_map_changed)
 	get_viewport().size_changed.connect(_reset_view)
@@ -148,10 +142,6 @@ func _apply_pose() -> void:
 	var pitch: float = lerpf(_pitch, 90.0, overview)
 	rotation_degrees = Vector3(-pitch, _yaw * (1.0 - overview), 0.0)
 	terrain.set_overview_blend(overview)
-	var sun = get_parent().get_node_or_null("Sun")
-	if sun is DirectionalLight3D:
-		sun.shadow_opacity = _sun_shadow_opacity * (1.0 - overview)
-		sun.shadow_enabled = _sun_shadows_enabled and overview < 0.999
 
 
 func _pan_down() -> Vector3:
@@ -171,6 +161,4 @@ func _fit_depth() -> void:
 	_camera.position.z = depth + 32.0
 	_camera.near = 1.0
 	_camera.far = depth * 2.0 + 64.0
-	var sun = get_parent().get_node_or_null("Sun")
-	if sun is DirectionalLight3D:
-		sun.directional_shadow_max_distance = _camera.far
+	terrain.sync_map_lighting(_camera,global_position)

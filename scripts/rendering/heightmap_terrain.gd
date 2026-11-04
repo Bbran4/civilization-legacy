@@ -630,6 +630,17 @@ func set_overview_blend(value: float) -> void:
 	if map_renderer != null: map_renderer.set_relief(1.0-overview_blend)
 	if forest_view != null: forest_view.update_presentation(self)
 
+func sync_map_lighting(camera: Camera3D, focus: Vector3) -> void:
+	if map_renderer == null: return
+	var world := get_parent().get_node_or_null("WorldEnvironment") as WorldEnvironment
+	# The camera rig can stay at overview Y=0 while relief rises underneath it.
+	# Anchor distance haze to the displayed ground, not that stale target altitude.
+	var local_focus := to_local(focus)
+	var uv := (Vector2(local_focus.x,local_focus.z)/display_size()+Vector2.ONE*0.5).clamp(Vector2.ZERO,Vector2.ONE)
+	local_focus.y = visible_surface_height(uv)
+	map_renderer.update_lighting(get_parent().get_node_or_null("Sun") as DirectionalLight3D,world.environment if world != null else null,camera,to_global(local_focus))
+	if forest_view != null: map_renderer.lighting.bind(forest_view.material)
+
 func set_heightmap_view(_enabled: bool) -> void:
 	heightmap_view = true
 

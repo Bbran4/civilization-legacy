@@ -6,10 +6,10 @@
 
 [sub_resource type="Environment" id="Environment_world"]
 background_mode = 1
-background_color = Color(0.055, 0.085, 0.11, 1)
+background_color = Color(0.075, 0.10, 0.13, 1)
 ambient_light_source = 3
-ambient_light_color = Color(0.72, 0.81, 0.9, 1)
-ambient_light_energy = 0.3
+ambient_light_color = Color(0.76, 0.84, 0.95, 1)
+ambient_light_energy = 0.38
 
 [sub_resource type="FastNoiseLite" id="Noise_land"]
 seed = 42
@@ -27,12 +27,10 @@ fractal_octaves = 4
 environment = SubResource("Environment_world")
 
 [node name="Sun" type="DirectionalLight3D" parent="." unique_id=707824059]
-transform = Transform3D(0.8660254, 0.40957603, -0.28678823, 0, 0.57357645, 0.81915206, 0.5, -0.7094065, 0.49673176, 0, 0, 0)
-light_color = Color(1, 0.9, 0.74, 1)
+rotation_degrees = Vector3(-52, -35, 0)
+light_color = Color(1, 0.95, 0.86, 1)
 light_energy = 0.85
-shadow_enabled = true
-shadow_blur = 1.5
-directional_shadow_mode = 0
+shadow_enabled = false
 
 [node name="Terrain" type="Node3D" parent="." unique_id=492534778]
 script = ExtResource("1_terrain")
