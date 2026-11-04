@@ -157,7 +157,7 @@ func _build(terrain: Node, ceiling: float, max_slope: float) -> void:
 		instance.name = "Forest_%d_%d_%d" % [bucket.x,bucket.y,bucket.z]
 		instance.multimesh = multimesh
 		instance.material_override = material
-		instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		instance.set_meta("footprint",rect.grow(height))
 		instance.set_meta("height",height)
 		add_child(instance)

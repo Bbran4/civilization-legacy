@@ -1,5 +1,5 @@
 shader_type spatial;
-render_mode unshaded, cull_disabled;
+render_mode cull_disabled, ambient_light_disabled, specular_disabled, fog_disabled;
 #include "res://scripts/rendering/map_geography.gdshaderinc"
 #include "res://scripts/rendering/map_relief.gdshaderinc"
 #include "res://scripts/rendering/map_lighting.gdshaderinc"
@@ -161,8 +161,6 @@ void fragment() {
 		float footprint = texture(forest_cover,UV).r;
 		float cover = footprint*forest_overview;
 		color = mix(color,color*vec3(0.48,0.70,0.45),cover*0.65);
-		// Soft ground contact, not an engine shadow map or moving cast shadow.
-		color *= 1.0-footprint*(1.0-forest_overview)*0.12*relief_amount;
 	}
 	// Appearance is above the height/surface shading and below every overlay.
 	if (paint_enabled && shaded_relief && geographic_land(UV)) {
@@ -208,4 +206,13 @@ void fragment() {
 	}
 	if (provinces_enabled && shaded_relief && vector_borders) color = mix(color,vec3(0.055,0.065,0.07),geographic_outline(UV));
 	ALBEDO = color;
+	float shadow_weight = shaded_relief ? map_shadow_strength*relief_amount : 0.0;
+	// Keep political colors legible while retaining relief/cast-shadow depth.
+	if (provinces_enabled) shadow_weight *= 0.7;
+	EMISSION = color*(1.0-shadow_weight);
+}
+void light() {
+	float strength = shaded_relief ? map_shadow_strength*relief_amount : 0.0;
+	if (provinces_enabled) strength *= 0.7;
+	if (LIGHT_IS_DIRECTIONAL) DIFFUSE_LIGHT += vec3(strength*ATTENUATION);
 }

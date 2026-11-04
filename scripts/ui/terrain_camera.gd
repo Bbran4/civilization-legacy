@@ -161,4 +161,10 @@ func _fit_depth() -> void:
 	_camera.position.z = depth + 32.0
 	_camera.near = 1.0
 	_camera.far = depth * 2.0 + 64.0
+	var sun := get_parent().get_node_or_null("Sun") as DirectionalLight3D
+	if sun != null:
+		# Orthographic overview has no raised casters. Keep close-view shadows
+		# inside the same fitted depth range as the visible map.
+		sun.shadow_enabled = terrain.map_renderer != null and terrain.map_renderer.visible_relief > 0.001
+		sun.directional_shadow_max_distance = _camera.far
 	terrain.sync_map_lighting(_camera,global_position)

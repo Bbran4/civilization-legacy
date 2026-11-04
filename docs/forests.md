@@ -39,7 +39,9 @@ conifer instances are batched by species into an 8×8 spatial grid (at most 128
 MultiMesh draws), allowing chunk culling in close views. Per-instance color is
 explicitly initialized; vertex colors are passed explicitly to the fragment stage
 for Compatibility rendering. A shared material applies mild wind and directional
-shading. Trees do not cast dynamic shadows in this implementation.
+shading. Tree batches cast dynamic directional shadows using their actual meshes
+and displaced roots; ground and foliage receive them through the shared shadow
+light pass. Hidden overview batches do not cast shadows. See `map-lighting.md`.
 
 The forest shader uses the renderer's shared relief grid for root heights. Instance
 scale is accounted for, so roots do not float as the map rises/flattens. Culling

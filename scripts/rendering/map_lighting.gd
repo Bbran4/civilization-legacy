@@ -9,7 +9,9 @@ var haze_focus := Vector3.ZERO
 var haze_forward := Vector3.FORWARD
 var haze_span := 100.0
 var haze_strength := 0.0
+var shadow_strength := 0.0
 func update(sun: DirectionalLight3D, environment: Environment, camera: Camera3D, focus: Vector3) -> void:
+	shadow_strength = 0.52 if sun != null and sun.visible and sun.shadow_enabled else 0.0
 	if sun != null:
 		sun_direction = sun.global_basis.z.normalized()
 		sun_color = Vector3(sun.light_color.r,sun.light_color.g,sun.light_color.b)
@@ -34,3 +36,4 @@ func bind(target: ShaderMaterial) -> void:
 	target.set_shader_parameter("map_haze_forward",haze_forward)
 	target.set_shader_parameter("map_haze_span",haze_span)
 	target.set_shader_parameter("map_haze_strength",haze_strength)
+	target.set_shader_parameter("map_shadow_strength",shadow_strength)

@@ -1,5 +1,5 @@
 shader_type spatial;
-render_mode unshaded, cull_back;
+render_mode cull_back, ambient_light_disabled, specular_disabled, fog_disabled;
 #include "res://scripts/rendering/map_relief.gdshaderinc"
 #include "res://scripts/rendering/map_lighting.gdshaderinc"
 uniform float tree_detail = 1.0;
@@ -22,4 +22,8 @@ void fragment() {
     float threshold = fract(52.9829189*fract(dot(floor(FRAGCOORD.xy),vec2(0.06711056,0.00583715))));
     if (tree_detail <= threshold) discard;
     ALBEDO = map_haze(tree_color*map_light(normalize(tree_normal))*mix(0.8,1.08,tree_variation),tree_world_position,relief_amount);
+    EMISSION = ALBEDO*(1.0-map_shadow_strength*relief_amount);
+}
+void light() {
+    if (LIGHT_IS_DIRECTIONAL) DIFFUSE_LIGHT += vec3(map_shadow_strength*relief_amount*ATTENUATION);
 }

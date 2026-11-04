@@ -8,6 +8,9 @@ uniform vec3 map_haze_focus = vec3(0.0);
 uniform vec3 map_haze_forward = vec3(0.0,0.0,-1.0);
 uniform float map_haze_span = 100.0;
 uniform float map_haze_strength = 0.0;
+// The custom palette supplies illumination; Godot's light pass supplies only
+// shadow visibility, avoiding a second diffuse/ambient lighting calculation.
+uniform float map_shadow_strength = 0.0;
 vec3 map_light(vec3 normal) {
     float key = max(dot(normalize(normal),normalize(map_sun_direction)),0.0);
     float sky = mix(0.82,1.0,clamp(normal.y*0.5+0.5,0.0,1.0));
