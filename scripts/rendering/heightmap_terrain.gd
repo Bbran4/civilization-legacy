@@ -376,12 +376,16 @@ func enter_world_painter() -> void:
 	var saved_water: RefCounted = water_layer
 	var saved_surface: RefCounted = terrain_surface
 	var saved_provinces: RefCounted = province_layer
+	var saved_heights := height_samples.duplicate()
 	heightmap_only = false
 	heightmap_view = false
 	shaded_relief = true
 	flat_map_mode = false
 	show_water = true
 	regenerate()
+	if saved_heights.size() == sample_size().x * sample_size().y:
+		height_samples = saved_heights
+		_build_mesh(_mesh_node("Surface"))
 	water_layer = saved_water
 	terrain_surface = saved_surface
 	province_layer = saved_provinces

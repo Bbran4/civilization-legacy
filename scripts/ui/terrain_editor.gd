@@ -877,7 +877,7 @@ func _stop_brush() -> void:
 		_brush.enabled.button_pressed = false
 
 func can_edit(key: String) -> bool:
-	if _terrain.heightmap_only and key not in ["heightmap", "rivers", "surface", "provinces"]:
+	if _terrain.heightmap_only and key not in ["heightmap", "rivers", "surface", "provinces", "ground"]:
 		return false
 	for layer in layers:
 		if layer.id == key:
@@ -886,7 +886,7 @@ func can_edit(key: String) -> bool:
 
 func regeneration_error(key: String) -> String:
 	if _terrain.heightmap_only:
-		if key not in ["heightmap", "rivers", "surface", "provinces"] or not can_edit(key):
+		if key not in ["heightmap", "rivers", "surface", "provinces", "ground"] or not can_edit(key):
 			return "Show and unlock the selected layer before generating."
 		if key in ["heightmap", "rivers", "surface"]:
 			for layer in layers:
@@ -1342,6 +1342,7 @@ func build_terrain_surface() -> void:
 func generate_natural_ground() -> void:
 	if _terrain.heightmap_only:
 		_enter_world_painter()
+		_surface_status.text = "World Painter opened. The existing world is preserved; select Terrain surface to rebuild relief if needed."
 		return
 	if _surface_busy or _water_busy or _province_busy:
 		return
