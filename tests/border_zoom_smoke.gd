@@ -44,6 +44,8 @@ func _run() -> void:
 				record.nation_id = 0
 			layer.ocean_generated = true
 			layer._index_regions()
+			heights.fill(0.1)
+			renderer.set_heightfield(heights,layer.size,Vector2(128,128),0,1,2)
 			renderer.set_provinces(layer,true)
 		for zoom_size in [24.0,12.0,6.0]:
 			camera.size = zoom_size
@@ -70,6 +72,8 @@ func _run() -> void:
 		record.nation_id = record.id
 	layer._index_regions()
 	renderer.set_provinces(layer,true)
+	heights.fill(0.5)
+	renderer.set_heightfield(heights,layer.size,Vector2(128,128),0,1,2)
 	var settings: Dictionary = preload("res://scripts/domain/border_appearance.gd").DEFAULTS.duplicate()
 	settings.nation_width = 7.0
 	settings.distant_scale = 0.2

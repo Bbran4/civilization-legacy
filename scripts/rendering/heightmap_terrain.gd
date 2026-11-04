@@ -552,7 +552,7 @@ func refresh_water_layer() -> void:
 		map_renderer.set_border_appearance(border_appearance)
 		map_renderer.set_provinces(province_layer, province_layer_visible and province_layer_current() and shaded_relief)
 		map_renderer.set_height_layer_visible(height_layer_visible or derived)
-		map_renderer.set_water_layer(water_layer, water_layer_visible and water_layer_current())
+		map_renderer.set_water_layer(water_layer if water_layer_current() else null, water_layer_visible and water_layer_current())
 
 func install_water_layer(layer: RefCounted) -> String:
 	if layer == null or layer.source_hash != water_source_hash or layer.mask_size != sample_size():

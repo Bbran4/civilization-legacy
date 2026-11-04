@@ -33,6 +33,8 @@ func set_heightfield(samples: PackedFloat32Array, size: Vector2i, extent: Vector
 	surface.mesh = plane
 	surface.material_override = material
 	_base_texture = ImageTexture.create_from_image(Image.create_from_data(size.x, size.y, false, Image.FORMAT_RF, normalized_heights.to_byte_array()))
+	material.set_shader_parameter("geography_heights",_base_texture)
+	borders.set_geography(_base_texture)
 	set_terrain_surface(null, false)
 	material.set_shader_parameter("texel_size", Vector2.ONE / Vector2(size))
 	set_shaded_relief(shaded_relief)
@@ -44,10 +46,11 @@ func set_shaded_relief(enabled: bool) -> void:
 
 func set_water_layer(layer: RefCounted, enabled: bool) -> void:
 	material.set_shader_parameter("water_enabled", enabled and layer != null)
-	if layer != null and enabled:
-		material.set_shader_parameter("water_field", layer.texture())
-	else:
-		material.set_shader_parameter("water_field", null)
+	var water_texture: Texture2D = layer.texture() if layer != null else null
+	material.set_shader_parameter("water_field",water_texture)
+	material.set_shader_parameter("geography_water",water_texture)
+	material.set_shader_parameter("geography_has_water",layer != null)
+	borders.set_water(water_texture)
 
 func set_height_layer_visible(enabled: bool) -> void:
 	material.set_shader_parameter("height_enabled", enabled)
@@ -69,6 +72,7 @@ func _update_nation_colors(layer: RefCounted) -> void:
 	if _nation_source == layer and _nation_revision == layer.border_revision: return
 	var image := Image.create(256,256,false,Image.FORMAT_RGBA8)
 	var kinds := Image.create(256,256,false,Image.FORMAT_R8)
+	kinds.fill(Color(0,0,0))
 	image.fill(Color(0,0,0,0))
 	for record in layer.records:
 		if record.kind != "land":
@@ -88,6 +92,8 @@ func _update_nation_colors(layer: RefCounted) -> void:
 func set_border_appearance(settings: Dictionary) -> void:
 	borders.configure(settings)
 	material.set_shader_parameter("smooth_borders",settings.smooth)
+	material.set_shader_parameter("coast_width",settings.ocean_width)
+	material.set_shader_parameter("coast_distant_scale",settings.distant_scale)
 
 func set_paint(layer: RefCounted, enabled: bool) -> void:
 	material.set_shader_parameter("paint_enabled",enabled and layer != null)

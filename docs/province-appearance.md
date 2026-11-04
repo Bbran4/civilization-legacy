@@ -53,3 +53,32 @@ On Godot 4.7.2, OpenGL compatibility:
 The environment logs certificate-store and shader-cache write failures. The
 rendered assertions pass. Complex authored maps and performance have not been
 measured by these fixtures.
+
+
+## Geographic alignment
+
+Province IDs remain authoritative raster ownership. They no longer define the
+visible land/water edge: a categorical midpoint contour can disagree with the
+interpolated heightfield, producing gray slivers or province color in the sea.
+
+The shared `map_geography.gdshaderinc` defines the geographic footprint from the
+original normalized height texture (sea datum 0.2) and the lake mask (half coverage).
+Carved river/lake beds affect relief, not the sea datum or province ownership.
+Province fills extend the matching local land/sea class to this footprint. Coast
+and lake outlines use the same continuous field; internal political borders keep
+their categorical contour, style, and zoom-dependent width. Border ribbons are
+clipped to their geographic class. Impassable/unassigned land remains a political
+boundary rather than being mistaken for a lake or ocean coastline.
+
+The renderer binds current water facts independently of water artwork visibility.
+Hiding water therefore does not assign lakes to a land province. Stale water caches
+are excluded at the owning terrain boundary. The change does not rewrite IDs,
+province records, terrain samples, or saved files. Picking/editing continues to
+operate on authoritative raster IDs at their saved resolution.
+
+Validation on locally available Godot 4.5.1 OpenGL Compatibility:
+`province_geography_alignment_smoke.gd` tests expanded/contracted coastlines,
+outline placement, lakes and hidden water; `province_contour_alignment_smoke.gd`
+checks existing internal fill/contour agreement; `smooth_province_borders_smoke.gd`
+and `border_zoom_smoke.gd` check internal styles and width scaling. Exact Godot 4.7
+behavior and the user's particular saved map have not been reproduced here.

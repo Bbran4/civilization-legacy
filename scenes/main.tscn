@@ -36,19 +36,22 @@ directional_shadow_mode = 0
 
 [node name="Terrain" type="Node3D" parent="." unique_id=492534778]
 script = ExtResource("1_terrain")
-terrain_template = "Continents"
+terrain_template = "Old World"
+map_seed = "1324865"
+surface_smoothing = 0
 land_noise = SubResource("Noise_land")
 mountain_noise = SubResource("Noise_mountains")
 
 [node name="CameraRig" type="Node3D" parent="." unique_id=787485630]
 transform = Transform3D(1, 0, 0, 0, 0.57357645, 0.81915206, 0, -0.81915206, 0.57357645, 0, 0, 0)
 script = ExtResource("2_camera")
+max_zoom = 5.0
 
 [node name="Camera3D" type="Camera3D" parent="CameraRig" unique_id=2064744091]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 240)
 projection = 1
 current = true
-size = 180.0
+size = 100.0
 far = 2000.0
 
 [node name="Interface" type="CanvasLayer" parent="." unique_id=1751660738]

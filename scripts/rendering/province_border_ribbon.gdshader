@@ -1,11 +1,17 @@
 shader_type spatial;
 render_mode unshaded, cull_disabled, depth_draw_never, shadows_disabled;
+#include "res://scripts/rendering/map_geography.gdshaderinc"
+uniform sampler2D province_field : filter_nearest, repeat_disable;
+uniform bool land_border = true;
+uniform bool unassigned_border = false;
+varying vec2 map_uv;
 uniform float width_pixels = 1.3;
 uniform int border_style = 0;
 uniform float distant_scale = 0.35;
 uniform float reference_width = 1.0;
 uniform float dash_length = 2.4;
 void vertex() {
+	map_uv = UV2;
 	vec2 normal = COLOR.rg * 2.0 - 1.0;
 	vec4 clip = PROJECTION_MATRIX * MODELVIEW_MATRIX * vec4(VERTEX,1.0);
 	vec4 neighbor = PROJECTION_MATRIX * MODELVIEW_MATRIX * vec4(VERTEX + vec3(normal.x,0.0,normal.y),1.0);
@@ -23,6 +29,17 @@ float dash_integral(float x, float half_span) {
         + clamp(fract(x) - (0.5 - half_span), 0.0, 2.0 * half_span);
 }
 void fragment() {
+    if (geographic_land(map_uv) != land_border) discard;
+    // ID zero includes lakes/ocean and deliberately erased impassable land.
+    // Only the latter is a political boundary; geography owns the former.
+    if (land_border && unassigned_border) {
+        vec2 texel = 1.0/vec2(textureSize(province_field,0));
+        float blocked = 0.0;
+        for (int y=-1;y<=1;y++) for (int x=-1;x<=1;x++) {
+            blocked = max(blocked,round(texture(province_field,map_uv+vec2(float(x),float(y))*texel).b*255.0)==3.0 ? 1.0 : 0.0);
+        }
+        if (blocked < 0.5) discard;
+    }
     float aa = max(fwidth(UV.y), 0.02);
     float across = abs(UV.y);
     float edge = 1.0 - smoothstep(1.0-aa, 1.0, across);

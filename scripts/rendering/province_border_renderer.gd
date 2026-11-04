@@ -3,6 +3,8 @@ const Paths = preload("res://scripts/rendering/province_border_paths.gd")
 const Ribbon = preload("res://scripts/rendering/province_border_ribbon.gdshader")
 const Appearance = preload("res://scripts/domain/border_appearance.gd")
 var appearance: Dictionary = Appearance.DEFAULTS.duplicate()
+var geography_heights: Texture2D
+var geography_water: Texture2D
 var _smooth := true
 var root: Node3D
 var source: RefCounted
@@ -27,17 +29,21 @@ func update(layer: RefCounted,world_extent: Vector2,enabled: bool) -> void:
 		layer.border_geometry = Paths.new()
 		layer.border_geometry.build(layer.ids,layer.size,_smooth)
 	var groups: Dictionary = {}
+	var has_impassable: bool = layer.impassable.has(1)
 	for path in layer.border_geometry.paths:
 		var a: int = path.a
 		var b: int = path.b
 		var land_a: bool = a > 0 and layer.records[a-1].kind == "land"
 		var land_b: bool = b > 0 and layer.records[b-1].kind == "land"
+		# Geographic shorelines are traced from the continuous height/water fields.
+		if a > 0 and b > 0 and land_a != land_b: continue
+		if (land_a or land_b) and (a == 0 or b == 0) and not has_impassable: continue
 		var owner_a: int = layer.records[a-1].get("nation_id",0) if land_a else 0
 		var owner_b: int = layer.records[b-1].get("nation_id",0) if land_b else 0
 		var style := 0 if land_a and land_b else 1
 		if land_a and land_b and owner_a != owner_b and (owner_a > 0 or owner_b > 0): style = 2
-		var key := str(style)
-		if not groups.has(key): groups[key] = {"style":style,"vertices":PackedVector3Array(),"uv":PackedVector2Array(),"colors":PackedColorArray()}
+		var key := str(style)+"/"+str(land_a or land_b)+"/"+str(a == 0 or b == 0)
+		if not groups.has(key): groups[key] = {"style":style,"land":land_a or land_b,"unassigned":a == 0 or b == 0,"vertices":PackedVector3Array(),"uv":PackedVector2Array(),"map_uv":PackedVector2Array(),"colors":PackedColorArray()}
 		_append(groups[key],path.points,layer.size)
 	for key in groups:
 		var group: Dictionary = groups[key]
@@ -45,11 +51,16 @@ func update(layer: RefCounted,world_extent: Vector2,enabled: bool) -> void:
 		arrays.resize(Mesh.ARRAY_MAX)
 		arrays[Mesh.ARRAY_VERTEX] = group.vertices
 		arrays[Mesh.ARRAY_TEX_UV] = group.uv
+		arrays[Mesh.ARRAY_TEX_UV2] = group.map_uv
 		arrays[Mesh.ARRAY_COLOR] = group.colors
 		var mesh := ArrayMesh.new()
 		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
 		var material := ShaderMaterial.new()
 		material.shader = Ribbon
+		_bind_geography(material)
+		material.set_shader_parameter("province_field",layer.texture())
+		material.set_shader_parameter("land_border",group.land)
+		material.set_shader_parameter("unassigned_border",group.unassigned)
 		material.set_shader_parameter("border_style",group.style)
 		material.set_shader_parameter("width_pixels",appearance.nation_width if group.style == 2 else (appearance.province_width if group.style == 0 else appearance.ocean_width))
 		material.set_shader_parameter("distant_scale",appearance.distant_scale)
@@ -86,6 +97,7 @@ func _append(group: Dictionary,pixels: PackedVector2Array,size: Vector2i) -> voi
 func _vertex(group: Dictionary,point: Vector2,normal: Vector2,arc: float,side: float) -> void:
 	group.vertices.append(Vector3(point.x,0.06,point.y))
 	group.uv.append(Vector2(arc,side))
+	group.map_uv.append(point/extent+Vector2.ONE*0.5)
 	group.colors.append(Color(normal.x*0.5+0.5,normal.y*0.5+0.5,1.0/3.0,1.0))
 
 func configure(settings: Dictionary) -> void:
@@ -97,3 +109,14 @@ func configure(settings: Dictionary) -> void:
 		var style: int = material.get_shader_parameter("border_style")
 		material.set_shader_parameter("width_pixels",appearance.nation_width if style == 2 else (appearance.province_width if style == 0 else appearance.ocean_width))
 		material.set_shader_parameter("distant_scale",appearance.distant_scale)
+
+func _bind_geography(material: ShaderMaterial) -> void:
+	material.set_shader_parameter("geography_heights",geography_heights)
+	material.set_shader_parameter("geography_water",geography_water)
+	material.set_shader_parameter("geography_has_water",geography_water != null)
+func set_geography(texture: Texture2D) -> void:
+	geography_heights = texture
+	for child in root.get_children(): _bind_geography(child.material_override)
+func set_water(texture: Texture2D) -> void:
+	geography_water = texture
+	for child in root.get_children(): _bind_geography(child.material_override)
