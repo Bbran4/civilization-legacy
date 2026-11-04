@@ -4,6 +4,8 @@ extends Control
 const WorldProject = preload("res://scripts/storage/world_project.gd")
 const LayerGraph = preload("res://scripts/domain/map_layer_graph.gd")
 const ForestPanel = preload("res://scripts/ui/forest_panel.gd")
+const RegionalPanel = preload("res://scripts/ui/regional_panel.gd")
+var _regional_panel: RefCounted
 var _forest_panel: RefCounted
 const PaintBrush = preload("res://scripts/ui/map_paint_brush.gd")
 var _paint_brush: Node
@@ -208,6 +210,9 @@ func _build_interface() -> void:
 	_context("trees")
 	_forest_panel = ForestPanel.new()
 	_forest_panel.configure(self)
+	_context("regions")
+	_regional_panel = RegionalPanel.new()
+	_regional_panel.configure(self)
 	_context("view")
 	_section("VIEW")
 	_number("Minimum zoom (×)", "min_zoom", 0.1, 1, 0.1, true)
@@ -330,6 +335,7 @@ func _button(title: String, action: Callable, parent: Node = null, node_name: St
 func _sync_from_terrain() -> void:
 	_syncing = true
 	_paint_brush.sync_textures()
+	_regional_panel.sync()
 	_forest_panel.sync()
 	_sync_border_appearance_controls()
 	if _terrain.heightmap_only:
@@ -596,6 +602,7 @@ func _reset_cell_inspector() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _regional_panel != null and _regional_panel.handle_input(event): return
 	if _paint_brush != null and _paint_brush.handle_input(event): return
 	if _province_brush != null and _province_brush.handle_input(event):
 		return
@@ -744,7 +751,14 @@ func _select_layer(key: String) -> void:
 	_stop_brush()
 	if key == "trees": _forest_panel.update_status()
 
+func _show_regions() -> void:
+	_select_layer("paint")
+	_contexts.paint.visible = false
+	_contexts.regions.visible = true
+	_regional_panel.update_preview()
+
 func _stop_brush() -> void:
+	if _regional_panel != null: _regional_panel.stop()
 	if _paint_brush != null:
 		_paint_brush.cancel()
 		_paint_brush.enabled.button_pressed = false
@@ -964,6 +978,7 @@ func _return_from_map() -> void:
 	editor_world.process_mode = _editor_process_mode
 	get_parent().visible = true
 	_camera_rig._camera.make_current()
+	if _regional_panel.active(): _regional_panel.update_preview()
 
 func _request_app_close() -> void:
 	_return_from_map()

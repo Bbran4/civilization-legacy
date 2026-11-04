@@ -226,15 +226,17 @@ func visible_height(uv: Vector2) -> float:
 func visible_bounds() -> Vector2:
 	return mesh_bounds*visible_relief if shaded_relief else Vector2.ZERO
 
-func set_texturing(settings: Dictionary, world_seed: String, visible: bool) -> String:
+func set_texturing(settings: Dictionary, world_seed: String, visible: bool, regional_controls: RefCounted = null) -> String:
 	var error := Texturing.validate(settings)
 	if not error.is_empty(): return error
 	# Regions are shared with forests even when the ground appearance is hidden.
-	if regions == null or regions.seed_text != world_seed:
+	if regional_controls != null:
+		regions = regional_controls.field(world_seed)
+	elif regions == null or regions.seed_text != world_seed:
 		regions = Regions.new(world_seed)
-		material.set_shader_parameter("ground_regions",regions.texture)
-		material.set_shader_parameter("region_lapse",Regions.LAPSE)
-		material.set_shader_parameter("region_snow_cooling",Regions.SNOW_COOLING)
+	material.set_shader_parameter("ground_regions",regions.texture)
+	material.set_shader_parameter("region_lapse",Regions.LAPSE)
+	material.set_shader_parameter("region_snow_cooling",Regions.SNOW_COOLING)
 	var enabled: bool = settings.enabled and visible
 	material.set_shader_parameter("textures_enabled",enabled)
 	if not enabled: return ""

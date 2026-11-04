@@ -36,12 +36,13 @@ func refresh(terrain: Node) -> void:
 		ceiling = minf(ceiling,terrain.texture_settings.snow_height/100.0-0.04)
 		slope = minf(slope,terrain.texture_settings.rock_angle*0.75)
 	var next_key: String = terrain.water_source_hash+"/"+water_key+"/"+terrain.map_seed+"/"+JSON.stringify(settings)+"/"+str(ceiling)+"/"+str(slope)
+	next_key += "/"+terrain.map_renderer.regions.key
 	if next_key != key:
 		_build(terrain,ceiling,tan(deg_to_rad(slope)))
 		key = next_key
 	update_presentation(terrain)
 func update_presentation(terrain: Node) -> void:
-	visible = terrain.tree_settings.enabled and terrain.tree_layer_visible and terrain.shaded_relief
+	visible = terrain.tree_settings.enabled and terrain.tree_layer_visible and terrain.shaded_relief and terrain.region_preview == 0
 	var camera := get_viewport().get_camera_3d()
 	if camera != null and camera.projection == Camera3D.PROJECTION_ORTHOGONAL:
 		var extent: Vector2 = terrain.display_size()
@@ -97,8 +98,9 @@ func _build(terrain: Node, ceiling: float, max_slope: float) -> void:
 	var spacing: float = scale_factor*settings.size*1.2*0.6
 	var transforms: Array[Transform3D] = []
 	var custom := PackedColorArray()
+	var planted_slots := 0
 	for visit in range(cells):
-		if positions.size() >= int(settings.count): break
+		if planted_slots >= int(settings.count): break
 		attempts += 1
 		var cell := (first+visit*stride)%cells
 		rng.seed = (seed_text+"/"+str(cell)).hash()
@@ -112,10 +114,15 @@ func _build(terrain: Node, ceiling: float, max_slope: float) -> void:
 		for y in range(-1,2):
 			for x in range(-1,2):
 				for neighbor in occupied.get(bin+Vector2i(x,y),[]):
-					if (positions[neighbor]*extent).distance_to(location) < (scales[neighbor]+size)*0.28: crowded = true
+					if Vector2(neighbor.x,neighbor.y).distance_to(location) < (neighbor.z+size)*0.28: crowded = true
 		if crowded: continue
 		var site: Vector2 = terrain.map_renderer.forest_site(uv,size*0.34+scale_factor*0.12)
 		if site.x < 0 or site.x >= ceiling or site.y > max_slope: continue
+		# Geometry-based slots and spacing are independent of climate acceptance.
+		# Editing a region changes only its trees, never reassigns distant slots.
+		if not occupied.has(bin): occupied[bin] = []
+		occupied[bin].append(Vector3(location.x,location.y,size))
+		planted_slots += 1
 		var region: Vector2 = terrain.map_renderer.regions.sample(uv,site.x)
 		var local_ceiling: float = settings.tree_line/100.0-(1.0-region.x)*0.1
 		if terrain.texture_settings.enabled and terrain.texture_settings.snow_height < 100.0:
@@ -125,8 +132,6 @@ func _build(terrain: Node, ceiling: float, max_slope: float) -> void:
 		if rng.randf() > lerpf(0.12,1.0,suitability): continue
 		var kind := 1 if rng.randf() < clampf((1.0-region.x)*0.85+smoothstep(0.4,0.8,site.x)*0.2,0.08,0.95) else 0
 		var index := positions.size()
-		if not occupied.has(bin): occupied[bin] = []
-		occupied[bin].append(index)
 		positions.append(uv)
 		kinds.append(kind)
 		scales.append(size)

@@ -22,6 +22,9 @@ const HeightDetail = preload("res://scripts/domain/heightmap_detail.gd")
 const MapRenderer = preload("res://scripts/rendering/terrain_map_renderer.gd")
 const TerrainDocument = preload("res://scripts/storage/terrain_document.gd")
 const ForestSettings = preload("res://scripts/domain/forest_settings.gd")
+const RegionalControls = preload("res://scripts/domain/regional_controls.gd")
+var regional_controls: RefCounted = RegionalControls.new()
+var region_preview := 0
 const ForestView = preload("res://scripts/rendering/forest_view.gd")
 var tree_settings: Dictionary = ForestSettings.DEFAULTS.duplicate()
 var tree_layer_visible := true
@@ -551,7 +554,8 @@ func water_layer_current() -> bool:
 
 func refresh_water_layer() -> void:
 	if heightmap_only and map_renderer != null:
-		map_renderer.set_texturing(texture_settings,map_seed,paint_layer_visible)
+		map_renderer.set_texturing(texture_settings,map_seed,paint_layer_visible,regional_controls)
+		map_renderer.material.set_shader_parameter("region_preview",region_preview)
 		var derived := terrain_surface_current() and surface_layer_visible and shaded_relief
 		map_renderer.set_terrain_surface(terrain_surface, derived)
 		map_renderer.set_paint(map_paint, paint_layer_visible)

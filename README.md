@@ -50,6 +50,23 @@ Only five small material tiles are generated; their mipmaps filter distant detai
 Zooming and panning reuse the cached tiles. Source terrain changes automatically
 update placement, without baking or storing a world-sized texture image.
 
+## Regional controls
+
+Open **Ground paint → Regional controls…**. Choose warmth or moisture coverage to
+preview the climate field. Whole-map controls adjust warmth/moisture by up to 50
+percentage points; variation changes the generated pattern.
+
+For a local change, enable **Brush a selection on the map**, left-drag an area,
+set its adjustments/variation, then **Regenerate selected area**. Yellow shows the
+selection with a soft edge. **Reset selected to generated** removes local edits;
+**Undo regional change** or Ctrl+Z restores up to 16 changes. Whole-map offsets
+also apply to edited regions; whole-map variation preserves their local overrides.
+
+Ground appearance and forests update while geography stays unchanged. Trees
+outside the edited field's filtering footprint retain their placement and species.
+Regional edits save with the world and work in Play map. Ground paint visibility
+and lock protect regional editing. Previews and the current selection are temporary.
+
 ## Painting
 
 Run the main scene, select **Ground paint**, and enable the ground brush. Choose
@@ -123,12 +140,14 @@ previews follow its triangles. Existing saves work without regeneration.
 The overview uses a simple plane; close views reuse a prepared relief grid capped
 at 513 samples per longest axis. Full-resolution source heights remain unchanged.
 Fine features smaller than the display grid can be softened; this is a bounded
-mesh implementation, without tiled distance LOD. Lighting retains the shared
-shader's directional relief shading; dynamic cast shadows are not implemented.
+mesh implementation, without tiled distance LOD. Lighting combines shared relief
+shading with directional cast shadows in the raised 3D view.
 
 ## Storage
 
-Terrain document version 14 adds `tree_settings`; older saves keep trees disabled
+Terrain document version 15 adds saved `regional_controls`, with global choices
+and a bounded local override map. Older saves use the original generated regions.
+Version 14 adds `tree_settings`; older saves keep trees disabled
 until generation is requested. Version 13 introduced `texture_settings`; missing settings in older
 saves default to disabled. Version 12 introduced `map_paint`. Earlier saves load with a
 transparent paint layer. World manifest version 6 adds Trees; version 5 introduced the independent paint

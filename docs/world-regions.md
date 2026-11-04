@@ -1,37 +1,77 @@
-# Regional appearance
+# Regional controls and appearance
 
-`domain/world_regions.gd` owns one 128×128 RGBA8 field per world seed. Red holds
-lowland warmth and green holds moisture. Independent seeded noise perturbs warmth
-and moisture; top/bottom edges are cooler and the map center warmer. Elevation
-reduces warmth using the shared lapse constant. These are normalized artistic
-values, not degrees, rainfall, weather, seasons or a water-cycle simulation.
+Open Ground paint → Regional controls… for global controls, coverage previews and
+a selection brush. This is part of ground appearance, with its existing visibility
+and lock; it does not add a world layer. Trees follow the resulting climate even
+when their settings are locked, as they follow regenerated geography.
 
-The renderer retains one field, generates it even when ground appearance is hidden
-(forests still need it), and replaces it only when the seed changes. CPU samples
-the quantized texels with the same clamp/texel-center bilinear mapping as the GPU.
-Texture and forest variations do not reseed climate. Zoom and layer visibility
-reuse it. There is no new world layer, saved payload or settings migration.
+Warmth and moisture adjustments range from -50 to +50 percentage points. Variation
+is a whole-number seed. Global offsets apply after local overrides; global variation
+changes generated areas but retains authored areas. Selected regeneration generates
+that area's lowland field from the local seed/adjustments and feathers it into the
+existing field. Reset selected removes its override so it follows global generation
+again. Undo retains at most 16 regional changes. Brush selection itself is temporary
+and does not modify the world until a regeneration/reset action is committed.
 
-Ground moisture guides grass/soil balance, dry warm regions gain warmer muted
-colors, and cold regions lower the snowline. Existing manual paint, water and
-political overlays remain above these materials. Forest placement samples the same
-field: dry/cold areas have lower suitability and cold areas favor conifers. Local
-tree limits respect the regional texture snowline. Source heights, hydraulic data
-and province identity are never written by this appearance pipeline.
+Warmth preview shows the field after elevation cooling (blue/cold, yellow/mild,
+red/warm); moisture preview shows brown/dry to green-blue/wet. Selection preview
+uses a yellow overlay. These views override political/water colors for inspection,
+hide tree geometry and bypass cast-shadow darkening. Leaving the panel restores
+normal materials, borders and trees. Previews never enter gameplay or saved data.
+The normal ground/province visibility choices remain independent of previews.
 
-This changes regenerated appearance and tree layouts for existing seeded saves.
-Earlier terrain documents with automatic textures/trees disabled remain disabled.
-The base field adds one 64 KiB image plus its GPU texture (driver overhead unmeasured)
-and one terrain sampler. No CPU/frame-time benchmark is claimed.
+## Ownership and persistence
 
-Checks in `automatic_textures_smoke.gd` cover seed repeatability, bounded resolution,
-moisture range, latitude/elevation cooling and CPU edge sampling. GPU checks use
-controlled climate inputs to verify greener wet regions and lower cold snowlines,
-then restore the real shared field. Forest checks cover regional snow limits,
-unchanged source geography, deterministic save/reload and climate reuse when
-texture variation changes. Validation uses installed Godot 4.5.1 Compatibility;
-the project's target 4.7 remains unverified.
+`regional_controls.gd` owns validated choices, local bytes, undo, and the cached
+field. `world_regions.gd` generates the field and supplies shared CPU/GPU sampling.
+The 128×128 RGBA8 override map stores raw lowland warmth/moisture in RG, B=0, with
+alpha 0 (generated) or 255 (authored). Feathering is resolved into its channel bytes
+when committed. Global offsets are applied after this composition. CPU sampling
+uses the same quantized, texel-center/clamped bilinear field as the shader.
 
-Executed: GPU automatic-texture and forest checks, plus headless map-paint checks,
-all completed with zero failures. Engine certificate-store and generic OpenGL
-startup diagnostics remain present in this environment. `git diff --check` passed.
+The cached content key includes canonical settings, override bytes and world seed.
+Temperature decreases with source elevation. These are stylized normalized values,
+not physical temperatures, rainfall, seasons or weather. Texture and tree variation
+seeds remain independent of the regional variation. Zoom/visibility reuse the field.
+
+Terrain document v15 requires a versioned regional payload. Override data is bounded
+to exactly 65,536 bytes and uses canonical base64; decoded length, settings, channel
+rules and finite/range constraints are checked before applying the document. Older
+saves receive zero global adjustments and no overrides. World manifest v6 and its
+six layers are unchanged. Save/load and Play map reconstruct the same field.
+
+Local edits follow normalized coordinates if map dimensions change. Their filtering
+footprint can extend one regional texel beyond authored texel centers, matching the
+preview's soft edges. The brush minimum follows regional sample spacing to avoid
+missed tiny selections on large maps. Terrain, water, surfaces, province IDs and
+manual ground-paint pixels are not regenerated by this feature.
+
+## Forest locality and bounds
+
+The forest now reserves geometry/spacing slots before climate acceptance. Local
+climate changes can remove/restore those slots' trees or change their species but
+cannot consume distant slots. Outside unchanged climate samples, trees retain
+positions, sizes and species. This also holds after reload, without storing tree
+placements. The forest still rebuilds its bounded derived batches and coverage
+mask; incremental chunk rebuilding is not implemented or benchmarked.
+
+Each override snapshot is 64 KiB, with up to 16 undo snapshots (~1 MiB plus settings).
+The selection is 16 KiB plus a GPU mask. The shared field retains raw/final 64 KiB
+buffers and a texture; driver overhead is unmeasured. No performance claim is made.
+
+## Verification
+
+`regional_controls_smoke.gd` exercises global and picked/brush selected-area edits,
+unchanged outside climate/trees, undo/reset, layer locking, unchanged geography,
+malformed payloads, legacy v14 defaults, exact world save/load forest reconstruction,
+and Play map without editor previews. Its GPU path captures warmth, moisture and
+selection previews under `.test-runtime/regions-*.png`.
+
+The installed Godot 4.5.1 Mono/OpenGL Compatibility engine is used with a writable
+local test shader cache; the certificate-store diagnostic remains. Target 4.7 and
+large-world performance remain unverified. Existing texture, forest, ground-paint,
+relief and cast-shadow checks cover affected consumers.
+
+Executed: the regional-controls GPU check (including brush input and all three
+previews) and cast-shadow GPU check completed with zero failures. Existing texture,
+forest, ground-paint and relief checks passed headless. `git diff --check` passed.

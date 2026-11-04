@@ -18,6 +18,15 @@ moisture and warmth reduce tree suitability in arid or very cold areas. Local
 tree/snow limits fall in colder regions, keeping forests below the textured snowline.
 The shared field is owned by `domain/world_regions.gd`, not recomputed forest noise.
 
+Geometry-based slots and their spacing are now reserved before climate suitability
+is applied. The tree budget caps these slots, not successful climate acceptances.
+Thus a selected climate edit only changes trees whose sampled climate changed;
+it cannot move distant trees by consuming or freeing the global budget. Layout
+and GPU batches are still rebuilt as a bounded whole; this is locality of results,
+not a claim of incremental GPU upload or measured generation speed. The climate
+content fingerprint participates in the layout key. Existing derived layouts may
+change once on this algorithm update, then remain deterministic through save/load.
+
 `terrain_map_renderer.gd` owns dry-ground/physical-slope sampling. A lazily prepared
 summed-area mask rejects any forbidden source/water sample in a conservative canopy
 footprint in constant query time. It includes river and lake coverage even when

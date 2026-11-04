@@ -37,6 +37,7 @@ func configure(owner_editor: Control) -> void:
 	texture_enabled.toggled.connect(func(_value: bool):
 		if not editor._syncing: apply_textures(false))
 	editor._label("Grass, soil, sand, rock and snow follow the terrain automatically. Manual paint stays above them. Choose Borders only in Provinces to see the terrain without political colors.",12).autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	editor._button("Regional controls…",editor._show_regions,null,"RegionalControls")
 	editor._label("Manual ground paint",16)
 	editor._label("Paint over generated textures. Water and province overlays stay above it.",13).autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	enabled = CheckBox.new()

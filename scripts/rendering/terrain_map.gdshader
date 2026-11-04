@@ -13,6 +13,8 @@ uniform bool shaded_relief = true;
 uniform bool paint_enabled = false;
 uniform sampler2D paint_field : source_color, filter_linear, repeat_disable;
 uniform bool height_enabled = true;
+uniform int region_preview = 0;
+uniform sampler2D region_selection : filter_linear, repeat_disable;
 uniform bool forest_enabled = false;
 uniform float forest_overview = 0.0;
 uniform sampler2D forest_cover : filter_linear_mipmap, repeat_disable;
@@ -203,11 +205,18 @@ void fragment() {
 		color = mix(color, map_haze(vec3(0.15,0.36,0.46),map_world_position,shaded_relief ? relief_amount : 0.0), water.g);
 	}
 	if (provinces_enabled && shaded_relief && vector_borders) color = mix(color,vec3(0.055,0.065,0.07),geographic_outline(UV));
+	if (region_preview > 0 && shaded_relief) {
+		vec2 region = texture(ground_regions,UV).rg;
+		float warmth = clamp(region.r-max(0.0,texture(geography_heights,UV).r-0.2)*region_lapse,0.0,1.0);
+		if (region_preview == 1) color = warmth < 0.5 ? mix(vec3(0.08,0.24,0.65),vec3(0.85,0.76,0.28),warmth*2.0) : mix(vec3(0.85,0.76,0.28),vec3(0.75,0.12,0.06),(warmth-0.5)*2.0);
+		if (region_preview == 2) color = mix(vec3(0.50,0.26,0.09),vec3(0.06,0.55,0.62),region.g);
+		if (region_preview == 3) color = mix(color,vec3(1.0,0.78,0.08),texture(region_selection,UV).r*0.65);
+	}
 	ALBEDO = color;
-	float shadow_weight = shaded_relief ? map_shadow_strength*relief_amount : 0.0;
+	float shadow_weight = shaded_relief && region_preview == 0 ? map_shadow_strength*relief_amount : 0.0;
 	EMISSION = color*(1.0-shadow_weight);
 }
 void light() {
-	float strength = shaded_relief ? map_shadow_strength*relief_amount : 0.0;
+	float strength = shaded_relief && region_preview == 0 ? map_shadow_strength*relief_amount : 0.0;
 	if (LIGHT_IS_DIRECTIONAL) DIFFUSE_LIGHT += vec3(strength*ATTENUATION);
 }
