@@ -10,9 +10,6 @@ static func apply(terrain: Node) -> void:
 	terrain.auto_density = true
 	terrain.graph_points = 10000
 	terrain.resolution = clampi(nearest_po2(ceili(longest / 2.0)), 256, 1024)
-	terrain.close_detail_enabled = true
-	terrain.close_detail_resolution = 128
-	terrain.micro_detail_strength = 0.15
 	terrain.surface_smoothing = 1
 	terrain.elevation = 8.0 if terrain.heightmap_texture != null or Recipe.PRECREATED.has(terrain.terrain_template) else 12.0
 	terrain.height_offset = 0.0
@@ -42,16 +39,8 @@ static func apply(terrain: Node) -> void:
 	terrain.show_water = true
 	terrain.sea_level = 0.0
 	terrain.water_color = Color("285b70")
-	terrain.sand_color = Color("c8b781")
-	terrain.grass_color = Color("6e8951")
-	terrain.rock_color = Color("777972")
-	terrain.snow_color = Color("e4e6dc")
-	terrain.beach_width = clampf(longest / 192.0 * 0.25, 0.1, 10.0)
-	terrain.rock_slope = 0.32
-	terrain.snow_height = terrain.elevation * 0.55
 	if terrain.heightmap_only:
 		terrain.auto_density = false
 		terrain.graph_points = 20000
 		terrain.resolution = 1024
-		terrain.close_detail_enabled = false
 		terrain.show_water = false

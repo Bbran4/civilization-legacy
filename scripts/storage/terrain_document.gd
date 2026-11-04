@@ -1,33 +1,27 @@
 extends RefCounted
 ## Versioned terrain-only documents. Parse and validate completely before applying.
 
+const MapPaint = preload("res://scripts/domain/map_paint.gd")
 const BorderAppearance = preload("res://scripts/domain/border_appearance.gd")
 const WorldProvinces = preload("res://scripts/domain/world_provinces.gd")
 const TerrainSurface = preload("res://scripts/domain/terrain_surface.gd")
 const WaterLayer = preload("res://scripts/domain/terrain_water_layer.gd")
-const PaintCatalog = preload("res://scripts/rendering/terrain_paint_catalog.gd")
-const PaintLayer = preload("res://scripts/rendering/terrain_paint_layer.gd")
-const PaintLibrary = preload("res://scripts/rendering/terrain_palette_library.gd")
-const Biomes = preload("res://scripts/domain/terrain_biomes.gd")
-const Hydrology = preload("res://scripts/domain/terrain_hydrology.gd")
-const Climate = preload("res://scripts/domain/terrain_climate.gd")
 const Geography = preload("res://scripts/domain/terrain_geography.gd")
 const Recipe = preload("res://scripts/domain/heightmap_recipe.gd")
-const VERSION: int = 10
+const VERSION: int = 12
 const MAX_BYTES: int = 256 * 1024 * 1024
 const NUMBERS: Dictionary = {
-	"tree_population": [0, 250000, true],
-	"close_detail_resolution": [32, 256, true], "micro_detail_strength": [0, 2],
+
 	"graph_points": [1000, 100000, true], "surface_smoothing": [0, 4, true],
-	"resolution": [16, 2049, true], "template_resolution": [32, 256, true], "elevation": [1, 100], "height_offset": [-50, 50],
+	"resolution": [16, 2049, true], "elevation": [1, 100], "height_offset": [-50, 50],
 	"height_contrast": [0.25, 4], "mountain_strength": [0, 1],
 	"image_blend": [0, 1], "island_inner_radius": [0.1, 0.95],
-	"island_roundness": [1, 8], "sea_level": [-40, 80], "beach_width": [0.1, 10],
-	"rock_slope": [0.05, 0.8], "snow_height": [0, 100],
-	"feature_scale": [0.5, 1.5], "template_detail": [0, 0.25], "smoothing_passes": [0, 6, true]
+	"island_roundness": [1, 8], "sea_level": [-40, 80],
+
+	"template_detail": [0, 0.25], "smoothing_passes": [0, 6, true]
 }
-const BOOLEANS: Array[String] = ["island_enabled", "show_water", "invert_image", "auto_density", "close_detail_enabled"]
-const COLORS: Array[String] = ["water_color", "sand_color", "grass_color", "rock_color", "snow_color"]
+const BOOLEANS: Array[String] = ["island_enabled", "show_water", "invert_image", "auto_density"]
+const COLORS: Array[String] = ["water_color"]
 const NOISE_NUMBERS: Dictionary = {
 	"seed": [-2147483648, 2147483647, true], "noise_type": [0, 5, true],
 	"frequency": [0.00001, 1], "fractal_type": [0, 3, true], "fractal_octaves": [1, 10, true],
@@ -70,12 +64,12 @@ static func capture(terrain: Node) -> Dictionary:
 		return {}
 	return {"format": "civilization-legacy-terrain", "version": VERSION,
 		"border_appearance": terrain.border_appearance.duplicate(),
+		"map_paint": terrain.map_paint.snapshot(),
 		"province_layer": terrain.province_layer.snapshot() if terrain.province_layer != null else null,
 		"terrain_surface": terrain.terrain_surface.snapshot() if terrain.terrain_surface != null else null,
 		"water_layer": terrain.water_layer.snapshot() if terrain.water_layer != null else null,
 		"heightmap_detail": {"version": 1, "coast": terrain.coast_detail, "mountains": terrain.mountain_detail},
-		"ground_palette": terrain.surface_catalog.snapshot(), "ground_paint": terrain.paint_layer.snapshot() if terrain.paint_layer != null else {"version": 1, "png": ""},
-		"biomes": {"version": Biomes.VERSION}, "hydrology": {"version": Hydrology.VERSION}, "generator_version": terrain.generator_version, "climate": {"version": Climate.VERSION, "settings": terrain.climate_settings.duplicate()}, "settings": settings, "source_image": source,
+		"generator_version": terrain.generator_version, "settings": settings, "source_image": source,
 		"sample_size": [terrain.sample_size().x, terrain.sample_size().y], "graph": terrain.graph_snapshot(),
 		"heights": Array(terrain.height_samples), "geography": terrain.geography_snapshot()}
 
@@ -84,9 +78,12 @@ static func validate(document: Variant) -> String:
 	if not document is Dictionary:
 		return "The file must contain a terrain document object."
 	if document.get("format") != "civilization-legacy-terrain" or not _within(document.get("version"), [1, VERSION, true]):
-		return "This is not a supported Civilization Legacy terrain file (versions 1–10)."
+		return "This is not a supported Civilization Legacy terrain file (versions 1–12)."
 	if not _within(document.get("generator_version"), [1, 4, true]):
 		return "The terrain generator version is unsupported."
+	if document.version >= 12 and document.get("map_paint") == null: return "Missing ground paint layer."
+	var paint := MapPaint.decode(document.get("map_paint"))
+	if not paint.error.is_empty(): return paint.error
 	if document.has("border_appearance"):
 		var appearance_error := BorderAppearance.validate(document.border_appearance)
 		if not appearance_error.is_empty(): return appearance_error
@@ -117,16 +114,12 @@ static func validate(document: Variant) -> String:
 	for key in NUMBERS:
 		if document.version < 9 and key == "tree_population":
 			continue
-		if document.version < 4 and key in ["close_detail_resolution", "micro_detail_strength"]:
-			continue
 		if document.version < 3 and key in ["graph_points", "surface_smoothing"]:
-			continue
-		if document.version == 1 and key == "template_resolution":
 			continue
 		if not _within(settings.get(key), NUMBERS[key]):
 			return "Invalid terrain setting: " + key
 	for key in BOOLEANS:
-		if document.version < 4 and key in ["auto_density", "close_detail_enabled"]:
+		if document.version < 4 and key in ["auto_density"]:
 			continue
 		if not settings.get(key) is bool:
 			return "Invalid terrain switch: " + key
@@ -169,28 +162,6 @@ static func validate(document: Variant) -> String:
 		var geography_error: String = Geography.validate_cache(document.get("geography"), document.graph, Vector2(settings.map_size[0], settings.map_size[1]), int(settings.surface_smoothing))
 		if not geography_error.is_empty():
 			return geography_error
-	if document.version >= 6:
-		var climate: Variant = document.get("climate")
-		if not climate is Dictionary or not _within(climate.get("version"), [Climate.VERSION, Climate.VERSION, true]):
-			return "Unsupported climate data."
-		var climate_error: String = Climate.validate(climate.get("settings"))
-		if not climate_error.is_empty():
-			return climate_error
-	if document.version >= 10:
-		var paint_error: String = PaintCatalog.validate_data(document.get("ground_palette"))
-		if not paint_error.is_empty():
-			return paint_error
-		var layer: Variant = document.get("ground_paint")
-		if not layer is Dictionary or layer.get("version") != 1 or not layer.get("png") is String or layer.png.length() > 32 * 1024 * 1024:
-			return "Invalid painted-ground data."
-	if document.version >= 8:
-		var biomes: Variant = document.get("biomes")
-		if not biomes is Dictionary or not _within(biomes.get("version"), [Biomes.VERSION, Biomes.VERSION, true]):
-			return "Unsupported biome data."
-	if document.version >= 7:
-		var hydrology: Variant = document.get("hydrology")
-		if not hydrology is Dictionary or not _within(hydrology.get("version"), [Hydrology.VERSION, Hydrology.VERSION, true]):
-			return "Unsupported hydrology data."
 	if province_cache.layer != null and surface_cache.layer != null and water.layer != null:
 		var samples := PackedFloat32Array(document.heights)
 		var actual_hash := WaterLayer.fingerprint(samples, size, Vector2(settings.map_size[0], settings.map_size[1]), settings.height_offset, settings.elevation, int(document.generator_version))
@@ -214,34 +185,23 @@ static func apply(terrain: Node, document: Dictionary) -> String:
 	if not surface_cache.error.is_empty():
 		return surface_cache.error
 	var water: Dictionary = WaterLayer.decode(document.get("water_layer"))
-	var ground_catalog: Resource = PaintCatalog.from_data(document.ground_palette) if document.version >= 10 else load("res://assets/terrain/default_ground_palette.tres")
-	var ground_resources: Dictionary = PaintLibrary.build(ground_catalog)
-	if not ground_resources.ok:
-		return ground_resources.error
-	var map_extent := Vector2(document.settings.map_size[0], document.settings.map_size[1])
-	var layer: Dictionary = PaintLayer.decode(document.ground_paint if document.version >= 10 else {"version": 1, "png": ""}, map_extent)
-	if not layer.ok:
-		return layer.error
-	# Dependencies and paint are valid before changing the live map.
 	var detail: Dictionary = document.get("heightmap_detail", {"coast": 0.75, "mountains": 0.8})
+	terrain.map_paint = MapPaint.decode(document.get("map_paint")).layer
 	terrain.border_appearance = document.get("border_appearance",BorderAppearance.DEFAULTS).duplicate()
 	terrain.province_layer = province_cache.layer
 	terrain.terrain_surface = surface_cache.layer
 	terrain.water_layer = water.layer
 	terrain.coast_detail = detail.coast
 	terrain.mountain_detail = detail.mountains
-	terrain.surface_catalog = ground_catalog
-	terrain.paint_layer = layer.layer
-	terrain._restore_paint = true
 	var settings: Dictionary = document.settings
 	var size: Vector2i = _sample_size(document)
 	for key in NUMBERS:
-		var defaults: Dictionary = {"tree_population": 20000, "graph_points": 10000, "surface_smoothing": 1, "template_resolution": 192, "close_detail_resolution": 128, "micro_detail_strength": 0.15}
-		var legacy: bool = (document.version < 9 and key == "tree_population") or (document.version < 3 and key in ["graph_points", "surface_smoothing"]) or (document.version < 4 and key in ["close_detail_resolution", "micro_detail_strength"])
+		var defaults: Dictionary = {"graph_points": 10000, "surface_smoothing": 1}
+		var legacy: bool = document.version < 3 and key in ["graph_points", "surface_smoothing"]
 		var value: Variant = defaults[key] if legacy else settings.get(key, defaults.get(key, 0))
 		terrain.set(key, int(value) if NUMBERS[key].size() > 2 else float(value))
 	for key in BOOLEANS:
-		terrain.set(key, (key == "close_detail_enabled") if document.version < 4 and key in ["auto_density", "close_detail_enabled"] else settings[key])
+		terrain.set(key, false if document.version < 4 and key == "auto_density" else settings[key])
 	for key in COLORS:
 		var values: Array = settings[key]
 		terrain.set(key, Color(values[0], values[1], values[2], values[3]))
@@ -271,7 +231,6 @@ static func apply(terrain: Node, document: Dictionary) -> String:
 				var height: float = document.source_image.red_samples[y * size.x + x]
 				image.set_pixel(x, y, Color(height, height, height, 1.0))
 		terrain.heightmap_texture = ImageTexture.create_from_image(image)
-	terrain.climate_settings = document.climate.settings.duplicate() if document.version >= 6 else Climate.DEFAULTS.duplicate()
 	terrain.restore_graph(document.graph if document.version >= 3 else {})
 	terrain.restore_heightfield(PackedFloat32Array(document.heights), size, int(document.generator_version))
 	return ""

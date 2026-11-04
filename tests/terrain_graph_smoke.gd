@@ -16,7 +16,6 @@ func _check(condition: bool, message: String) -> void:
 
 func _run() -> void:
 	var world = load("res://scenes/main.tscn").instantiate()
-	world.get_node("Terrain").heightmap_only = false
 	world.get_node("Terrain").terrain_template = "Noise"
 	root.add_child(world)
 	await process_frame

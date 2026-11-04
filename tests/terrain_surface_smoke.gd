@@ -5,6 +5,7 @@ const Document = preload("res://scripts/storage/terrain_document.gd")
 const Manifest = preload("res://scripts/storage/world_manifest.gd")
 var failures := 0
 func _initialize() -> void:
+	DirAccess.make_dir_recursive_absolute("res://.test-runtime")
 	_run.call_deferred()
 func check(ok: bool, message: String) -> void:
 	if not ok:
@@ -64,17 +65,17 @@ func _run() -> void:
 	var corrupt: Dictionary = restored.layer.snapshot()
 	corrupt.heights.count += 1
 	check(not Surface.decode(corrupt).error.is_empty(), "Corrupt surface payloads are rejected.")
-	var old_manifest := Manifest.capture(Manifest.default_layers(), "old.terrain.json", "heightmap")
+	var old_manifest := Manifest.capture(Manifest._legacy_layers(), "old.terrain.json", "heightmap")
 	old_manifest.version = 1
 	old_manifest.layers.remove_at(3)
 	old_manifest.layers.remove_at(2)
 	old_manifest.layers[0].locked = true
-	var file := FileAccess.open("user://legacy.world.json", FileAccess.WRITE)
+	var file := FileAccess.open("res://.test-runtime/terrain_surface_smoke-legacy.world.json", FileAccess.WRITE)
 	file.store_string(JSON.stringify(old_manifest))
 	file.close()
-	var bytes := FileAccess.get_file_as_bytes("user://legacy.world.json")
-	var migrated := Manifest.load_file("user://legacy.world.json")
-	check(migrated.error.is_empty() and migrated.document.layers.size() == 7 and migrated.document.layers[0].locked and bytes == FileAccess.get_file_as_bytes("user://legacy.world.json"), "Old manifest gains surface state in memory without rewriting old saves.")
+	var bytes := FileAccess.get_file_as_bytes("res://.test-runtime/terrain_surface_smoke-legacy.world.json")
+	var migrated := Manifest.load_file("res://.test-runtime/terrain_surface_smoke-legacy.world.json")
+	check(migrated.error.is_empty() and migrated.document.layers.size() == 5 and migrated.document.layers[0].locked and bytes == FileAccess.get_file_as_bytes("res://.test-runtime/terrain_surface_smoke-legacy.world.json"), "Old manifest gains surface state in memory without rewriting old saves.")
 	var world := (load("res://scenes/main.tscn") as PackedScene).instantiate()
 	root.add_child(world)
 	await process_frame

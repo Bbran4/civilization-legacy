@@ -168,12 +168,6 @@ func _fit_depth() -> void:
 	_camera.position.z = depth + 32.0
 	_camera.near = 1.0
 	_camera.far = depth * 2.0 + 64.0
-	if terrain.detail != null and terrain.detail.active:
-		var visible_bounds: Vector2 = terrain.detail.visible_depth_bounds(_camera, global_position)
-		if visible_bounds.x <= visible_bounds.y:
-			_camera.position.z = maxf(32.0, visible_bounds.y + 32.0)
-			_camera.near = maxf(1.0, _camera.position.z - visible_bounds.y - 8.0)
-			_camera.far = maxf(_camera.near + 16.0, _camera.position.z - visible_bounds.x + 8.0)
 	var sun = get_parent().get_node_or_null("Sun")
 	if sun is DirectionalLight3D:
 		sun.directional_shadow_max_distance = _camera.far

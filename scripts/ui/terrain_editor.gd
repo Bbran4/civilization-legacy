@@ -1,10 +1,10 @@
 extends Control
 ## Runtime controls stage generation settings; save/load operate on the visible map.
 
-const MaterialPanel = preload("res://scripts/ui/terrain_material_panel.gd")
-const GroundBrush = preload("res://scripts/ui/terrain_brush.gd")
 const WorldProject = preload("res://scripts/storage/world_project.gd")
 const LayerGraph = preload("res://scripts/domain/map_layer_graph.gd")
+const PaintBrush = preload("res://scripts/ui/map_paint_brush.gd")
+var _paint_brush: Node
 const ProvinceBorderBrush = preload("res://scripts/ui/province_border_brush.gd")
 var _border_controls: Dictionary = {}
 var _province_brush: Node
@@ -51,12 +51,8 @@ var _contexts: Dictionary = {}
 var _layer_buttons: Dictionary = {}
 var _layer_selectors: Dictionary = {}
 var _context_host: VBoxContainer
-var _climate_panel: PanelContainer
 var _toolbar: HBoxContainer
-var _material_panel: Window
-var _brush: Node
 
-const ClimatePanel = preload("res://scripts/ui/climate_panel.gd")
 const Help = preload("res://scripts/ui/terrain_editor_help.gd")
 const GenerationProfile = preload("res://scripts/domain/terrain_generation_profile.gd")
 const Recipe = preload("res://scripts/domain/heightmap_recipe.gd")
@@ -78,8 +74,6 @@ var _selected_cell: int = -1
 var _selected_point := Vector2.INF
 var _cell_panel: PanelContainer
 var _cell_label: Label
-var _tree_population: SpinBox
-var _tree_status: Label
 var _custom_index: int = -1
 var _image_size := Vector2i.ZERO
 
@@ -91,22 +85,12 @@ func _ready() -> void:
 	_camera_rig = get_parent().get_parent().get_node("CameraRig")
 	_build_interface()
 	_camera_rig.zoom_changed.connect(_update_zoom_status)
-	_terrain.vegetation_changed.connect(_update_tree_status)
 	_sync_from_terrain()
 	_update_zoom_status()
 	_terrain.terrain_regenerated.connect(_update_preview)
 	_update_preview()
 	_terrain.terrain_regenerated.connect(_apply_layer_visibility)
 	_build_cell_inspector()
-	if not _terrain.heightmap_only:
-		var climate_panel := ClimatePanel.new()
-		climate_panel.terrain = _terrain
-		climate_panel.editor = self
-		_climate_panel = climate_panel
-		_contexts["climate"].add_child(climate_panel)
-		climate_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-		climate_panel.custom_minimum_size.y = 450
-		climate_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_select_layer("heightmap")
 	_setup_document_tracking()
 
@@ -215,28 +199,10 @@ func _build_interface() -> void:
 	_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_form.add_child(_preview)
 	_help(_preview, "preview")
-	_context("trees")
-	_section("TREES")
-	_label("Requested tree population", 13)
-	_tree_population = SpinBox.new()
-	_tree_population.name = "TreePopulation"
-	_tree_population.min_value = 0
-	_tree_population.max_value = 250000
-	_tree_population.step = 1
-	_set_hint(_tree_population, "Choose how many trees to try to plant; water, cliffs and crowded ground can leave fewer places.")
-	_form.add_child(_tree_population)
-	_button("Apply trees", _apply_trees, null, "ApplyTrees")
-	_tree_status = _label("", 12, Color("a9bdc8"))
-	_tree_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_context("ground")
-	_section("NATURAL GROUND")
-	_label("Generate the natural ground appearance from the heightmap, rivers and lakes first. Manual paint remains available below after you review it.", 13, Color("a9bdc8")).autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_button("Generate natural ground appearance", generate_natural_ground, null, "GenerateNaturalGround")
-	_label("Trees are deliberately not placed by this step.", 12, Color("8fa7b3"))
-	_section("MANUAL TERRAIN PAINT")
-	_brush = GroundBrush.new()
-	add_child(_brush)
-	_brush.configure(self)
+	_context("paint")
+	_paint_brush = PaintBrush.new()
+	add_child(_paint_brush)
+	_paint_brush.configure(self)
 	_context("view")
 	_section("VIEW")
 	_number("Minimum zoom (×)", "min_zoom", 0.1, 1, 0.1, true)
@@ -284,7 +250,6 @@ func _build_interface() -> void:
 		_build_province_controls()
 	else:
 		_label("Available in the focused terrain workspace.")
-	_context("climate")
 	_form = _contexts["heightmap"]
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("user://maps"))
 
@@ -360,8 +325,6 @@ func _button(title: String, action: Callable, parent: Node = null, node_name: St
 func _sync_from_terrain() -> void:
 	_syncing = true
 	_sync_border_appearance_controls()
-	_tree_population.set_value_no_signal(_terrain.tree_population)
-	_update_tree_status()
 	if _terrain.heightmap_only:
 		if _province_count != null and _terrain.province_layer != null:
 			_province_count.set_value_no_signal(_terrain.province_layer.requested_count)
@@ -398,26 +361,6 @@ func _sync_from_terrain() -> void:
 				picker.select(i)
 	_update_description()
 	_syncing = false
-
-
-func _apply_trees() -> void:
-	if not can_edit("trees"):
-		return
-	_tree_population.apply()
-	await get_tree().process_frame
-	if not can_edit("trees"):
-		return
-	_terrain.apply_tree_population(int(_tree_population.value))
-	_update_tree_status()
-	_refresh_selected_cell()
-
-func _update_tree_status() -> void:
-	if _tree_status == null:
-		return
-	var actual: int = _terrain.vegetation_view.layout.instances.size() if _terrain.vegetation_view != null and _terrain.vegetation_view.layout != null else 0
-	_tree_status.text = "Placed %d / requested %d" % [actual, _terrain.tree_population]
-	if actual < _terrain.tree_population:
-		_tree_status.text += "\nLimited by suitable ground, spacing and placement budget."
 
 
 func _zoom_limits_changed() -> void:
@@ -486,7 +429,6 @@ func apply_settings() -> void:
 		_terrain.resolution = int(_controls["heightmap_resolution"].value) - 1
 	_terrain.island_enabled = (_controls["island_enabled"] as CheckBox).button_pressed
 	_terrain.elevation = _controls["elevation"].value
-	_terrain.snow_height = _terrain.elevation * 0.55
 	_terrain.regenerate()
 	# Normalize an empty seed in the control to match the generated map.
 	(_controls["map_seed"] as LineEdit).text = _terrain.map_seed
@@ -633,19 +575,8 @@ func _build_cell_inspector() -> void:
 	_cell_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	scroll.add_child(_cell_label)
 	add_child(panel)
-	_terrain.climate_changed.connect(_refresh_selected_cell)
 	_terrain.terrain_regenerated.connect(_reset_cell_inspector)
 	_reset_cell_inspector()
-
-
-func _open_ground_palette() -> void:
-	_select_layer("ground")
-	if _material_panel == null:
-		_material_panel = MaterialPanel.new()
-		_material_panel.visible = false
-		add_child(_material_panel)
-	_material_panel.configure(_terrain, self)
-	_material_panel.popup_centered()
 
 
 func _reset_cell_inspector() -> void:
@@ -658,9 +589,8 @@ func _reset_cell_inspector() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _paint_brush != null and _paint_brush.handle_input(event): return
 	if _province_brush != null and _province_brush.handle_input(event):
-		return
-	if _brush != null and _brush.handle_input(event):
 		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		var camera: Camera3D = get_parent().get_parent().get_node("CameraRig/Camera3D")
@@ -711,48 +641,6 @@ func _show_cell_info(info: Dictionary) -> void:
 				if _terrain.province_layer.is_impassable(point / _terrain.map_size): water_kind = "Unassigned impassable land"
 				_cell_label.text += "\n" + water_kind
 		return
-	_cell_panel.anchor_bottom = 1.0
-	_cell_panel.offset_bottom = -14
-	_cell_label.text = "CELL %d · %s\nX %.2f   Y %.2f\nHeight %d / 100 · sea datum 20\n%d neighbors\nArea %.2f map units²" % [info.id, info.get("surface_kind", "Land" if info.land else "Water"), info.position.x, info.position.y, info.height, info.neighbor_count, info.area]
-	if info.has("inspected_position"):
-		_cell_label.text += "\nClicked at %.2f, %.2f · %s" % [info.inspected_position.x, info.inspected_position.y, info.surface_kind]
-		if info.cell_biome != info.biome or info.cell_surface_kind != info.surface_kind:
-			_cell_label.text += "\nCell classification: %s · %s" % [info.cell_surface_kind, info.cell_biome]
-	if info.has("painted_ground"):
-		_cell_label.text += "\nPaint layer: %s · %s" % [info.painted_ground, info.painted_texture]
-	if info.has("basin_id"):
-		if info.basin_id >= 0:
-			var basin: Dictionary = _terrain.hydrology.basins[info.basin_id]
-			var destinations := {"ocean": "ocean", "map_edge": "map edge", "closed_lake": "closed lake", "dry_depression": "dry depression"}
-			_cell_label.text += "\nBasin #%d · drains to %s" % [info.basin_id, destinations[basin.kind]]
-		if info.river_id >= 0:
-			_cell_label.text += "\nRiver reach #%d · flow %.1f×" % [info.river_id, info.flow_strength]
-		if info.lake_id >= 0:
-			_cell_label.text += "\nLake basin #%d · spill level %.1f / 100\n%s" % [info.lake_id, info.lake_level, ("Outlet: cell %d" % info.lake_outlet) if info.lake_outlet >= 0 else ("Closed lake: inflow lost to evaporation" if info.lake_active else "Dry basin: no rainfall runoff")]
-
-			if info.lake_active:
-				_cell_label.text += "\nLake depth: %.1f height units" % info.water_depth
-	if info.has("feature_id"):
-		var names := {"landmass": "Large landmass", "island": "Island", "open_water": "Open water", "inland_water": "Inland water (lake candidate)"}
-		var distance: String = "No coastline" if info.coast_distance < 0.0 else "About %.1f map units from coast" % info.coast_distance
-		_cell_label.text += "\n%s #%d\n%s · %d cells\nFeature area: %.1f map units²\n%s\n%s" % [names[info.feature_kind], info.feature_id, "Touches map border" if info.touches_border else "Enclosed within map", info.feature_cells, info.feature_area, "Coastal cell" if info.coastal else "Away from coast", distance]
-		if not info.land:
-			_cell_label.text += "\nHeight below sea datum: %d units" % info.depth
-	if info.has("temperature"):
-		_cell_label.text += "\nBiome at point: %s\nLatitude: %+.1f°\nTemperature: %.1f°C\nRainfall: %.0f mm/yr (est.)\nWind travels: %s" % [info.biome, info.latitude, info.temperature, info.rainfall, _wind_name(info.wind)]
-		if info.has("canopy"):
-			_cell_label.text += "\nPotential tree cover: %.0f%% · nearby water: %.0f%%" % [info.canopy * 100.0, info.water_support * 100.0]
-		if info.get("water_support", 0.0) > 0.05 and info.get("surface_kind", "Land") == "Land":
-			_cell_label.text += "\nWater-fed margin: ground cover blends locally"
-		if info.has("tree_count"):
-			_cell_label.text += "\nPlaced trees in this cell: %d" % info.tree_count
-
-
-
-
-func _wind_name(wind: Vector2) -> String:
-	var bearing: float = fposmod(rad_to_deg(atan2(wind.x, -wind.y)), 360.0)
-	return ["North", "North-east", "East", "South-east", "South", "South-west", "West", "North-west"][roundi(bearing / 45.0) % 8]
 
 
 func _build_shell() -> void:
@@ -778,7 +666,6 @@ func _build_shell() -> void:
 	_button("Full map", func(): _camera_rig._reset_view(), _toolbar)
 	if _terrain.heightmap_only:
 		_button("Play map", play_map, _toolbar, "PlayMap")
-		_button("World painter", _enter_world_painter, _toolbar, "WorldPainter")
 	var stack := VBoxContainer.new()
 	stack.name = "LayerStack"
 	stack.position = Vector2(14, 60)
@@ -806,7 +693,7 @@ func _build_shell() -> void:
 		lock.toggled.connect(func(value: bool): layer.locked = value; _stop_brush(); _update_dependency_status(); mark_dirty())
 		row.add_child(lock)
 		_layer_buttons[layer.id] = [eye, lock]
-		if _terrain.heightmap_only and layer.id not in ["heightmap", "rivers", "surface", "provinces", "ground"]:
+		if _terrain.heightmap_only and layer.id not in ["heightmap", "rivers", "surface", "provinces", "paint"]:
 			layer.visible = false
 			eye.set_pressed_no_signal(false)
 			eye.disabled = true
@@ -835,12 +722,12 @@ func _context(key: String) -> void:
 	_form = box
 
 func _select_layer(key: String) -> void:
-	if _terrain.heightmap_only and key not in ["heightmap", "rivers", "surface", "provinces", "ground", "view"]:
+	if _terrain.heightmap_only and key not in ["heightmap", "rivers", "surface", "provinces", "paint", "view"]:
 		key = "heightmap"
 	if selected_layer != key:
 		mark_dirty()
 	selected_layer = key
-	if key in ["rivers", "surface", "provinces"] and _terrain.heightmap_only:
+	if key in ["paint", "rivers", "surface", "provinces"] and _terrain.heightmap_only:
 		find_child("RawHeightView", true, false).button_pressed = false
 	for id in _layer_selectors:
 		_layer_selectors[id].set_pressed_no_signal(id == key)
@@ -849,35 +736,16 @@ func _select_layer(key: String) -> void:
 	_update_dependency_status()
 	_stop_brush()
 
-func _enter_world_painter() -> void:
-	if not _terrain.heightmap_only:
-		return
-	_terrain.enter_world_painter()
-	for id in ["climate", "ground", "trees"]:
-		if _layer_buttons.has(id):
-			_layer_buttons[id][0].disabled = false
-			_layer_buttons[id][1].disabled = false
-			_layer_selectors[id].disabled = false
-			_layer_selectors[id].tooltip_text = ""
-	for id in ["rivers", "surface", "provinces", "ground"]:
-		if _layer_buttons.has(id):
-			_layer_buttons[id][0].set_pressed_no_signal(true)
-			for layer in layers:
-				if layer.id == id: layer.visible = true
-	_apply_layer_visibility()
-	_update_dependency_status()
-	_select_layer("ground")
-
 func _stop_brush() -> void:
+	if _paint_brush != null:
+		_paint_brush.cancel()
+		_paint_brush.enabled.button_pressed = false
 	if _province_brush != null:
 		_province_brush.cancel()
 		_province_brush.enabled.button_pressed = false
-	if _brush != null:
-		_brush.painting = false
-		_brush.enabled.button_pressed = false
 
 func can_edit(key: String) -> bool:
-	if _terrain.heightmap_only and key not in ["heightmap", "rivers", "surface", "provinces", "ground"]:
+	if _terrain.heightmap_only and key not in ["heightmap", "rivers", "surface", "provinces", "paint"]:
 		return false
 	for layer in layers:
 		if layer.id == key:
@@ -886,7 +754,7 @@ func can_edit(key: String) -> bool:
 
 func regeneration_error(key: String) -> String:
 	if _terrain.heightmap_only:
-		if key not in ["heightmap", "rivers", "surface", "provinces", "ground"] or not can_edit(key):
+		if key not in ["heightmap", "rivers", "surface", "provinces", "paint"] or not can_edit(key):
 			return "Show and unlock the selected layer before generating."
 		if key in ["heightmap", "rivers", "surface"]:
 			for layer in layers:
@@ -925,42 +793,14 @@ func _update_dependency_status() -> void:
 
 
 func _apply_layer_visibility() -> void:
-	if _terrain.heightmap_only:
-		_terrain.visible = (layer_visible("provinces") and _terrain.province_layer_current()) or (layer_visible("surface") and _terrain.terrain_surface_current()) or layers[0].visible or (layer_visible("rivers") and _terrain.water_layer_current())
-		_terrain.set_height_layer_visible(layers[0].visible)
-		for layer in layers:
-			if layer.id not in ["heightmap", "rivers", "surface", "provinces", "ground"]:
-				layer.visible = false
-				_layer_buttons[layer.id][0].set_pressed_no_signal(false)
-		_terrain.set_province_layer_visible(layer_visible("provinces"))
-		_update_province_status()
-		_terrain.set_surface_layer_visible(layer_visible("surface"))
-		_terrain.set_water_layer_visible(layer_visible("rivers"))
-		_update_surface_status()
-		_update_water_status()
-		if _terrain.paint_layer != null:
-			_terrain.paint_layer.editor_visible = layer_visible("ground")
-			_terrain.update_painted_surface()
-		return
-	for layer in layers:
-		match layer.id:
-			"heightmap": _terrain.visible = layer.visible
-			"trees":
-				if _terrain.vegetation_view != null:
-					_terrain.vegetation_view.editor_visible = layer.visible
-					_terrain.vegetation_view._update_visibility()
-			"ground":
-				if _terrain.paint_layer != null:
-					_terrain.paint_layer.editor_visible = layer.visible
-					_terrain.update_painted_surface()
-			"climate":
-				if not layer.visible:
-					_terrain.set_climate_view(0)
-			"rivers":
-				if _terrain.hydrology_view != null:
-					_terrain.hydrology_view.editor_visible = layer.visible
-					_terrain.hydrology_view._update_visibility()
-	_stop_brush()
+	_terrain.paint_layer_visible = layer_visible("paint")
+	_terrain.set_height_layer_visible(layer_visible("heightmap"))
+	_terrain.set_province_layer_visible(layer_visible("provinces"))
+	_terrain.set_surface_layer_visible(layer_visible("surface"))
+	_terrain.set_water_layer_visible(layer_visible("rivers"))
+	_update_province_status()
+	_update_surface_status()
+	_update_water_status()
 
 func load_world(path: String) -> String:
 	var result: Dictionary = Manifest.load_file(path)
@@ -1034,8 +874,6 @@ func _setup_document_tracking() -> void:
 	add_child(_unsaved_dialog)
 	_dialog.canceled.connect(_cancel_pending_action)
 	_terrain.terrain_regenerated.connect(mark_dirty)
-	_terrain.climate_changed.connect(mark_dirty)
-	_terrain.vegetation_changed.connect(mark_dirty)
 	_terrain.province_layer_changed.connect(mark_dirty)
 	_terrain.province_layer_changed.connect(_apply_layer_visibility)
 	_terrain.terrain_surface_changed.connect(mark_dirty)
@@ -1338,27 +1176,6 @@ func build_terrain_surface() -> void:
 		_surface_status.text = error
 	else:
 		_update_surface_status()
-
-func generate_natural_ground() -> void:
-	if _terrain.heightmap_only:
-		_enter_world_painter()
-		_surface_status.text = "World Painter opened. The existing world is preserved; select Terrain surface to rebuild relief if needed."
-		return
-	if _surface_busy or _water_busy or _province_busy:
-		return
-	if not _terrain.water_layer_current():
-		_surface_status.text = "Generate rivers / lakes first, then generate natural ground appearance."
-		_select_layer("rivers")
-		return
-	if _terrain.terrain_surface_current():
-		_terrain.set_surface_layer_visible(true)
-		if _layer_buttons.has("surface"):
-			_layer_buttons["surface"][0].set_pressed_no_signal(true)
-		_update_surface_status()
-		return
-	await build_terrain_surface()
-	if _terrain.terrain_surface_current():
-		_terrain.set_surface_layer_visible(true)
 
 func _build_province_controls() -> void:
 	_label("Province view")

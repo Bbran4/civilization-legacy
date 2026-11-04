@@ -93,7 +93,6 @@ func _run() -> void:
 	_check(Geography.land_kind(999.0 * 4, false, 40000.0) == "island", "Land size classification must scale with map area, not cell count.")
 	# Exercise real terrain regeneration, the inspector, files and the LOD camera.
 	var world = load("res://scenes/main.tscn").instantiate()
-	world.get_node("Terrain").heightmap_only = false
 	world.get_node("Terrain").terrain_template = "Noise"
 	root.add_child(world)
 	await process_frame
@@ -143,7 +142,6 @@ func _run() -> void:
 	for zoom in [1.0, 5.0, 20.0]:
 		camera._zoom = zoom
 		camera._apply_zoom()
-		terrain.detail._process(1.0)
 		_check(terrain.geography == cache and terrain.geography.snapshot() == before, "Zoom and LOD must never regenerate geographic identities or shorelines.")
 		_check(terrain.geography_view._ribbons.mesh.get_instance_id() == shore_mesh and terrain.geography_view._ribbons.visible, "Shore ribbons must remain visible in overview and angled views without rebuilding their mesh.")
 	var info: Dictionary = terrain.cell_info(0)

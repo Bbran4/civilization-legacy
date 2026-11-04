@@ -16,7 +16,6 @@ func _run() -> void:
 	check(not Appearance.validate(bad).is_empty(),"Smoothing requires a boolean.")
 	var world = (load("res://scenes/main.tscn") as PackedScene).instantiate()
 	var terrain = world.get_node("Terrain")
-	terrain.heightmap_only = false
 	terrain.terrain_template = "Noise"
 	terrain.map_size = Vector2(16,16)
 	root.add_child(world)

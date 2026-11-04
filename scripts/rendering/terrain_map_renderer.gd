@@ -88,3 +88,7 @@ func _update_nation_colors(layer: RefCounted) -> void:
 func set_border_appearance(settings: Dictionary) -> void:
 	borders.configure(settings)
 	material.set_shader_parameter("smooth_borders",settings.smooth)
+
+func set_paint(layer: RefCounted, enabled: bool) -> void:
+	material.set_shader_parameter("paint_enabled",enabled and layer != null)
+	material.set_shader_parameter("paint_field",layer.texture if layer != null else null)

@@ -5,6 +5,7 @@ const Recipe = preload("res://scripts/domain/heightmap_recipe.gd")
 const Document = preload("res://scripts/storage/terrain_document.gd")
 var failures := 0
 func _initialize() -> void:
+	DirAccess.make_dir_recursive_absolute("res://.test-runtime")
 	_run.call_deferred()
 func check(ok: bool, message: String) -> void:
 	if not ok:
@@ -30,10 +31,8 @@ func _run() -> void:
 	var terrain = world.get_node("Terrain")
 	var editor = world.get_node("Interface/Editor")
 	check(terrain.heightmap_only and terrain.heightmap_view and terrain.resolution == 1024 and terrain.effective_graph_points() == 20000, "Main scene opens in detailed heightmap focus.")
-	check(terrain.climate == null and terrain.biomes == null and terrain.hydrology == null and terrain.vegetation_view == null and terrain.hydrology_view == null and terrain.provinces == null, "No climate, biomes, trees, rivers, lakes or province generators run.")
-	check(terrain.detail == null and not terrain.get_node("Water").visible, "Heightmap uses one raster plane, with water and LOD relief disabled.")
 	for layer in editor.layers:
-		if layer.id not in ["heightmap", "rivers", "surface", "provinces"]:
+		if layer.id not in ["heightmap", "paint", "rivers", "surface", "provinces"]:
 			check(not layer.visible and editor._layer_selectors[layer.id].disabled and not editor.can_edit(layer.id), "Other layers are visibly inactive and cannot be edited.")
 	var image: Image = terrain.heightmap_image()
 	check(image.get_size() == terrain.sample_size() and image.get_width() == 1025, "Export uses the detailed canonical sample grid.")
@@ -47,7 +46,7 @@ func _run() -> void:
 	terrain.set_relief_preview(true)
 	check(terrain.height_samples == original, "Relief preview never changes the height data.")
 	terrain.set_relief_preview(false)
-	var path := "user://heightmap-focus.terrain.json"
+	var path := "res://.test-runtime/heightmap_focus_smoke-heightmap-focus.terrain.json"
 	check(Document.save_file(path, terrain).is_empty(), "Detailed heights remain compatible with terrain documents.")
 	var loaded := Document.load_file(path)
 	check(loaded.ok, "Detailed terrain document validates.")
@@ -59,7 +58,7 @@ func _run() -> void:
 		check(Document.validate(old).is_empty(), "Prior terrain files remain readable without refinement metadata.")
 		old.heightmap_detail = {"coast": "high", "mountains": 0.8}
 		check(not Document.validate(old).is_empty(), "Invalid refinement metadata is rejected.")
-	check(editor.save_world("user://heightmap-focus.world.json").is_empty(), "World Save All also supports the focused heightmap pipeline.")
+	check(editor.save_world("res://.test-runtime/heightmap_focus_smoke-heightmap-focus.world.json").is_empty(), "World Save All also supports the focused heightmap pipeline.")
 	# Imported rasters bypass procedural embellishment: authored detail is not overwritten.
 	var imported := Image.create(8, 8, false, Image.FORMAT_RF)
 	for y in range(8):

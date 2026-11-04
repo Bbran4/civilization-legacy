@@ -3,6 +3,8 @@ render_mode unshaded, cull_disabled;
 uniform sampler2D height_field : filter_linear, repeat_disable;
 uniform vec2 texel_size = vec2(0.001);
 uniform bool shaded_relief = true;
+uniform bool paint_enabled = false;
+uniform sampler2D paint_field : source_color, filter_linear, repeat_disable;
 uniform bool height_enabled = true;
 uniform bool water_enabled = false;
 uniform sampler2D water_field : filter_linear, repeat_disable;
@@ -71,6 +73,11 @@ void fragment() {
 		value = h < 0.2 ? h * 0.35 : clamp(0.25 + h * 0.7, 0.0, 1.0) * light;
 	}
 	vec3 color = height_enabled ? vec3(value) : vec3(0.02);
+	// Appearance is above the height/surface shading and below every overlay.
+	if (paint_enabled && shaded_relief && h >= 0.2) {
+		vec4 paint = texture(paint_field,UV);
+		color = mix(color,paint.rgb*(0.55+value*0.65),paint.a);
+	}
 	if (provinces_enabled && shaded_relief) {
 		float id = province_id(UV);
 		int zone = int(round(texture(province_field, UV).b * 255.0));

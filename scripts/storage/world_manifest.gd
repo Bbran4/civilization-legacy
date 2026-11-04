@@ -1,10 +1,18 @@
 extends RefCounted
 ## A sidecar references an existing terrain document; it never rewrites terrain data.
 const Layer = preload("res://scripts/domain/map_layer.gd")
-const VERSION = 3
+const VERSION = 5
+
+static func _legacy_layers() -> Array:
+	return [Layer.new("heightmap", "Heightmap"), Layer.new("rivers", "Rivers / lakes", ["heightmap", "climate"]), Layer.new("surface", "Terrain surface", ["heightmap", "rivers"]), Layer.new("provinces", "Provinces", ["surface"]), Layer.new("climate", "Climate", ["heightmap"]), Layer.new("ground", "Ground paint", ["heightmap"]), Layer.new("trees", "Trees", ["heightmap", "climate", "rivers"])]
 
 static func default_layers() -> Array:
-	return [Layer.new("heightmap", "Heightmap"), Layer.new("rivers", "Rivers / lakes", ["heightmap", "climate"]), Layer.new("surface", "Terrain surface", ["heightmap", "rivers"]), Layer.new("provinces", "Provinces", ["surface"]), Layer.new("climate", "Climate", ["heightmap"]), Layer.new("ground", "Ground paint", ["heightmap"]), Layer.new("trees", "Trees", ["heightmap", "climate", "rivers"])]
+	return [Layer.new("heightmap", "Heightmap"), Layer.new("paint", "Ground paint"), Layer.new("rivers", "Rivers / lakes", ["heightmap"]), Layer.new("surface", "Terrain surface", ["heightmap", "rivers"]), Layer.new("provinces", "Provinces", ["surface"])]
+
+static func _layers_for_version(version: int) -> Array:
+	if version >= 5: return default_layers()
+	if version == 4: return default_layers().filter(func(layer): return layer.id != "paint")
+	return _legacy_layers()
 
 static func capture(layers: Array, terrain_path: String, selected: String) -> Dictionary:
 	var entries: Array = []
@@ -13,14 +21,14 @@ static func capture(layers: Array, terrain_path: String, selected: String) -> Di
 	return {"format": "civilization-legacy-world", "version": VERSION, "terrain": terrain_path, "selected_layer": selected, "layers": entries}
 
 static func validate(data: Dictionary) -> String:
-	if data.get("format") != "civilization-legacy-world" or data.get("version") not in [1, 1.0, 2, 2.0, VERSION, float(VERSION)]:
+	if data.get("format") != "civilization-legacy-world" or data.get("version") not in [1, 1.0, 2, 2.0, 3, 3.0, 4, 4.0, VERSION, float(VERSION)]:
 		return "Unsupported world manifest."
 	if not data.get("terrain") is String or data.terrain.is_empty():
 		return "A world must reference a terrain save."
-	if not data.get("layers") is Array or data.layers.size() != (5 if data.version == 1 else (6 if data.version == 2 else 7)):
+	if not data.get("layers") is Array or data.layers.size() != (5 if data.version >= 5 else (4 if data.version == 4 else (5 if data.version == 1 else (6 if data.version == 2 else 7)))):
 		return "Invalid layer stack."
 	var ids: Array = []
-	for layer in default_layers():
+	for layer in _layers_for_version(int(data.version)):
 		if (data.version != 1 or layer.id != "surface") and (data.version >= 3 or layer.id != "provinces"):
 			ids.append(layer.id)
 	for entry in data.layers:
@@ -29,7 +37,7 @@ static func validate(data: Dictionary) -> String:
 		ids.erase(entry.id)
 	if not data.get("selected_layer") is String:
 		return "Invalid selected layer."
-	for layer in default_layers():
+	for layer in _layers_for_version(int(data.version)):
 		if layer.id == data.selected_layer and (data.version != 1 or layer.id != "surface") and (data.version >= 3 or layer.id != "provinces"):
 			return ""
 	return "Unknown selected layer."
@@ -73,5 +81,9 @@ static func load_file(path: String) -> Dictionary:
 		value.layers.insert(2, Layer.new("surface", "Terrain surface").to_dict())
 	if error.is_empty() and value.version < 3:
 		value.layers.insert(3, Layer.new("provinces", "Provinces").to_dict())
+	if error.is_empty():
+		value.layers = value.layers.filter(func(entry): return entry.id in ["heightmap", "paint", "rivers", "surface", "provinces"])
+		if value.version < 5: value.layers.insert(1, Layer.new("paint", "Ground paint").to_dict())
+		if value.selected_layer not in ["heightmap", "paint", "rivers", "surface", "provinces"]: value.selected_layer = "heightmap"
 		value.version = VERSION
 	return {"error": error, "document": value}

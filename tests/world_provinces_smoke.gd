@@ -60,22 +60,26 @@ func _run() -> void:
 	disconnected.records.append({"id":1,"name":"Broken","active":true})
 	disconnected.records.append({"id":2,"name":"Surrounding","active":true})
 	check(not Provinces.decode(disconnected.snapshot()).error.is_empty(), "Imported disconnected province identities are rejected.")
-	var layers := Manifest.default_layers()
+	var layers := Manifest._legacy_layers()
 	var old := Manifest.capture(layers, "map.terrain.json", "surface")
 	old.version = 2
 	old.layers.remove_at(3)
-	var file := FileAccess.open("user://v2.world.json", FileAccess.WRITE)
+	var file := FileAccess.open("res://.test-runtime/world_provinces_smoke-v2.world.json", FileAccess.WRITE)
 	file.store_string(JSON.stringify(old))
 	file.close()
-	var bytes := FileAccess.get_file_as_bytes("user://v2.world.json")
-	var migration := Manifest.load_file("user://v2.world.json")
-	check(migration.error.is_empty() and migration.document.layers.size() == 7 and bytes == FileAccess.get_file_as_bytes("user://v2.world.json"), "V2 manifests migrate without rewriting prior files.")
+	var bytes := FileAccess.get_file_as_bytes("res://.test-runtime/world_provinces_smoke-v2.world.json")
+	var migration := Manifest.load_file("res://.test-runtime/world_provinces_smoke-v2.world.json")
+	check(migration.error.is_empty() and migration.document.layers.size() == 5 and bytes == FileAccess.get_file_as_bytes("res://.test-runtime/world_provinces_smoke-v2.world.json"), "V2 manifests migrate without rewriting prior files.")
 	var world := (load("res://scenes/main.tscn") as PackedScene).instantiate()
 	world.get_node("Terrain").resolution = 255
 	root.add_child(world)
 	await process_frame
 	var terrain = world.get_node("Terrain")
 	var editor = world.get_node("Interface/Editor")
+	if DisplayServer.get_name() == "headless":
+		terrain.resolution = 255
+		terrain.regenerate()
+		editor._sync_from_terrain()
 	await editor.generate_provinces()
 	check(terrain.province_layer == null, "Provinces require the finished surface.")
 	if DisplayServer.get_name() != "headless":
@@ -98,8 +102,8 @@ func _run() -> void:
 	editor._province_name.text = "Saved Province"
 	editor.rename_province()
 	var saved := Document.capture(terrain)
-	check(Document.save_file("user://province-roundtrip.terrain.json", terrain).is_empty(), "Province terrain document saves to disk.")
-	var disk := Document.load_file("user://province-roundtrip.terrain.json")
+	check(Document.save_file("res://.test-runtime/world_provinces_smoke-province-roundtrip.terrain.json", terrain).is_empty(), "Province terrain document saves to disk.")
+	var disk := Document.load_file("res://.test-runtime/world_provinces_smoke-province-roundtrip.terrain.json")
 	check(disk.ok and Document.apply(terrain, disk.document).is_empty(), "Province document restores from actual JSON disk data.")
 	check(terrain.province_layer.records[0].nation_id == nation and terrain.province_layer.nations.size() == 1,"Nation assignments and palette restore through full terrain saves.")
 	var bad := saved.duplicate(true)

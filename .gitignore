@@ -13,3 +13,7 @@ Thumbs.db
 
 # Intermediate input to regenerate the checked-in upstream comparison fixture.
 /tests/reference/graph-inputs.json
+
+# Local verification output.
+.test-runtime/
+.painter-fixture*

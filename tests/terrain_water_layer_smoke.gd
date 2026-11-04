@@ -3,6 +3,7 @@ const Water = preload("res://scripts/domain/terrain_water_layer.gd")
 const Document = preload("res://scripts/storage/terrain_document.gd")
 var failures := 0
 func _initialize() -> void:
+	DirAccess.make_dir_recursive_absolute("res://.test-runtime")
 	_run.call_deferred()
 func check(ok: bool, message: String) -> void:
 	if not ok:
@@ -68,7 +69,6 @@ func _run() -> void:
 	await editor.generate_water_layer()
 	check(terrain.water_layer_current() and terrain.height_samples == original, "Independent water generation works on a locked heightmap without changing it.")
 	check(terrain.map_renderer.material.get_shader_parameter("height_field") == height_texture and terrain.map_renderer.material.get_shader_parameter("water_enabled"), "Overlay adds water without replacing the shared height texture.")
-	check(terrain.climate == null and terrain.biomes == null and terrain.vegetation_view == null and terrain.hydrology == null, "Other generators remain disabled.")
 	editor._layer_buttons.heightmap[0].button_pressed = false
 	check(terrain.visible and not terrain.map_renderer.material.get_shader_parameter("height_enabled") and terrain.map_renderer.material.get_shader_parameter("water_enabled"), "Water can be inspected alone with the height layer hidden.")
 	editor._layer_buttons.heightmap[0].button_pressed = true
@@ -77,8 +77,8 @@ func _run() -> void:
 	editor._layer_buttons.rivers[0].button_pressed = true
 	var saved := Document.capture(terrain)
 	check(Document.validate(saved).is_empty(), "Water-bearing terrain document validates.")
-	check(Document.save_file("user://water-roundtrip.terrain.json", terrain).is_empty(), "Water artwork saves to disk.")
-	var disk := Document.load_file("user://water-roundtrip.terrain.json")
+	check(Document.save_file("res://.test-runtime/terrain_water_layer_smoke-water-roundtrip.terrain.json", terrain).is_empty(), "Water artwork saves to disk.")
+	var disk := Document.load_file("res://.test-runtime/terrain_water_layer_smoke-water-roundtrip.terrain.json")
 	check(disk.ok, "JSON numeric settings validate after parsing a saved water document.")
 	var mask: PackedByteArray = terrain.water_layer.mask_bytes.duplicate()
 	check(Document.apply(terrain, saved).is_empty() and terrain.water_layer_current() and terrain.water_layer.mask_bytes == mask, "Save/load restores exact water and height data.")
