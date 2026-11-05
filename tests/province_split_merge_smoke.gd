@@ -35,6 +35,27 @@ func _run() -> void:
 	for edge in channel.connections:
 		check(expected.erase("%d:%d:%s" % [edge.a, edge.b, edge.type]), "Unexpected or duplicate connection: " + str(edge))
 	check(expected.is_empty(), "Missing connections: " + str(expected))
+	for dx in [-1, 1]:
+		var diagonal := Provinces.new()
+		diagonal.size = Vector2i(5,5)
+		diagonal.ids.resize(25)
+		diagonal.ids.fill(3)
+		var bank := 6 if dx == 1 else 8
+		diagonal.ids[bank] = 1
+		diagonal.ids[bank + 10 + 2 * dx] = 2
+		for kind in ["land","land","ocean"]:
+			diagonal.records.append({"id":diagonal.records.size()+1, "kind":kind})
+		var sea := Water.new()
+		sea.mask_size = diagonal.size
+		sea.mask_bytes.resize(100)
+		var route := {"a":1, "b":2, "type":"strait", "crossings":1}
+		check(diagonal._index_regions().is_empty(), "Index diagonal fixture.")
+		diagonal.build_connections(sea)
+		check(diagonal.connections.has(route), "A clear diagonal channel connects opposite banks.")
+		diagonal.ids[bank + dx] = 0
+		check(diagonal._index_regions().is_empty(), "Index blocked diagonal fixture.")
+		diagonal.build_connections(sea)
+		check(not diagonal.connections.has(route), "Unassigned water blocks the diagonal corner.")
 	var layer := fixture()
 	var original: PackedInt32Array = layer.ids.duplicate()
 	var base := PackedFloat32Array()

@@ -107,14 +107,15 @@ func build_connections(water: RefCounted) -> void:
 	var mask: PackedByteArray = water.mask_bytes
 	var seen := {}
 	var reach := maxi(1, roundi(3.0 * maxi(size.x, size.y) / 1024.0))
+	var diagonal_reach := 1 + maxi(1, floori(reach / sqrt(2.0)))
 	for i in range(ids.size()):
 		if ids[i] == 0: continue
 		if i % size.x + 1 < size.x and ids[i + 1] != ids[i]:
 			_classify_contact(i, 1, mini(reach + 1, size.x - 1 - i % size.x), mask, seen)
 		if i + size.x < ids.size() and ids[i + size.x] != ids[i]:
-			_classify_contact(i, size.x, mini(reach + 1, size.y - 1 - i / size.x), mask, seen)
+			_classify_contact(i, size.x, mini(reach + 1, size.y - 1 - i / size.x), mask, seen, diagonal_reach)
 
-func _classify_contact(i: int, step: int, limit: int, mask: PackedByteArray, seen: Dictionary) -> void:
+func _classify_contact(i: int, step: int, limit: int, mask: PackedByteArray, seen: Dictionary, diagonal_reach: int = 0) -> void:
 	var next := i + step
 	var a := ids[i]
 	var b := ids[next]
@@ -131,6 +132,11 @@ func _classify_contact(i: int, step: int, limit: int, mask: PackedByteArray, see
 	_add_connection(a, b, "coastal_access", seen)
 	# The positive-axis scan visits each channel once from its first land bank.
 	if first != "land": return
+	if step == size.x:
+		var diagonal_limit := mini(limit, diagonal_reach)
+		# The row limit can be shorter than the configured reach near the bottom edge.
+		for dx in [-1, 1]:
+			_scan_diagonal(i, dx, diagonal_limit, seen)
 	for distance in range(2, limit + 1):
 		var bank := i + distance * step
 		var other := ids[bank]
@@ -138,6 +144,24 @@ func _classify_contact(i: int, step: int, limit: int, mask: PackedByteArray, see
 		if records[other - 1].kind == "ocean": continue
 		if records[other - 1].kind == "land" and other != a and _land_components[i] != _land_components[bank]:
 			_add_connection(a, other, "strait", seen)
+		return
+
+func _is_assigned_ocean(pixel: int) -> bool:
+	var id := ids[pixel]
+	return id > 0 and records[id - 1].kind == "ocean"
+
+func _scan_diagonal(start: int, dx: int, limit: int, seen: Dictionary) -> void:
+	var pixel := start
+	for distance in range(1, limit + 1):
+		var x := pixel % size.x + dx
+		if x < 0 or x >= size.x: return
+		# Require water on both sides of each crossed corner to avoid cutting through land.
+		if not _is_assigned_ocean(pixel + dx) or not _is_assigned_ocean(pixel + size.x): return
+		pixel += size.x + dx
+		if _is_assigned_ocean(pixel): continue
+		var other := ids[pixel]
+		if distance >= 2 and other > 0 and other != ids[start] and records[other - 1].kind == "land" and _land_components[start] != _land_components[pixel]:
+			_add_connection(ids[start], other, "strait", seen)
 		return
 
 func _add_connection(a: int, b: int, kind: String, seen: Dictionary) -> void:
