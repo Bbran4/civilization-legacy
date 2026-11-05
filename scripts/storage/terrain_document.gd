@@ -252,6 +252,8 @@ static func apply(terrain: Node, document: Dictionary) -> String:
 		terrain.heightmap_texture = ImageTexture.create_from_image(image)
 	terrain.restore_graph(document.graph if document.version >= 3 else {})
 	terrain.restore_heightfield(PackedFloat32Array(document.heights), size, int(document.generator_version))
+	if terrain.province_layer_current():
+		terrain.province_layer.build_connections(terrain.water_layer)
 	return ""
 
 

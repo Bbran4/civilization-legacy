@@ -10,6 +10,7 @@ var records: Array[Dictionary] = []
 var nations: Array[Dictionary] = []
 ## Derived movement hooks. Each record links two province IDs and a crossing type.
 var connections: Array[Dictionary] = []
+var _connection_water_hash := ""
 var border_revision := 0
 var border_geometry: RefCounted
 var requested_count := 64
@@ -95,29 +96,56 @@ func generate(base: PackedFloat32Array, surface: RefCounted, water: RefCounted, 
 	return _index_regions()
 
 func build_connections(water: RefCounted) -> void:
+	if water == null or water.mask_size != size or water.mask_bytes.size() != ids.size() * 4:
+		connections.clear()
+		_connection_water_hash = ""
+		return
+	var water_hash: String = water.hydraulic_fingerprint()
+	if _connection_water_hash == water_hash: return
+	_connection_water_hash = water_hash
 	connections.clear()
-	if water == null or water.mask_bytes.size() != ids.size() * 4: return
+	var mask: PackedByteArray = water.mask_bytes
 	var seen := {}
-	for y in range(size.y):
-		for x in range(size.x):
-			var i := y * size.x + x
-			for next in [i + 1 if x + 1 < size.x else -1, i + size.x if y + 1 < size.y else -1]:
-				if next < 0: continue
-				var a: int = ids[i]
-				var b: int = ids[next]
-				if a <= 0 or b <= 0 or a == b: continue
-				var low := mini(a, b)
-				var high := maxi(a, b)
-				var river :Variant= water.mask_bytes[i * 4] > 64 or water.mask_bytes[next * 4] > 64
-				var kind := "river_crossing" if river else ("strait" if records[a - 1].kind != records[b - 1].kind else "province_border")
-				var key := str(low) + ":" + str(high) + ":" + kind
-				if seen.has(key): continue
-				seen[key] = true
-				connections.append({"a": low, "b": high, "type": kind, "crossings": 1})
-	for record in records:
-		var parts: int = int(record.get("parts", 1))
-		if record.kind == "land" and parts > 1:
-			connections.append({"a": record.id, "b": record.id, "type": "island_connection", "crossings": parts - 1})
+	var reach := maxi(1, roundi(3.0 * maxi(size.x, size.y) / 1024.0))
+	for i in range(ids.size()):
+		if ids[i] == 0: continue
+		if i % size.x + 1 < size.x and ids[i + 1] != ids[i]:
+			_classify_contact(i, 1, mini(reach + 1, size.x - 1 - i % size.x), mask, seen)
+		if i + size.x < ids.size() and ids[i + size.x] != ids[i]:
+			_classify_contact(i, size.x, mini(reach + 1, size.y - 1 - i / size.x), mask, seen)
+
+func _classify_contact(i: int, step: int, limit: int, mask: PackedByteArray, seen: Dictionary) -> void:
+	var next := i + step
+	var a := ids[i]
+	var b := ids[next]
+	if b == 0 or a == b: return
+	var first: String = records[a - 1].kind
+	var second: String = records[b - 1].kind
+	if first == "inland_water" or second == "inland_water": return
+	if first == second:
+		var kind := "sea_border"
+		if first == "land":
+			kind = "river_crossing" if mask[i * 4] > 64 or mask[next * 4] > 64 else "province_border"
+		_add_connection(a, b, kind, seen)
+		return
+	_add_connection(a, b, "coastal_access", seen)
+	# The positive-axis scan visits each channel once from its first land bank.
+	if first != "land": return
+	for distance in range(2, limit + 1):
+		var bank := i + distance * step
+		var other := ids[bank]
+		if other == 0: return
+		if records[other - 1].kind == "ocean": continue
+		if records[other - 1].kind == "land" and other != a and _land_components[i] != _land_components[bank]:
+			_add_connection(a, other, "strait", seen)
+		return
+
+func _add_connection(a: int, b: int, kind: String, seen: Dictionary) -> void:
+	var pair := Vector2i(mini(a,b), maxi(a,b))
+	if not seen.has(pair): seen[pair] = {}
+	if seen[pair].has(kind): return
+	seen[pair][kind] = true
+	connections.append({"a": pair.x, "b": pair.y, "type": kind, "crossings": 1})
 
 func _growth_heights(source: PackedFloat32Array) -> PackedFloat32Array:
 	var result := PackedFloat32Array()
@@ -196,6 +224,8 @@ func _pop() -> Vector2i:
 	return result
 
 func _index_regions(allow_absorption: bool = false) -> String:
+	_connection_water_hash = ""
+	connections.clear()
 	if not impassable.is_empty() and impassable.size() != ids.size(): return "Invalid impassable dimensions."
 	for i in range(impassable.size()):
 		if impassable[i] > 1 or (impassable[i] != 0 and ids[i] != 0): return "Impassable land cannot own province pixels."

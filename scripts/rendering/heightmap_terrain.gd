@@ -627,6 +627,7 @@ func province_layer_current() -> bool:
 func install_province_layer(layer: RefCounted) -> String:
 	if layer == null or not terrain_surface_current() or layer.source_hash != terrain_surface.fingerprint() or layer.size != sample_size():
 		return "The terrain surface changed. Generate provinces again."
+	layer.build_connections(water_layer)
 	province_layer = layer
 	refresh_water_layer()
 	province_layer_changed.emit()

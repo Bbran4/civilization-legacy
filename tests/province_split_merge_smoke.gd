@@ -20,6 +20,21 @@ func fixture() -> RefCounted:
 	layer._index_regions()
 	return layer
 func _run() -> void:
+	var channel := Provinces.new()
+	channel.size = Vector2i(6, 3)
+	channel.ids = PackedInt32Array([1,2,3,4,5,0, 1,2,3,4,5,0, 1,2,3,4,5,0])
+	for kind in ["land","land","ocean","land","inland_water"]:
+		channel.records.append({"kind":kind, "id":channel.records.size()+1})
+	channel._index_regions()
+	var mask := Water.new()
+	mask.mask_size = channel.size
+	mask.mask_bytes.resize(channel.ids.size()*4)
+	mask.mask_bytes[4] = 255
+	channel.build_connections(mask)
+	var expected := {"1:2:river_crossing":true, "1:2:province_border":true, "2:3:coastal_access":true, "3:4:coastal_access":true, "2:4:strait":true}
+	for edge in channel.connections:
+		check(expected.erase("%d:%d:%s" % [edge.a, edge.b, edge.type]), "Unexpected or duplicate connection: " + str(edge))
+	check(expected.is_empty(), "Missing connections: " + str(expected))
 	var layer := fixture()
 	var original: PackedInt32Array = layer.ids.duplicate()
 	var base := PackedFloat32Array()
@@ -111,6 +126,8 @@ func _run() -> void:
 	check(brush.mode.item_count == 4, "Editor exposes paint, split and merge tools.")
 	# Choose an actual land province and search a simple cut that yields two valid pieces.
 	var source: RefCounted = terrain.province_layer
+	var routes := source.connections.duplicate(true) as Array
+	check(not routes.is_empty(), "Generated map has routes.")
 	var target := 1
 	for record in source.records:
 		if record.kind == "land" and record.pixels > source.records[target - 1].pixels: target = record.id
@@ -127,7 +144,7 @@ func _run() -> void:
 	cuts.sort_custom(func(a: int,b: int): return absi(a-center) < absi(b-center))
 	for x in cuts:
 		var probe := History.new()
-		var points := PackedVector2Array([Vector2(x,low.y - 1),Vector2(x,high.y + 1)])
+		var points := PackedVector2Array([Vector2(x,maxi(0,low.y - 1)),Vector2(x,mini(source.size.y - 1,high.y + 1))])
 		if probe.split(source,target,points).error.is_empty():
 			cut = points
 			break
@@ -158,9 +175,17 @@ func _run() -> void:
 	check(new_id > source.records.size() and terrain.province_layer_current(), "Editor installs validated split and selects its new ID.")
 	brush.undo()
 	check(editor._province_selected == target and not terrain.province_layer.records[new_id-1].active, "Undo split selects the restored original province.")
+	check(terrain.province_layer.connections == routes, "Undo restores every route and reason.")
+	check(Document.save_file("user://undo-routes.terrain.json", terrain).is_empty(), "Save undone map.")
 	brush.redo()
 	check(editor._province_selected == new_id and terrain.province_layer.records[new_id-1].active, "Redo split selects the same restored new ID.")
 	check(Document.save_file("user://split-map.terrain.json", terrain).is_empty(), "Split map saves to disk.")
+	var restored := Document.load_file("user://undo-routes.terrain.json")
+	check(restored.ok and Document.apply(terrain, restored.document).is_empty(), "Reload undone map.")
+	check(terrain.province_layer.connections == routes, "Reload restores routes.")
+	editor.play_map()
+	check(editor._gameplay_map != null and editor._gameplay_map.get_node("Terrain").province_layer.connections == routes, "Play map restores routes.")
+	editor._return_from_map()
 	var saved := Document.load_file("user://split-map.terrain.json")
 	check(saved.ok and Document.apply(terrain, saved.document).is_empty() and terrain.province_layer.records[new_id - 1].active, "Split map restores exact IDs after ocean records.")
 	editor._select_province(target)
@@ -173,7 +198,9 @@ func _run() -> void:
 			donor_pixel = i
 			break
 	var donor_point := (Vector2(donor_pixel % source.size.x,donor_pixel / source.size.x) / Vector2(source.size - Vector2i.ONE) - Vector2.ONE * 0.5) * extent
-	down.position = camera.unproject_position(terrain.to_global(Vector3(donor_point.x,0,donor_point.y)))
+	while terrain.map_renderer.display_pending(): await process_frame
+	var donor_height: float = terrain.visible_surface_height(donor_point / extent + Vector2.ONE * 0.5)
+	down.position = camera.unproject_position(terrain.to_global(Vector3(donor_point.x,donor_height,donor_point.y)))
 	brush.handle_input(down)
 	check(brush.merge_ids.size() == 2 and not brush.merge_action.disabled, "Merge selection includes kept and donor regions.")
 	if DisplayServer.get_name() != "headless":
