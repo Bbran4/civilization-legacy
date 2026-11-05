@@ -1,0 +1,125 @@
+[gd_scene format=3 uid="uid://6ixpd3ygtjkv"]
+
+[ext_resource type="Script" uid="uid://bwyadesl8egd1" path="res://scripts/rendering/terrain3d_trial.gd" id="1"]
+[ext_resource type="Material" uid="uid://cgk4glwmc4vk2" path="res://addons/terrain_3d/extras/shaders/M_ocean.tres" id="2_4qpcn"]
+[ext_resource type="Texture2D" uid="uid://b8s7j7s534ki3" path="res://assets/terrain3d/ground037_alb_ht.png" id="2_mknqc"]
+[ext_resource type="Texture2D" uid="uid://dh8oyyhhugjcr" path="res://assets/terrain3d/ground037_nrm_rgh.png" id="3_nwqsk"]
+[ext_resource type="Texture2D" uid="uid://k6fyr5t7fufh" path="res://assets/terrain3d/rock023_alb_ht.png" id="4_4x6lt"]
+[ext_resource type="Texture2D" uid="uid://eklmb7euh80x" path="res://assets/terrain3d/rock023_nrm_rgh.png" id="5_cct8k"]
+
+[sub_resource type="Terrain3DMaterial" id="Terrain3DMaterial_fwyrg"]
+_shader_parameters = {
+&"auto_base_texture": 0,
+&"auto_height_reduction": null,
+&"auto_overlay_texture": 1,
+&"auto_shader": null,
+&"auto_slope": null,
+&"bias_distance": null,
+&"blend_sharpness": null,
+&"depth_blur": null,
+&"distant_normal_scale": null,
+&"flat_terrain_normals": null,
+&"general_uniforms": null,
+&"mipmap_bias": null,
+&"mipmaps": null,
+&"private": null
+}
+world_background = 0
+auto_shader_enabled = true
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_xcf1o"]
+transparency = 4
+cull_mode = 2
+vertex_color_use_as_albedo = true
+backlight_enabled = true
+backlight = Color(0.5, 0.5, 0.5, 1)
+distance_fade_mode = 1
+distance_fade_min_distance = 128.0
+distance_fade_max_distance = 96.0
+metadata/terrain3d_generated_material = true
+
+[sub_resource type="Terrain3DMeshAsset" id="Terrain3DMeshAsset_ftp24"]
+generated_type = 1
+height_offset = 0.5
+density = 10.0
+material_override = SubResource("StandardMaterial3D_xcf1o")
+last_lod = 0
+last_shadow_lod = 0
+lod0_range = 128.0
+
+[sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_evy0c"]
+name = "Grass"
+albedo_color = Color(0.67, 0.75, 0.69, 1)
+albedo_texture = ExtResource("2_mknqc")
+normal_texture = ExtResource("3_nwqsk")
+
+[sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_jnphs"]
+name = "Cliff"
+id = 1
+albedo_texture = ExtResource("4_4x6lt")
+normal_texture = ExtResource("5_cct8k")
+
+[sub_resource type="Terrain3DAssets" id="Terrain3DAssets_2ewt6"]
+mesh_list = Array[Terrain3DMeshAsset]([SubResource("Terrain3DMeshAsset_ftp24")])
+texture_list = Array[Terrain3DTextureAsset]([SubResource("Terrain3DTextureAsset_evy0c"), SubResource("Terrain3DTextureAsset_jnphs")])
+
+[sub_resource type="StandardMaterial3D" id="Water"]
+albedo_color = Color(0.055, 0.24, 0.31, 1)
+roughness = 0.32
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_slsn3"]
+size = Vector2(1024, 1024)
+
+[sub_resource type="Environment" id="Environment"]
+background_mode = 1
+background_color = Color(0.12, 0.18, 0.24, 1)
+ambient_light_source = 3
+ambient_light_color = Color(0.65, 0.77, 0.9, 1)
+ambient_light_energy = 0.5
+tonemap_mode = 2
+
+[node name="Terrain3DTrial" type="Node3D" unique_id=544208849]
+script = ExtResource("1")
+template = "Old World"
+world_seed = "13248650"
+height_range = 77.0
+mountain_detail = 0.3
+applied_settings = {
+"height_range": 77.0,
+"length": 1024,
+"mountain_detail": 0.3,
+"sea_level": 0.2,
+"seed": "13248650",
+"template": "Old World",
+"width": 1024
+}
+
+[node name="Terrain3D" type="Terrain3D" parent="." unique_id=1699301463 node_paths=PackedStringArray("light_target")]
+data_directory = "res://.terrain3d-trials/1793910510.025-866685086"
+material = SubResource("Terrain3DMaterial_fwyrg")
+assets = SubResource("Terrain3DAssets_2ewt6")
+light_target = NodePath("../Sun")
+displacement_sharpness = 0.5
+ocean_material = ExtResource("2_4qpcn")
+free_editor_textures = false
+top_level = true
+metadata/_edit_lock_ = true
+
+[node name="Sea" type="MeshInstance3D" parent="." unique_id=1682334581]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 512, 0, 512)
+material_override = SubResource("Water")
+mesh = SubResource("PlaneMesh_slsn3")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1244981864]
+environment = SubResource("Environment")
+
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=1855717931]
+transform = Transform3D(0.81915206, 0.4262504, -0.38379753, 0, 0.66913056, 0.74314487, 0.57357645, -0.6087487, 0.54811966, 0, 0, 0)
+light_color = Color(1, 0.93, 0.82, 1)
+light_energy = 1.1
+shadow_enabled = true
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=1742717283]
+transform = Transform3D(1, 0, 0, 0, 0.57357645, 0.81915206, 0, -0.81915206, 0.57357645, 512, 1006.5741, 1216.8108)
+current = true
+far = 12000.0

@@ -678,6 +678,7 @@ func _build_shell() -> void:
 	_button("Open world…", func(): _show_dialog("load_world"), _toolbar, "OpenWorld")
 	_button("View settings", func(): _select_layer("view"), _toolbar)
 	_button("Full map", func(): _camera_rig._reset_view(), _toolbar)
+	_button("Terrain3D test", func(): OS.create_process(OS.get_executable_path(), ["--path", ProjectSettings.globalize_path("res://"), "res://scenes/terrain3d_trial.tscn"]), _toolbar, "Terrain3DTest")
 	if _terrain.heightmap_only:
 		_button("Play map", play_map, _toolbar, "PlayMap")
 	var stack := VBoxContainer.new()

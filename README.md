@@ -2,6 +2,13 @@
 
 Godot world generation with layered map authoring.
 
+## Terrain3D trial
+
+Terrain3D 1.1.0 is installed as an optional terrain workspace. Open
+`scenes/terrain3d_trial.tscn` to generate seeded templates and use the native
+sculpting/material tools, or choose **Terrain3D test** in the existing editor for
+a separate runtime preview. See [setup and editing instructions](docs/TERRAIN3D_TRIAL.md).
+
 ## World layers
 
 - **Heightmap** — seeded terrain, templates, imported heightmaps and grayscale export.
