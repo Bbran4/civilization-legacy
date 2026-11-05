@@ -34,6 +34,8 @@ var borders: RefCounted
 var map_extent := Vector2.ONE
 const SHADER = preload("res://scripts/rendering/terrain_map.gdshader")
 var surface: MeshInstance3D
+var _water_preview := 0
+var water_material := ShaderMaterial.new()
 var material := ShaderMaterial.new()
 var shaded_relief := true
 var provinces_visible := false
@@ -69,6 +71,8 @@ var _relief_dirty := true
 func _init(target: MeshInstance3D) -> void:
 	surface = target
 	material.shader = SHADER
+	water_material.shader = preload("res://scripts/rendering/hydraulic_water.gdshader")
+	water_material.render_priority = -20
 	lighting.bind(material)
 	borders = Borders.new(surface)
 	patches = Patches.new(surface,material)
@@ -107,6 +111,7 @@ func set_shaded_relief(enabled: bool) -> void:
 	borders.root.visible = enabled and provinces_visible
 	material.set_shader_parameter("shaded_relief", enabled)
 	set_relief(relief)
+	sync_water_surface()
 
 func set_water_layer(layer: RefCounted, enabled: bool) -> void:
 	var mask_key: String = layer.hydraulic_fingerprint() if layer != null else ""
@@ -123,8 +128,28 @@ func set_water_layer(layer: RefCounted, enabled: bool) -> void:
 	material.set_shader_parameter("water_field",water_texture)
 	material.set_shader_parameter("geography_water",water_texture)
 	material.set_shader_parameter("geography_has_water",layer != null)
+	sync_water_surface()
 	borders.set_water(water_texture)
 	_rebuild_relief()
+
+func sync_water_surface(preview: int = -1) -> void:
+	if preview >= 0: _water_preview = preview
+	var active: bool = _water_visible and _water_layer != null and _water_layer.has_hydraulic_data() and shaded_relief and _water_preview == 0
+	material.next_pass = water_material if active else null
+	material.set_shader_parameter("separate_water",active)
+	if not active: return
+	var scale := maxf(map_extent.x,map_extent.y)/192.0
+	material.set_shader_parameter("bed_offset",_height_offset)
+	material.set_shader_parameter("bed_datum",_datum)
+	material.set_shader_parameter("bed_scale",scale)
+	water_material.set_shader_parameter("enabled",true)
+	water_material.set_shader_parameter("coverage",_water_layer.texture())
+	water_material.set_shader_parameter("bed_field",material.get_shader_parameter("height_field"))
+	water_material.set_shader_parameter("height_scale",_elevation*scale)
+	water_material.set_shader_parameter("offset_world",_height_offset*scale)
+	water_material.set_shader_parameter("datum",_datum)
+	water_material.set_shader_parameter("map_extent",map_extent)
+	bind_relief_material(water_material)
 
 func set_height_layer_visible(enabled: bool) -> void:
 	material.set_shader_parameter("height_enabled", enabled)
@@ -356,6 +381,9 @@ func update_detail(camera: Camera3D,world_focus: Vector3) -> void:
 	_bind_patch_materials()
 func _bind_patch_materials() -> void:
 	material.set_shader_parameter("terrain_inverse",surface.global_transform.affine_inverse())
+	water_material.set_shader_parameter("terrain_inverse",surface.global_transform.affine_inverse())
+	water_material.set_shader_parameter("relief_vertices",_relief_texture)
+	water_material.set_shader_parameter("relief_amount",visible_relief)
 	patches.bind(material,chunking_enabled)
 	for i in range(_relief_materials.size()-1,-1,-1):
 		var target: ShaderMaterial = _relief_materials[i].get_ref()
@@ -375,6 +403,7 @@ func bind_relief_material(target: ShaderMaterial) -> void:
 func update_lighting(sun: DirectionalLight3D, environment: Environment, camera: Camera3D, focus: Vector3) -> void:
 	if camera != null: update_detail(camera,focus)
 	lighting.update(sun,environment,camera,focus)
+	lighting.bind(water_material)
 	lighting.bind(material)
 
 # Return normalized elevation and physical slope, or a rejected site. Both root

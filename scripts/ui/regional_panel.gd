@@ -94,6 +94,7 @@ func _set_preview(mode: int) -> void:
 	var terrain = editor._terrain
 	terrain.region_preview = mode
 	if terrain.map_renderer != null:
+		terrain.map_renderer.sync_water_surface(mode)
 		terrain.map_renderer.material.set_shader_parameter("region_preview",mode)
 		terrain.map_renderer.material.set_shader_parameter("region_selection",selection_texture)
 	if terrain.forest_view != null: terrain.forest_view.update_presentation(terrain)

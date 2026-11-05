@@ -130,7 +130,10 @@ Fine world-scaled normals remain visible at full relief. Zoom reuses prepared
 fields. Large sources now use camera-dependent patches, reaching approximately 2048 cells
 along a 2050-pixel source near the camera. Smooth detail transitions share the same
 surface with picking, borders and tree roots. See [chunked terrain](docs/chunked-terrain.md).
-Separate water surfaces remain later work. Source heights and saved hydrology stay unchanged.
+Rivers and lakes with saved hydraulic levels use a separate translucent surface.
+Close views show depth-dependent color, subtle ripples and pale bank edges over
+the conditioned bed. The Rivers / lakes eye reveals the bed. Older mask-only water
+uses the original overlay until hydraulic levels are generated.
 
 ## Lighting and atmosphere
 

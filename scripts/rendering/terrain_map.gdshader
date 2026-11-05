@@ -20,6 +20,10 @@ uniform sampler2D region_selection : filter_linear, repeat_disable;
 uniform bool forest_enabled = false;
 uniform float forest_overview = 0.0;
 uniform sampler2D forest_cover : filter_linear_mipmap, repeat_disable;
+uniform bool separate_water = false;
+uniform float bed_offset;
+uniform float bed_datum;
+uniform float bed_scale;
 uniform bool water_enabled = false;
 uniform sampler2D water_field : filter_linear, repeat_disable;
 uniform bool provinces_enabled = false;
@@ -134,6 +138,11 @@ void vertex() {
     } else {
         VERTEX.y = relief_height(UV);
     }
+    if (separate_water) {
+        vec2 wet = texture(water_field,UV).rg;
+        float bed = (texture(height_field,UV).r-bed_datum)*ground_height_scale+bed_offset*bed_scale;
+        VERTEX.y = mix(VERTEX.y,min(VERTEX.y,bed*relief_amount),max(wet.r,wet.g));
+    }
     map_world_position = (MODEL_MATRIX*vec4(VERTEX,1.0)).xyz;
 }
 void fragment() {
@@ -201,7 +210,7 @@ void fragment() {
 			if (selected) color = mix(color, vec3(1.0, 0.8, 0.3), 0.45);
 		}
 	}
-	if (water_enabled && (shaded_relief || !height_enabled)) {
+	if (!separate_water && water_enabled && (shaded_relief || !height_enabled)) {
 		vec2 water = texture(water_field, UV).rg;
 		color = mix(color, map_haze(vec3(0.20,0.44,0.56),map_world_position,shaded_relief ? relief_amount : 0.0), water.r);
 		color = mix(color, map_haze(vec3(0.15,0.36,0.46),map_world_position,shaded_relief ? relief_amount : 0.0), water.g);

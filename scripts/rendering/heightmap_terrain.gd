@@ -578,6 +578,7 @@ func refresh_water_layer() -> void:
 		map_renderer.set_provinces(province_layer, province_layer_visible and province_layer_current() and shaded_relief)
 		map_renderer.set_height_layer_visible(height_layer_visible or derived)
 		map_renderer.set_water_layer(water_layer if water_layer_current() else null, water_layer_visible and water_layer_current())
+		map_renderer.sync_water_surface(region_preview)
 		map_renderer.end_update(true)
 		presentation_changed.emit()
 		if not Engine.is_editor_hint():
