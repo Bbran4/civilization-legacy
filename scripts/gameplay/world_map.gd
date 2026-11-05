@@ -8,6 +8,17 @@ var _origin := 0
 var _destination := 0
 var _directions: RichTextLabel
 var _clear: Button
+var _settlement := 0
+var _unit := 0
+var _turn := 1
+var _orders: Array[int] = []
+var _status: Label
+var _found: Button
+var _select_unit: Button
+var _order: Button
+var _end_turn: Button
+var _home_marker: Label3D
+var _unit_marker: Label3D
 var _route_colors: ImageTexture
 
 func _ready() -> void:
@@ -88,6 +99,12 @@ func _setup_routes(hud: CanvasLayer) -> void:
 	_clear.text = "Clear route"
 	_clear.pressed.connect(_reset_route)
 	box.add_child(_clear)
+	_status = Label.new()
+	box.add_child(_status)
+	_found = _action(box, "Found settlement here", _found_settlement)
+	_select_unit = _action(box, "Select scout", _focus_unit)
+	_order = _action(box, "Order scout to destination", _issue_order)
+	_end_turn = _action(box, "End turn", _advance_turn)
 	_reset_route()
 
 func _reset_route() -> void:
@@ -145,6 +162,7 @@ func _find_route(start: int, finish: int) -> Array[int]:
 	return path
 
 func _show_route(path: Array) -> void:
+	_update_actions(path)
 	var material: ShaderMaterial = $Terrain.map_renderer.material
 	material.set_shader_parameter("route_enabled", not path.is_empty())
 	if path.is_empty(): return
@@ -159,3 +177,77 @@ func _show_route(path: Array) -> void:
 	else: _route_colors.update(colors)
 	material.set_shader_parameter("route_colors", _route_colors)
 	material.set_shader_parameter("route_provinces", $Terrain.province_layer.texture())
+
+func _action(box: VBoxContainer, caption: String, action: Callable) -> Button:
+	var button := Button.new()
+	button.text = caption
+	button.pressed.connect(action)
+	box.add_child(button)
+	return button
+
+func _update_actions(path: Array) -> void:
+	_found.visible = _settlement == 0
+	_found.disabled = _origin == 0 or _destination != 0
+	_select_unit.visible = _unit != 0
+	_order.visible = _unit != 0
+	_order.disabled = _origin != _unit or _destination == 0 or path.size() < 2 or not _neighbors.get(path[0], {}).has(path[1])
+	_end_turn.visible = _unit != 0
+	if _unit == 0:
+		_status.text = "Choose a starting province to found a settlement."
+		return
+	var records: Array = $Terrain.province_layer.records
+	_status.text = "Turn %d  |  Scout at %s" % [_turn, records[_unit - 1].name]
+	if not _orders.is_empty():
+		_status.text += "\nTo %s (%d turns)" % [records[_orders.back() - 1].name, _orders.size()]
+
+func _found_settlement() -> void:
+	if _settlement != 0 or _origin == 0 or _destination != 0: return
+	_settlement = _origin
+	_unit = _origin
+	_home_marker = _marker("Settlement", Color.WHEAT)
+	_unit_marker = _marker("Scout", Color.AQUAMARINE)
+	_place_markers()
+	_focus_unit()
+
+func _focus_unit() -> void:
+	if _unit == 0: return
+	_origin = 0
+	_pick_province(_unit)
+
+func _issue_order() -> void:
+	if _unit == 0 or _origin != _unit or _destination == 0: return
+	var path := _find_route(_unit, _destination)
+	if path.size() < 2: return
+	_orders.assign(path.slice(1))
+	_update_actions(path)
+
+func _advance_turn() -> void:
+	if _unit == 0: return
+	_turn += 1
+	if not _orders.is_empty():
+		_unit = _orders.pop_front()
+		_place_markers()
+	_focus_unit()
+	if not _orders.is_empty(): _pick_province(_orders.back())
+
+func _marker(caption: String, tint: Color) -> Label3D:
+	var marker := Label3D.new()
+	marker.text = caption
+	marker.modulate = tint
+	marker.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	marker.no_depth_test = true
+	marker.fixed_size = true
+	marker.pixel_size = 0.001
+	marker.font_size = 18
+	$Terrain.add_child(marker)
+	return marker
+
+func _place_markers() -> void:
+	var layer: RefCounted = $Terrain.province_layer
+	for marker: Label3D in [_home_marker, _unit_marker]:
+		var province := _settlement if marker == _home_marker else _unit
+		var pixel: int = layer.ids.find(province)
+		var uv := Vector2(pixel % layer.size.x, pixel / layer.size.x) / Vector2(layer.size - Vector2i.ONE)
+		var horizontal: Vector2 = (uv - Vector2.ONE * 0.5) * $Terrain.display_size()
+		marker.position = Vector3(horizontal.x, $Terrain.visible_surface_height(uv), horizontal.y)
+		marker.offset.y = 20 if marker == _unit_marker and _unit == _settlement else 0

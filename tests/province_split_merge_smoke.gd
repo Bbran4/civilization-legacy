@@ -227,6 +227,15 @@ func _run() -> void:
 		check(runtime.map_renderer.material.get_shader_parameter("route_enabled") == true, "Route highlight is enabled.")
 		play._clear.pressed.emit()
 		check(play._origin == 0 and play._destination == 0, "Clear route resets the preview.")
+		play._pick_province(edge.a)
+		play._found.pressed.emit()
+		check(play._settlement == edge.a and play._unit == edge.a, "Foundation places scout in the settlement.")
+		play._pick_province(edge.b)
+		check(not play._order.disabled, "A reachable scout destination enables movement orders.")
+		play._order.pressed.emit()
+		check(play._unit == edge.a and play._orders == [edge.b], "Orders wait for End turn.")
+		play._end_turn.pressed.emit()
+		check(play._unit == edge.b and play._settlement == edge.a and play._turn == 2 and play._orders.is_empty(), "Scout arrives after one turn while the settlement stays home.")
 		clicked_route = true
 		break
 	check(clicked_route, "Play map fixture contains a land route.")
