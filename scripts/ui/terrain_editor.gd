@@ -1,4 +1,6 @@
 extends Control
+signal menu_requested
+
 ## Runtime controls stage generation settings; save/load operate on the visible map.
 
 const WorldProject = preload("res://scripts/storage/world_project.gd")
@@ -680,6 +682,8 @@ func _build_shell() -> void:
 	_button("Full map", func(): _camera_rig._reset_view(), _toolbar)
 	if _terrain.heightmap_only:
 		_button("Play map", play_map, _toolbar, "PlayMap")
+	if menu_requested.has_connections():
+		_button("Main menu", func(): request_action(func(): menu_requested.emit()), _toolbar)
 	var stack := VBoxContainer.new()
 	stack.name = "LayerStack"
 	stack.position = Vector2(14, 60)

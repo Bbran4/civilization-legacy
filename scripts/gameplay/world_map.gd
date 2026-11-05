@@ -1,6 +1,7 @@
 extends Node3D
 ## Runtime map has no authoring controls and uses the same canonical terrain renderer.
 signal return_requested
+var menu_session := false
 
 const CROSSINGS := {"province_border":"Land border", "river_crossing":"River crossing", "strait":"Strait"}
 var _neighbors := {}
@@ -56,6 +57,7 @@ func _ready() -> void:
 	var back := Button.new()
 	back.name = "ReturnToEditor"
 	back.text = "Return to editor" if not return_requested.get_connections().is_empty() else "Exit map"
+	if menu_session: back.text = "Main menu"
 	back.custom_minimum_size.y = 36
 	back.pressed.connect(_request_return)
 	toolbar.add_child(back)
@@ -101,7 +103,7 @@ func _setup_routes(hud: CanvasLayer) -> void:
 	box.add_child(_clear)
 	_status = Label.new()
 	box.add_child(_status)
-	_found = _action(box, "Found settlement here", _found_settlement)
+	_found = _action(box, "Found tribal settlement here", _found_settlement)
 	_select_unit = _action(box, "Select scout", _focus_unit)
 	_order = _action(box, "Order scout to destination", _issue_order)
 	_end_turn = _action(box, "End turn", _advance_turn)
@@ -204,7 +206,7 @@ func _found_settlement() -> void:
 	if _settlement != 0 or _origin == 0 or _destination != 0: return
 	_settlement = _origin
 	_unit = _origin
-	_home_marker = _marker("Settlement", Color.WHEAT)
+	_home_marker = _marker("Tribal settlement", Color.WHEAT)
 	_unit_marker = _marker("Scout", Color.AQUAMARINE)
 	_place_markers()
 	_focus_unit()
