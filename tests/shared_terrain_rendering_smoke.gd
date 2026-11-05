@@ -14,6 +14,7 @@ func _run() -> void:
 	await process_frame
 	var editor = world.get_node("Interface/Editor")
 	var terrain = world.get_node("Terrain")
+	await terrain.wait_for_presentation()
 	var original: PackedFloat32Array = terrain.height_samples.duplicate()
 	var export_bytes: PackedByteArray = terrain.heightmap_image().get_data()
 	var dirty_before: bool = editor.dirty
@@ -38,10 +39,11 @@ func _run() -> void:
 		quit(1)
 		return
 	var runtime = game.get_node("Terrain")
+	await runtime.wait_for_presentation()
 	check(runtime.height_samples == original and runtime.map_seed == terrain.map_seed and runtime.sample_size() == terrain.sample_size(), "Gameplay receives exact authored samples, seed and resolution.")
 	check(runtime.map_renderer.material.shader == terrain.map_renderer.material.shader and runtime.shaded_relief, "Both surfaces share the same shader with relief enabled.")
 	check(runtime.map_renderer.material.get_shader_parameter("height_field").get_image().get_data() == terrain.map_renderer.material.get_shader_parameter("height_field").get_image().get_data(), "The renderer receives identical float height textures in gameplay and editor.")
-	check(runtime.climate == null and runtime.biomes == null and runtime.hydrology == null and runtime.vegetation_view == null and runtime.provinces == null, "Gameplay retains the requested heightmap-only scope.")
+	check(runtime.heightmap_only and runtime.texture_settings == terrain.texture_settings and runtime.tree_settings == terrain.tree_settings, "Gameplay retains the focused pipeline and authored appearance settings.")
 	check(not game.has_node("Interface/Editor") and not game.has_node("LayerStack"), "Gameplay scene contains no authoring interface.")
 	check(runtime.startup_document.is_empty() and runtime.heightmap_image().get_data() == export_bytes, "Startup consumes the document once without changing exports.")
 	if editor_image != null:

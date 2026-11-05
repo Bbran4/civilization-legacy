@@ -120,6 +120,16 @@ reuses existing placements and coverage. The current models are original,
 procedurally built low-poly trees with slight wind sway; there are no external
 model dependencies. There is no manual tree-planting/erasing brush yet.
 
+## Terrain display preparation
+
+Display heights are cached at source resolution as float32 world heights. Large
+updates prepare the combined ground/water display in a worker; the editor remains
+responsive and shows **Updating terrain view…** until the result is ready. Picking
+pauses during replacement and resumes against the actual displayed triangles.
+Fine world-scaled normals remain visible at full relief. Zoom reuses prepared
+fields. The mesh is still capped at 512 cells; chunked terrain and separate water
+surfaces are later work. Source heights and saved hydrology remain unchanged.
+
 ## Lighting and atmosphere
 
 Terrain and trees share warm sunlight and cool sky fill in the editor and gameplay.
@@ -177,7 +187,9 @@ paint. Add `-- --capture` without `--headless` to capture a rendered preview und
 picking, tilted painting, raw-view restoration, hydraulic elevations, and exact
 triangle splits for draped lines.
 
-The available local test engine is Godot 4.5.1 Mono. The project retains its existing
-4.7 configuration; exact 4.7 behavior has not been verified. Historical reference
-and design documents may describe retired systems. See `docs/world-painter-review.md`
-for the current implementation review.
+The project targets Godot 4.7. This terrain-display update is verified with Godot
+4.7.2 / OpenGL Compatibility on Intel UHD 730. Older feature documents record their
+original Godot 4.5.1 test environment; those records are historical, not the current
+engine requirement. See [display-height caching and fine normals](docs/display-height-cache.md)
+for the current renderer and measured limits. Historical pipeline references are
+marked as archived.

@@ -10,6 +10,7 @@ const BorderAppearance = preload("res://scripts/domain/border_appearance.gd")
 var border_appearance: Dictionary = BorderAppearance.DEFAULTS.duplicate()
 signal terrain_surface_changed
 signal water_layer_changed
+signal presentation_changed
 signal terrain_regenerated
 const WaterLayer = preload("res://scripts/domain/terrain_water_layer.gd")
 var terrain_surface: RefCounted
@@ -211,12 +212,19 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if map_renderer != null and map_renderer.poll_display():
+		if forest_view != null: forest_view.update_presentation(self)
+		presentation_changed.emit()
 	if not _dirty:
 		return
 	_delay -= delta
 	if _delay <= 0.0:
 		regenerate()
 
+
+func wait_for_presentation() -> void:
+	while map_renderer != null and map_renderer.display_pending():
+		await get_tree().process_frame
 
 func _request_rebuild() -> void:
 	_restored_samples = PackedFloat32Array()
@@ -450,6 +458,7 @@ func pick_cell(ray_origin: Vector3, ray_direction: Vector3) -> Dictionary:
 
 
 func ray_surface_hit(ray_origin: Vector3, ray_direction: Vector3) -> Variant:
+	if map_renderer != null and map_renderer.display_pending(): return null
 	if height_samples.is_empty():
 		return null
 	var origin: Vector3 = to_local(ray_origin)
@@ -525,12 +534,16 @@ func _regenerate_heightmap_only(surface: MeshInstance3D, water: MeshInstance3D, 
 	_build_mesh(surface)
 	if map_renderer == null:
 		map_renderer = MapRenderer.new(surface)
+	map_renderer.begin_update()
 	map_renderer.set_shaded_relief(shaded_relief)
 	map_renderer.set_heightfield(height_samples, sample_size(), display_size(), height_offset, elevation, generator_version)
 	map_renderer.set_relief(1.0-overview_blend)
 	_land_material = map_renderer.material
 	water_source_hash = WaterLayer.fingerprint(height_samples, sample_size(), map_size, height_offset, elevation, generator_version)
 	refresh_water_layer()
+	map_renderer.end_update(true)
+	if forest_view != null: forest_view.update_presentation(self)
+	presentation_changed.emit()
 	generation_ms = (Time.get_ticks_usec() - started) / 1000.0
 	terrain_regenerated.emit()
 
@@ -554,6 +567,7 @@ func water_layer_current() -> bool:
 
 func refresh_water_layer() -> void:
 	if heightmap_only and map_renderer != null:
+		map_renderer.begin_update()
 		map_renderer.set_texturing(texture_settings,map_seed,paint_layer_visible,regional_controls)
 		map_renderer.material.set_shader_parameter("region_preview",region_preview)
 		var derived := terrain_surface_current() and surface_layer_visible and shaded_relief
@@ -564,6 +578,8 @@ func refresh_water_layer() -> void:
 		map_renderer.set_provinces(province_layer, province_layer_visible and province_layer_current() and shaded_relief)
 		map_renderer.set_height_layer_visible(height_layer_visible or derived)
 		map_renderer.set_water_layer(water_layer if water_layer_current() else null, water_layer_visible and water_layer_current())
+		map_renderer.end_update(true)
+		presentation_changed.emit()
 		if not Engine.is_editor_hint():
 			if forest_view == null and tree_settings.enabled:
 				forest_view = ForestView.new()

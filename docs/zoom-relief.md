@@ -21,19 +21,17 @@ Province ribbons and authoring previews are split at grid edges and triangle
 diagonals using `heightmap_grid.gd`, then lifted to the same height grid. Changing
 zoom does not rebuild these paths. Ground brushes now use displayed-surface hits.
 
-Lighting blends the existing hillshade normal with a world-scale relief normal.
-This retains the map's current palette and paint composition. The material remains
-unshaded by Godot lights, so dynamic cast shadows are not claimed. Fine source
-features below the capped grid resolution and thin hydraulic features can soften.
-There is no chunked distance LOD in this implementation. Source-file loading remains
-synchronous. No CPU/memory/frame-time benchmark is claimed.
+Lighting now uses full-resolution display-height normals in world units at every
+relief amount. The coarse grid still defines silhouettes, picking and draped lines;
+fine normals improve shading without adding geometry. Dynamic cast shadows are
+supported by the shared lighting path. Thin hydraulic geometry can still soften;
+chunked distance LOD and separate water geometry remain later work.
 
-Validation uses Godot 4.5.1 Mono, including an OpenGL render and captured views.
-Exact project-target Godot 4.7 behavior remains unverified. The dedicated zoom smoke
-check uses a controlled height/hydraulic fixture; the map-paint integration check
-also exercises actual generated water, surface and province layers in the shared
-renderer. The engine reports certificate-store and generic OpenGL initialization
-diagnostics in this environment; successful assertions are reported separately.
+Display preparation now batches source changes, caches two surface/water variants,
+and prepares large fields in a worker. See [display-height caching](display-height-cache.md)
+for implementation, measurements and update behavior. Source-file loading and height
+normalization remain synchronous. This update is checked on Godot 4.7.2 with OpenGL.
+The older executed-check list below records the original relief implementation.
 
 ## Executed checks
 

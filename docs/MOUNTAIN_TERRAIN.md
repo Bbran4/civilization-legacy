@@ -1,5 +1,7 @@
 # Mountain terrain
 
+> **Archived pipeline reference.** This document describes the retired terrain pipeline, not the current renderer. See [the README](../README.md), [zoom relief](zoom-relief.md), and [display-height caching](display-height-cache.md) for the active implementation.
+
 The mountain pass adds original procedural ridge geometry, connected highland
 rock, fractured surface detail, exposed steep faces under snow and readable
 relief at the flat overview. Biome identity remains climate/hydrology data:

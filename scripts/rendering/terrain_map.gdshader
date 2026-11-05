@@ -3,6 +3,7 @@ render_mode cull_disabled, ambient_light_disabled, specular_disabled, fog_disabl
 #include "res://scripts/rendering/map_geography.gdshaderinc"
 #include "res://scripts/rendering/map_relief.gdshaderinc"
 #include "res://scripts/rendering/map_lighting.gdshaderinc"
+#include "res://scripts/rendering/display_normals.gdshaderinc"
 varying vec3 map_world_position;
 uniform vec2 map_extent = vec2(192.0);
 uniform float coast_width = 4.5;
@@ -133,18 +134,12 @@ void fragment() {
 	float value = h;
 	vec3 illumination = vec3(1.0);
 	if (shaded_relief) {
-		float dx = texture(height_field, UV + vec2(texel_size.x, 0.0)).r - texture(height_field, UV - vec2(texel_size.x, 0.0)).r;
-		float dy = texture(height_field, UV + vec2(0.0, texel_size.y)).r - texture(height_field, UV - vec2(0.0, texel_size.y)).r;
-		float resolution_scale = float(max(textureSize(height_field, 0).x, textureSize(height_field, 0).y)) / 1025.0;
-		vec3 n = normalize(vec3(-dx * 45.0 * resolution_scale, 1.0, -dy * 45.0 * resolution_scale));
+		vec3 n = display_normal(UV,map_extent,fwidth(UV));
 		vec2 mesh_step = 1.0/vec2(textureSize(relief_vertices,0)-1);
 		float right = relief_height(UV+vec2(mesh_step.x,0.0));
 		float left = relief_height(UV-vec2(mesh_step.x,0.0));
 		float back = relief_height(UV+vec2(0.0,mesh_step.y));
 		float front = relief_height(UV-vec2(0.0,mesh_step.y));
-		float hx = (right-left)/(2.0*mesh_step.x*map_extent.x);
-		float hz = (back-front)/(2.0*mesh_step.y*map_extent.y);
-		n = normalize(mix(n,normalize(vec3(-hx,1.0,-hz)),relief_amount));
 		illumination = map_light(normalize(mat3(MODEL_MATRIX)*n));
 		float cavity = max(0.0,(right+left+back+front)*0.25-relief_height(UV));
 		float neighborhood = max(0.001,min(mesh_step.x*map_extent.x,mesh_step.y*map_extent.y));

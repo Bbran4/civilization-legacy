@@ -139,7 +139,7 @@ or land to see its basin, river-flow strength, lake level and outlet information
 while preserving the ocean and original terrain. **Show heights** hides water
 presentation for inspecting the source heightmap.
 
-Maps save in version 10, including texture choices and ground paint; earlier files still load. See the
+Maps save in terrain document version 15, including regional controls, tree and texture choices and ground paint; earlier files still load. See the
 [hydrology model and verification](HYDROLOGY_REFERENCE.md) for details and limits.
 
 ## Biomes and tree suitability

@@ -1,5 +1,7 @@
 # Province split and merge tools
 
+> **Version note:** Current terrain documents are v15 and world manifests are v6. Older version numbers below record this feature's introduction. See [the current renderer](display-height-cache.md) and [README](../README.md) for active behavior.
+
 ## Split a province
 
 1. In Provinces, pick the province to split with the editing tool off.

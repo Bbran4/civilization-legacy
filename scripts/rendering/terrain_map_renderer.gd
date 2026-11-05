@@ -8,7 +8,23 @@ var lighting := Lighting.new()
 var regions: RefCounted
 var _ground_library: RefCounted
 const Grid = preload("res://scripts/domain/heightmap_grid.gd")
-const MAX_RELIEF_CELLS = 512
+const DisplayField = preload("res://scripts/rendering/display_height_field.gd")
+const MAX_RELIEF_CELLS = DisplayField.MAX_RELIEF_CELLS
+const BACKGROUND_THRESHOLD = (MAX_RELIEF_CELLS+1)*(MAX_RELIEF_CELLS+1)
+var display_heights := PackedFloat32Array()
+var display_texture: ImageTexture
+var display_builds := 0
+var display_cache_hits := 0
+var display_prepare_usec := 0
+var display_upload_usec := 0
+var _height_revision := 0
+var _update_depth := 0
+var _display_key := ""
+var _published_key := ""
+var _display_cache: Array[RefCounted] = []
+var _display_task := -1
+var _display_job: RefCounted
+var _queued_display: RefCounted
 const Borders = preload("res://scripts/rendering/province_border_renderer.gd")
 var borders: RefCounted
 var map_extent := Vector2.ONE
@@ -58,6 +74,8 @@ func set_heightfield(samples: PackedFloat32Array, size: Vector2i, extent: Vector
 	normalized_heights.resize(samples.size())
 	for i in range(samples.size()):
 		normalized_heights[i] = clampf((samples[i] - height_offset) / elevation + (0.2 if generator_version >= 3 else 0.0), 0.0, 1.0)
+	_height_revision += 1
+	_display_cache.clear()
 	map_extent = extent
 	_height_size = size
 	_forest_clearance_dirty = true
@@ -88,6 +106,7 @@ func set_shaded_relief(enabled: bool) -> void:
 func set_water_layer(layer: RefCounted, enabled: bool) -> void:
 	var mask_key: String = layer.hydraulic_fingerprint() if layer != null else ""
 	if mask_key != _forest_mask_key or _water_layer != layer:
+		_relief_dirty = true
 		_forest_mask_key = mask_key
 		_forest_clearance_dirty = true
 	if _water_layer != layer or _water_visible != enabled:
@@ -169,47 +188,100 @@ func set_relief(amount: float) -> void:
 
 # Bilinear texture sampling uses texel centers, unlike Grid.sample's triangle mesh.
 static func _texture_sample(values: PackedFloat32Array, size: Vector2i, uv: Vector2) -> float:
-	var p := (uv*Vector2(size)-Vector2.ONE*0.5).clamp(Vector2.ZERO,Vector2(size-Vector2i.ONE))
-	var x := mini(int(p.x),size.x-2)
-	var y := mini(int(p.y),size.y-2)
-	var f := p-Vector2(x,y)
-	return lerpf(lerpf(values[y*size.x+x],values[y*size.x+x+1],f.x),lerpf(values[(y+1)*size.x+x],values[(y+1)*size.x+x+1],f.x),f.y)
+	return DisplayField.sample(values,size,uv)
 
-func _rebuild_relief() -> void:
-	if not _relief_dirty or rendered_heights.is_empty(): return
+func begin_update() -> void:
+	_update_depth += 1
+func end_update(background: bool = false) -> void:
+	assert(_update_depth > 0)
+	_update_depth -= 1
+	if _update_depth == 0: _rebuild_relief(background)
+func display_pending() -> bool:
+	return _published_key != _display_key
+func _rebuild_relief(background: bool = false) -> void:
+	if _update_depth > 0 or not _relief_dirty or rendered_heights.is_empty(): return
 	_relief_dirty = false
-	var cells := mini(MAX_RELIEF_CELLS,maxi(_height_size.x,_height_size.y)-1)
-	var size := Grid.sample_size_for(map_extent,cells)
-	if size != mesh_size or _relief_mesh == null or _mesh_extent != map_extent:
-		mesh_size = size
+	var water: bool = _water_visible and _water_layer != null and _water_layer.has_hydraulic_data()
+	_display_key = str(_height_revision)+"/"+str(_surface_layer.get_instance_id() if _surface_layer != null else 0)+"/"+(_forest_mask_key if water else "dry")
+	if _published_key == _display_key:
+		_queued_display = null
+		surface.visible = true
+		borders.root.visible = provinces_visible and shaded_relief
+		return
+	for cached in _display_cache:
+		if cached.key == _display_key:
+			display_cache_hits += 1
+			_queued_display = null
+			_publish_display(cached)
+			return
+	if _display_job != null and _display_job.key == _display_key:
+		surface.visible = false
+		borders.root.visible = false
+		_queued_display = null
+		return
+	var job := DisplayField.new()
+	job.key = _display_key
+	job.base = rendered_heights.duplicate()
+	job.size = _height_size
+	job.extent = map_extent
+	job.offset = _height_offset
+	job.elevation = _elevation
+	job.datum = _datum
+	if water:
+		job.mask = _water_layer.mask_bytes.duplicate()
+		job.levels = _water_layer.surface_levels.duplicate()
+	# Hide a stale surface while its new display is prepared. Picking is gated too.
+	surface.visible = false
+	borders.root.visible = false
+	if background and job.base.size() > BACKGROUND_THRESHOLD:
+		if _display_task >= 0: _queued_display = job
+		else: _start_display(job)
+	else:
+		job.build()
+		display_builds += 1
+		_publish_display(job)
+func _start_display(job: RefCounted) -> void:
+	_display_job = job
+	_display_task = WorkerThreadPool.add_task(job.build)
+func poll_display() -> bool:
+	if _display_task < 0 or not WorkerThreadPool.is_task_completed(_display_task): return false
+	WorkerThreadPool.wait_for_task_completion(_display_task)
+	_display_task = -1
+	display_builds += 1
+	var job := _display_job
+	_display_job = null
+	var published: bool = job.key == _display_key
+	if published: _publish_display(job)
+	if _queued_display != null:
+		var next := _queued_display
+		_queued_display = null
+		if next.key == _display_key and next.key != _published_key: _start_display(next)
+	return published
+func _publish_display(job: RefCounted) -> void:
+	var started := Time.get_ticks_usec()
+	# Both textures publish atomically on the main thread from the same CPU result.
+	display_heights = job.heights
+	var display_image := Image.create_from_data(job.size.x,job.size.y,false,Image.FORMAT_RF,display_heights.to_byte_array())
+	if display_texture == null or display_texture.get_size() != Vector2(job.size): display_texture = ImageTexture.create_from_image(display_image)
+	else: display_texture.update(display_image)
+	material.set_shader_parameter("display_heights",display_texture)
+	material.set_shader_parameter("display_sea_height",job.sea_height)
+	material.set_shader_parameter("display_texel_size",Vector2.ONE/Vector2(job.size))
+	if job.mesh_size != mesh_size or _relief_mesh == null or _mesh_extent != map_extent:
+		mesh_size = job.mesh_size
 		_mesh_extent = map_extent
 		_overview_mesh = PlaneMesh.new()
 		_overview_mesh.size = map_extent
 		var plane := PlaneMesh.new()
 		plane.size = map_extent
-		plane.subdivide_width = size.x-2
-		plane.subdivide_depth = size.y-2
+		plane.subdivide_width = mesh_size.x-2
+		plane.subdivide_depth = mesh_size.y-2
 		_relief_mesh = plane
-		borders.set_relief_grid(size)
-	var visible_field := rendered_heights
-	if _water_visible and _water_layer != null and _water_layer.has_hydraulic_data():
-		visible_field = rendered_heights.duplicate()
-		for i in range(visible_field.size()):
-			if (_water_layer.mask_bytes[i*4] > 0 or _water_layer.mask_bytes[i*4+1] > 0) and _water_layer.surface_levels[i] >= 0:
-				visible_field[i] = maxf(visible_field[i],_water_layer.surface_levels[i])
-	mesh_heights.resize(size.x*size.y)
-	var scale_factor := maxf(map_extent.x,map_extent.y)/192.0
-	mesh_bounds = Vector2(INF,-INF)
-	for y in range(size.y):
-		for x in range(size.x):
-			var uv := Vector2(x,y)/Vector2(size-Vector2i.ONE)
-			var h := maxf(0.2,_texture_sample(visible_field,_height_size,uv))
-			var world := (_height_offset+(h-_datum)*_elevation)*scale_factor
-			mesh_heights[y*size.x+x] = world
-			mesh_bounds.x = minf(mesh_bounds.x,world)
-			mesh_bounds.y = maxf(mesh_bounds.y,world)
-	var image := Image.create_from_data(size.x,size.y,false,Image.FORMAT_RF,mesh_heights.to_byte_array())
-	if _relief_texture == null or _relief_texture.get_size() != Vector2(size): _relief_texture = ImageTexture.create_from_image(image)
+		borders.set_relief_grid(mesh_size)
+	mesh_heights = job.mesh_heights
+	mesh_bounds = job.bounds
+	var image := Image.create_from_data(mesh_size.x,mesh_size.y,false,Image.FORMAT_RF,mesh_heights.to_byte_array())
+	if _relief_texture == null or _relief_texture.get_size() != Vector2(mesh_size): _relief_texture = ImageTexture.create_from_image(image)
 	else: _relief_texture.update(image)
 	material.set_shader_parameter("relief_vertices",_relief_texture)
 	material.set_shader_parameter("map_extent",map_extent)
@@ -217,7 +289,15 @@ func _rebuild_relief() -> void:
 	var high := maxf(0,mesh_bounds.y)+1.0
 	surface.custom_aabb = AABB(Vector3(-map_extent.x*0.5,low,-map_extent.y*0.5),Vector3(map_extent.x,high-low,map_extent.y))
 	borders.set_relief_margin(maxf(absf(low),absf(high)))
+	_published_key = job.key
+	_display_cache.append(job)
+	while _display_cache.size() > 2: _display_cache.pop_front()
+	display_prepare_usec = job.elapsed_usec
 	set_relief(relief)
+	if borders.source != null: borders.update(borders.source,map_extent,provinces_visible and shaded_relief)
+	surface.visible = true
+	borders.root.visible = provinces_visible and shaded_relief
+	display_upload_usec = Time.get_ticks_usec()-started
 
 func visible_height(uv: Vector2) -> float:
 	if not shaded_relief or mesh_heights.is_empty(): return 0.0

@@ -1,5 +1,7 @@
 # Terrain generation roadmap
 
+> **Version note:** Current terrain documents are v15 and world manifests are v6. Older version numbers below record this feature's introduction. See [the current renderer](display-height-cache.md) and [README](../README.md) for active behavior.
+
 Land/water/coastlines, basic climate, initial lakes/rivers and water-supported biome classification and canopy suitability are implemented.
 The remaining stages below are proposed.
 The player-facing inputs are heightmap, seed, width and height, plus optional

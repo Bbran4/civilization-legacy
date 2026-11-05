@@ -1,5 +1,7 @@
 # Island attachment and coastal maritime regions
 
+> **Version note:** Current terrain documents are v15 and world manifests are v6. Older version numbers below record this feature's introduction. See [the current renderer](display-height-cache.md) and [README](../README.md) for active behavior.
+
 ## Attach a small island to a mainland province
 
 1. Click the mainland province you want the island to belong to.

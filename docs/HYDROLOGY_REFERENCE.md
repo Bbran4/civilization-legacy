@@ -1,5 +1,7 @@
 # Lakes, drainage basins and rivers
 
+> **Archived pipeline reference.** This document describes the retired terrain pipeline, not the current renderer. See [the README](../README.md), [zoom relief](zoom-relief.md), and [display-height caching](display-height-cache.md) for the active implementation.
+
 ## Using the editor
 
 Generate a map normally. Lakes and rivers are generated automatically after

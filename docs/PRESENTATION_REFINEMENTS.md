@@ -1,5 +1,7 @@
 # Tree, river and relief refinements
 
+> **Archived pipeline reference.** This document describes the retired terrain pipeline, not the current renderer. See [the README](../README.md), [zoom relief](zoom-relief.md), and [display-height caching](display-height-cache.md) for the active implementation.
+
 These belong to the terrain presentation layers already started. River occlusion
 and mouth overlap were defects in that first pass, not features intentionally
 waiting for snow/ice. The following corrections are implemented.

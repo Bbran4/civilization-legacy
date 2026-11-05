@@ -1,5 +1,7 @@
 # Tree population and editable assets
 
+> **Archived pipeline reference.** This document describes the retired terrain pipeline, not the current renderer. See [the README](../README.md), [zoom relief](zoom-relief.md), and [display-height caching](display-height-cache.md) for the active implementation.
+
 ## Choose the number of trees
 
 In the left map-editor sidebar, scroll to **TREES**, enter **Requested tree

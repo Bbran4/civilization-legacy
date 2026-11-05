@@ -55,7 +55,7 @@ func refresh(terrain: Node) -> void:
 		key = next_key
 	update_presentation(terrain)
 func update_presentation(terrain: Node) -> void:
-	visible = terrain.tree_settings.enabled and terrain.tree_layer_visible and terrain.shaded_relief and terrain.region_preview == 0
+	visible = terrain.tree_settings.enabled and terrain.tree_layer_visible and terrain.shaded_relief and terrain.region_preview == 0 and not terrain.map_renderer.display_pending()
 	var camera := get_viewport().get_camera_3d()
 	if camera != null and camera.projection == Camera3D.PROJECTION_ORTHOGONAL:
 		var extent: Vector2 = terrain.display_size()

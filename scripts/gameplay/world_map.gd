@@ -13,7 +13,10 @@ func _ready() -> void:
 	toolbar.offset_top = 10
 	hud.add_child(toolbar)
 	var title := Label.new()
-	title.text = "WORLD MAP · Shaded relief · Seed " + $Terrain.map_seed
+	var update_title := func():
+		title.text = "WORLD MAP · " + ("Updating terrain view…" if $Terrain.map_renderer != null and $Terrain.map_renderer.display_pending() else "Shaded relief · Seed " + $Terrain.map_seed)
+	update_title.call()
+	$Terrain.presentation_changed.connect(update_title)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	toolbar.add_child(title)

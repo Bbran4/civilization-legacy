@@ -1,5 +1,7 @@
 # Terrain material palette and coverage blending
 
+> **Archived pipeline reference.** This document describes the retired terrain pipeline, not the current renderer. See [the README](../README.md), [zoom relief](zoom-relief.md), and [display-height caching](display-height-cache.md) for the active implementation.
+
 The Terrain view now uses editable, authored surface choices. Each land biome
 has three texture/pattern slots; beach sand, mountain rock, snow cover and wet
 soil also have separate rows. A runtime brush can paint a biome mix or an

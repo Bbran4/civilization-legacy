@@ -20,16 +20,21 @@ func _run() -> void:
 	editor._controls.coast_detail.value = 0
 	editor._controls.mountain_detail.value = 0
 	editor.apply_settings()
+	await terrain.wait_for_presentation()
 	check(terrain.sample_size() == Vector2i(2050, 2050) and terrain.height_samples.size() == 2050 * 2050, "Maximum map is exactly 2050 pixels on the longest edge.")
 	check(terrain.get_node("Surface").mesh is PlaneMesh, "Maximum output retains the bounded shared renderer, not millions of mesh triangles.")
+	print("2050: display ready")
 	editor._select_layer("rivers")
 	editor._water_controls.routing_resolution.select(0)
 	await editor.generate_water_layer()
 	check(terrain.water_layer_current() and terrain.water_layer.mask_size == terrain.sample_size(), "Maximum-resolution water matches the full heightmap raster.")
+	print("2050: water ready")
 	await editor.build_terrain_surface()
 	check(terrain.terrain_surface_current() and terrain.terrain_surface.heights.size() == 2050 * 2050, "Maximum surface builds at full output resolution.")
+	print("2050: surface ready")
 	await editor.generate_provinces()
 	check(terrain.province_layer_current() and terrain.province_layer.ids.size() == 2050 * 2050, "Province ownership matches the maximum output raster.")
+	print("2050: provinces ready")
 	await editor.generate_ocean_borders()
 	check(terrain.province_layer.ocean_generated, "Ocean regions generate at full 2050 resolution.")
 	# A closed cut within an interior land block exercises new IDs after sea IDs at maximum size.
@@ -69,12 +74,14 @@ func _run() -> void:
 	check(unerased.layer.ids[blocked_pixel] == created_id and not unerased.layer.blocked(blocked_pixel), "Maximum erasure Undo restores ID and passability.")
 	var re_erased := edits.redo(unerased.layer)
 	terrain.install_province_layer(re_erased.layer)
+	print("2050: edit history ready")
 	var path := "user://maximum-water.terrain.json"
 	check(Document.save_file(path, terrain).is_empty(), "Maximum-size height and water data fit the expanded bounded save format.")
 	var result := Document.load_file(path)
 	check(result.ok and Document.apply(terrain, result.document).is_empty() and terrain.water_layer_current() and terrain.terrain_surface_current() and terrain.province_layer_current(), "Maximum-resolution water and terrain restore together.")
 	check(terrain.province_layer.records[created_id-1].active and terrain.province_layer.records[created_id-1].kind == "land", "Appended land province restores after ocean records.")
 	check(terrain.province_layer.blocked(blocked_pixel) and terrain.province_layer.ids[blocked_pixel] == 0, "Maximum map restores the impassable mask exactly.")
+	print("2050: saved data restored")
 	# Race protection: reject an in-flight result if the source changes.
 	var previous_layer = terrain.water_layer
 	editor.generate_water_layer()

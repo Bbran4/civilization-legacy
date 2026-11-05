@@ -1,5 +1,7 @@
 # Coastline ribbons
 
+> **Archived pipeline reference.** This document describes the retired terrain pipeline, not the current renderer. See [the README](../README.md), [zoom relief](zoom-relief.md), and [display-height caching](display-height-cache.md) for the active implementation.
+
 Ocean coast outlines now use soft-edged triangle ribbons in Terrain view at every
 zoom. They retain ordinary scene depth testing: foreground mountains and objects
 can hide them. This replaces the old overview-only line overlay that drew through

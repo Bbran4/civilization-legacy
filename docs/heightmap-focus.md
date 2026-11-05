@@ -1,5 +1,7 @@
 # Grayscale heightmap focus
 
+> **Version note:** Current terrain documents are v15 and world manifests are v6. Older version numbers below record this feature's introduction. See [the current renderer](display-height-cache.md) and [README](../README.md) for active behavior.
+
 The active editor builds heightmap terrain first, using the existing Noise
 and 14 procedural templates plus supplied/imported heightmaps. Default: Continents,
 seed 42. Rivers/lakes are now an independently generated second layer; see

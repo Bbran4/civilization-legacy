@@ -1,5 +1,7 @@
 # Map Editor 2.0 — Phase 1
 
+> **Version note:** Current terrain documents are v15 and world manifests are v6. Older version numbers below record this feature's introduction. See [the current renderer](display-height-cache.md) and [README](../README.md) for active behavior.
+
 ## Active workspace
 
 The active application now offers Heightmap, independent Rivers / lakes, then

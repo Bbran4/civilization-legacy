@@ -37,16 +37,18 @@ water; river and lake pixels receive submerged beds. Distant terrain is untouche
 - The shared editor/gameplay renderer binds the derived field for shaded relief
   while retaining its canonical base field for future water generation. Logical
   surface-height queries also use current derived ground, independent of visibility.
-  The strategy map remains a flat rendered plane, not a new displaced 3D mesh.
+  Overview uses a flat plane; zoom blends into a displaced relief grid. The
+  display-height cache and fine shading are described in [display-height caching](display-height-cache.md).
 
 ## Safety and compatibility
 
-Terrain document version 10 gains an optional terrain_surface cache and optional
+Current terrain documents are v15; world manifests are v6. Historically, terrain
+document version 10 introduced the optional terrain_surface cache and optional
 water version 2 records. Documents without either field still load. Old water
 version 1 masks remain viewable/exportable and are never silently regenerated;
 Build asks for water regeneration to supply elevation/profile records.
 
-World manifest version 2 adds the surface layer. Version 1 manifests are validated
+World manifest version 2 originally added the surface layer. Version 1 manifests are validated
 against their original five layers, then upgraded in memory without rewriting
 files or changing their saved visibility/lock states. Save world still writes a
 new unique terrain snapshot before publishing the manifest, preserving old saves.

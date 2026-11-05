@@ -1,5 +1,7 @@
 # Independent rivers/lakes layer and expanded resolution
 
+> **Version note:** Current terrain documents are v15 and world manifests are v6. Older version numbers below record this feature's introduction. See [the current renderer](display-height-cache.md) and [README](../README.md) for active behavior.
+
 ## Workflow
 
 1. Generate the heightmap. Output resolution now accepts any whole number from

@@ -897,6 +897,7 @@ func _setup_document_tracking() -> void:
 			_save_current_world())
 	add_child(_unsaved_dialog)
 	_dialog.canceled.connect(_cancel_pending_action)
+	_terrain.presentation_changed.connect(_update_world_status)
 	_terrain.terrain_regenerated.connect(mark_dirty)
 	_terrain.province_layer_changed.connect(mark_dirty)
 	_terrain.province_layer_changed.connect(_apply_layer_visibility)
@@ -922,6 +923,7 @@ func _set_clean() -> void:
 func _update_world_status() -> void:
 	if _world_status != null:
 		_world_status.text = ("Unsaved changes" if dirty else "Saved") + (" · " + _world_path.get_file() if not _world_path.is_empty() else " · New world")
+		if _terrain.map_renderer != null and _terrain.map_renderer.display_pending(): _world_status.text += " · Updating terrain view…"
 
 func request_action(action: Callable) -> void:
 	if dirty:

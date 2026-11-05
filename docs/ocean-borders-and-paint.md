@@ -1,5 +1,7 @@
 # Ocean regions and manual border painting
 
+> **Version note:** Current terrain documents are v15 and world manifests are v6. Older version numbers below record this feature's introduction. See [the current renderer](display-height-cache.md) and [README](../README.md) for active behavior.
+
 ## Generate the oceans
 
 After generating Heightmap, Rivers / lakes, Terrain surface and land Provinces:

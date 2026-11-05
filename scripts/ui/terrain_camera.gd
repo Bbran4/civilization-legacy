@@ -30,6 +30,7 @@ var _zoom: float = 1.0
 func _ready() -> void:
 	_reset_view()
 	get_parent().get_node("Terrain").terrain_regenerated.connect(_map_changed)
+	get_parent().get_node("Terrain").presentation_changed.connect(_fit_depth)
 	get_viewport().size_changed.connect(_reset_view)
 
 

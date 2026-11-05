@@ -1,5 +1,7 @@
 # Province foundation
 
+> **Version note:** Current terrain documents are v15 and world manifests are v6. Older version numbers below record this feature's introduction. See [the current renderer](display-height-cache.md) and [README](../README.md) for active behavior.
+
 ## Using it
 
 Generate Heightmap, then Rivers / lakes, then Build terrain surface. Select

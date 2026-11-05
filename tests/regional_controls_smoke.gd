@@ -34,6 +34,7 @@ func _run() -> void:
 	source.resize(size.x*size.y)
 	source.fill((0.44-0.2)*12)
 	terrain.restore_heightfield(source,size)
+	await terrain.wait_for_presentation()
 	var trees: Dictionary = terrain.tree_settings.duplicate()
 	trees.count = 500
 	trees.coverage = 100
