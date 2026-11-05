@@ -21,3 +21,6 @@ Thumbs.db
 # Terrain3D local authored trials and platform binaries (install pinned release).
 .terrain3d-trials/
 addons/terrain_3d/bin/
+
+# Private installed-game reference assets; never distribute with the project.
+.terrain3d-reference/

@@ -30,6 +30,7 @@ var _heap: Array[int] = []
 var _order := PackedInt32Array()
 var _image: Image
 var _texture: Texture2D
+var _runoff_map: Image
 
 static func validate_settings(value: Variant) -> String:
 	if not value is Dictionary:
@@ -52,12 +53,21 @@ static func fingerprint(samples: PackedFloat32Array, size: Vector2i, extent: Vec
 	context.update(JSON.stringify([size.x, size.y, extent.x, extent.y, offset, elevation, version]).to_utf8_buffer())
 	return context.finish().hex_encode()
 
-func generate(heights: PackedFloat32Array, size: Vector2i, source: String, choices: Dictionary) -> String:
+func generate(heights: PackedFloat32Array, size: Vector2i, source: String, choices: Dictionary, runoff_map: Image = null) -> String:
 	var error := validate_settings(choices)
 	if not error.is_empty():
 		return error
-	if size.x < 3 or size.y < 3 or maxi(size.x, size.y) > 2050 or heights.size() != size.x * size.y:
+	if size.x < 3 or size.y < 3 or maxi(size.x, size.y) > 4096 or heights.size() != size.x * size.y:
 		return "Unsupported heightmap size for water generation."
+	if runoff_map != null:
+		if runoff_map.is_empty() or runoff_map.is_compressed() or maxi(runoff_map.get_width(), runoff_map.get_height()) > 1025:
+			return "Invalid runoff field."
+		for y in range(runoff_map.get_height()):
+			for x in range(runoff_map.get_width()):
+				var value := runoff_map.get_pixel(x, y).r
+				if not is_finite(value) or value < 0 or value > 1:
+					return "Runoff must be finite and between zero and one."
+	_runoff_map = runoff_map
 	lakes.clear()
 	river_features.clear()
 	lake_features.clear()
@@ -177,6 +187,11 @@ func _route() -> void:
 				downstream[i] = neighbor
 	flow.resize(count)
 	flow.fill(1.0)
+	if _runoff_map != null:
+		for i in range(count):
+			var uv := Vector2(i % routing_size.x, i / routing_size.x) / Vector2(routing_size - Vector2i.ONE)
+			var pixel := Vector2i((uv * Vector2(_runoff_map.get_size() - Vector2i.ONE)).round())
+			flow[i] = 0.0 if ocean[i] != 0 else _runoff_map.get_pixelv(pixel).r
 	for j in range(_order.size() - 1, -1, -1):
 		var i := _order[j]
 		if downstream[i] >= 0:
@@ -195,15 +210,17 @@ func _find_lakes() -> void:
 		seen[i] = 1
 		var cursor := 0
 		var depth := 0.0
+		var inflow := 0.0
 		while cursor < cells.size():
 			var cell := cells[cursor]
 			cursor += 1
 			depth = maxf(depth, filled[cell] - bed[cell])
+			inflow = maxf(inflow, flow[cell])
 			for neighbor in _neighbors(cell):
 				if seen[neighbor] == 0 and ocean[neighbor] == 0 and filled[neighbor] - bed[neighbor] > 0.00001 and absf(filled[neighbor] - filled[i]) < 0.000001:
 					seen[neighbor] = 1
 					cells.append(neighbor)
-		if cells.size() < minimum_area or depth < float(settings.lake_depth):
+		if cells.size() < minimum_area or depth < float(settings.lake_depth) or (_runoff_map != null and inflow <= 0.00001):
 			continue
 		var id := lakes.size()
 		for cell in cells:
@@ -455,7 +472,7 @@ static func decode(data: Variant) -> Dictionary:
 		if not size is Array or size.size() != 2:
 			return {"error": "Invalid water map dimensions."}
 		for value in size:
-			if not (value is int or value is float) or not is_finite(float(value)) or value != int(value) or value < 3 or value > (2050 if key == "size" else 1025):
+			if not (value is int or value is float) or not is_finite(float(value)) or value != int(value) or value < 3 or value > (4096 if key == "size" else 1025):
 				return {"error": "Invalid water map dimensions."}
 	for key in ["river_reaches", "lakes"]:
 		var value: Variant = data.get(key)
@@ -515,13 +532,13 @@ func _restore_features(data: Dictionary) -> String:
 		total += int(count)
 		if total > 17210000:
 			return "Too many river profile samples."
-		var profile := FloatPayload.decode(river.profile, int(count), 0, 2050)
+		var profile := FloatPayload.decode(river.profile, int(count), 0, 4096)
 		if not profile.error.is_empty():
 			return profile.error
 		var record: Dictionary = river.duplicate()
 		record.profile = profile.values
 		for i in range(0, record.profile.size(), 4):
-			if record.profile[i] > mask_size.x - 1 or record.profile[i + 1] > mask_size.y - 1 or record.profile[i + 2] <= 0 or record.profile[i + 2] > 128 or record.profile[i + 3] > 1:
+			if record.profile[i] > mask_size.x - 1 or record.profile[i + 1] > mask_size.y - 1 or record.profile[i + 2] <= 0 or record.profile[i + 2] > maxf(128, 40.0 * maxi(mask_size.x, mask_size.y) / 1025.0) or record.profile[i + 3] > 1:
 				return "Invalid river profile values."
 			if i > 0 and record.profile[i + 3] > record.profile[i - 1] + 0.00001:
 				return "A river profile flows uphill."

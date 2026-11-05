@@ -107,7 +107,7 @@ static func decode(data: Variant) -> Dictionary:
 	if not data is Dictionary or data.get("version") != 1 or not data.get("source_hash") is String or data.source_hash.length() != 64 or not data.get("water_hash") is String or data.water_hash.length() != 64 or not data.get("size") is Array or data.size.size() != 2:
 		return {"error": "Invalid terrain surface cache."}
 	for v in data.size:
-		if not (v is int or v is float) or not is_finite(float(v)) or v != int(v) or v < 3 or v > 2050:
+		if not (v is int or v is float) or not is_finite(float(v)) or v != int(v) or v < 3 or v > 4096:
 			return {"error": "Invalid terrain surface dimensions."}
 	var error := validate_settings(data.get("settings"))
 	if not error.is_empty():
