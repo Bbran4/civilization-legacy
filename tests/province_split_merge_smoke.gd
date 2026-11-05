@@ -206,6 +206,34 @@ func _run() -> void:
 	check(terrain.province_layer.connections == routes, "Reload restores routes.")
 	editor.play_map()
 	check(editor._gameplay_map != null and editor._gameplay_map.get_node("Terrain").province_layer.connections == routes, "Play map restores routes.")
+	var play = editor._gameplay_map
+	var runtime = play.get_node("Terrain")
+	while runtime.map_renderer.display_pending(): await process_frame
+	var clicked_route := false
+	for edge in routes:
+		if edge.type != "province_border": continue
+		for endpoint: int in [edge.a, edge.b]:
+			var pixel: int = runtime.province_layer.ids.find(endpoint)
+			var uv := Vector2(pixel % source.size.x, pixel / source.size.x) / Vector2(source.size - Vector2i.ONE)
+			var horizontal: Vector2 = (uv - Vector2.ONE * 0.5) * runtime.display_size()
+			var position_3d := Vector3(horizontal.x, runtime.visible_surface_height(uv), horizontal.y)
+			var click := InputEventMouseButton.new()
+			click.button_index = MOUSE_BUTTON_LEFT
+			click.pressed = true
+			click.position = play.get_node("CameraRig/Camera3D").unproject_position(runtime.to_global(position_3d))
+			play._unhandled_input(click)
+		check(play._origin == edge.a and play._destination == edge.b, "Map clicks select both route endpoints.")
+		check(play._directions.text.contains("Land border"), "Route preview explains the crossing.")
+		check(runtime.map_renderer.material.get_shader_parameter("route_enabled") == true, "Route highlight is enabled.")
+		play._clear.pressed.emit()
+		check(play._origin == 0 and play._destination == 0, "Clear route resets the preview.")
+		clicked_route = true
+		break
+	check(clicked_route, "Play map fixture contains a land route.")
+	for edge in routes:
+		if edge.type == "coastal_access":
+			check(play._find_route(edge.a, edge.b).is_empty(), "Coastal access alone cannot carry a land route.")
+			break
 	editor._return_from_map()
 	var saved := Document.load_file("user://split-map.terrain.json")
 	check(saved.ok and Document.apply(terrain, saved.document).is_empty() and terrain.province_layer.records[new_id - 1].active, "Split map restores exact IDs after ocean records.")

@@ -26,6 +26,9 @@ uniform float bed_datum;
 uniform float bed_scale;
 uniform bool water_enabled = false;
 uniform sampler2D water_field : filter_linear, repeat_disable;
+uniform bool route_enabled = false;
+uniform sampler2D route_colors : source_color, filter_nearest, repeat_disable;
+uniform sampler2D route_provinces : filter_nearest, repeat_disable;
 uniform bool provinces_enabled = false;
 uniform bool province_fill = true;
 uniform bool vector_borders = false;
@@ -222,6 +225,11 @@ void fragment() {
 		if (region_preview == 1) color = warmth < 0.5 ? mix(vec3(0.08,0.24,0.65),vec3(0.85,0.76,0.28),warmth*2.0) : mix(vec3(0.85,0.76,0.28),vec3(0.75,0.12,0.06),(warmth-0.5)*2.0);
 		if (region_preview == 2) color = mix(vec3(0.50,0.26,0.09),vec3(0.06,0.55,0.62),region.g);
 		if (region_preview == 3) color = mix(color,vec3(1.0,0.78,0.08),texture(region_selection,UV).r*0.65);
+	}
+	if (route_enabled) {
+		ivec2 province = ivec2(round(texture(route_provinces, UV).rg * 255.0));
+		vec4 route = texelFetch(route_colors, province, 0);
+		color = mix(color, route.rgb, route.a * 0.68);
 	}
 	ALBEDO = color;
 	float shadow_weight = shaded_relief && region_preview == 0 ? map_shadow_strength*relief_amount : 0.0;
