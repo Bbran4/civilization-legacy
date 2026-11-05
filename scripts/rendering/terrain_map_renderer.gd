@@ -8,6 +8,10 @@ var lighting := Lighting.new()
 var regions: RefCounted
 var _ground_library: RefCounted
 const Grid = preload("res://scripts/domain/heightmap_grid.gd")
+const Patches = preload("res://scripts/rendering/terrain_patches.gd")
+var patches: RefCounted
+var chunking_enabled := true
+var _relief_materials: Array[WeakRef] = []
 const DisplayField = preload("res://scripts/rendering/display_height_field.gd")
 const MAX_RELIEF_CELLS = DisplayField.MAX_RELIEF_CELLS
 const BACKGROUND_THRESHOLD = (MAX_RELIEF_CELLS+1)*(MAX_RELIEF_CELLS+1)
@@ -67,6 +71,7 @@ func _init(target: MeshInstance3D) -> void:
 	material.shader = SHADER
 	lighting.bind(material)
 	borders = Borders.new(surface)
+	patches = Patches.new(surface,material)
 	surface.material_override = material
 
 func set_heightfield(samples: PackedFloat32Array, size: Vector2i, extent: Vector2, height_offset: float, elevation: float, generator_version: int) -> void:
@@ -141,6 +146,7 @@ func set_provinces(layer: RefCounted, enabled: bool, preview: bool = false) -> v
 	material.set_shader_parameter("vector_borders",enabled and layer != null and not preview)
 	material.set_shader_parameter("provinces_enabled", enabled)
 	material.set_shader_parameter("province_field", layer.texture() if enabled else null)
+	_bind_patch_materials()
 
 func _update_nation_colors(layer: RefCounted) -> void:
 	if _nation_source == layer and _nation_revision == layer.border_revision: return
@@ -182,9 +188,12 @@ func set_relief(amount: float) -> void:
 	relief = clampf(amount,0.0,1.0)
 	visible_relief = relief if shaded_relief and relief > 0.001 else 0.0
 	var visible := visible_relief
-	if _relief_mesh != null: surface.mesh = _relief_mesh if visible > 0.0 else _overview_mesh
+	var detailed: bool = patches.enabled and chunking_enabled and visible > 0.0
+	patches.root.visible = detailed
+	if _relief_mesh != null: surface.mesh = null if detailed else (_relief_mesh if visible > 0.0 else _overview_mesh)
 	material.set_shader_parameter("relief_amount",visible)
 	borders.set_relief(_relief_texture,visible)
+	_bind_patch_materials()
 
 # Bilinear texture sampling uses texel centers, unlike Grid.sample's triangle mesh.
 static func _texture_sample(values: PackedFloat32Array, size: Vector2i, uv: Vector2) -> float:
@@ -277,7 +286,6 @@ func _publish_display(job: RefCounted) -> void:
 		plane.subdivide_width = mesh_size.x-2
 		plane.subdivide_depth = mesh_size.y-2
 		_relief_mesh = plane
-		borders.set_relief_grid(mesh_size)
 	mesh_heights = job.mesh_heights
 	mesh_bounds = job.bounds
 	var image := Image.create_from_data(mesh_size.x,mesh_size.y,false,Image.FORMAT_RF,mesh_heights.to_byte_array())
@@ -289,6 +297,8 @@ func _publish_display(job: RefCounted) -> void:
 	var high := maxf(0,mesh_bounds.y)+1.0
 	surface.custom_aabb = AABB(Vector3(-map_extent.x*0.5,low,-map_extent.y*0.5),Vector3(map_extent.x,high-low,map_extent.y))
 	borders.set_relief_margin(maxf(absf(low),absf(high)))
+	patches.configure(display_heights,job.size,map_extent,job.sea_height,display_texture,mesh_bounds)
+	borders.set_relief_grid(surface_grid_size())
 	_published_key = job.key
 	_display_cache.append(job)
 	while _display_cache.size() > 2: _display_cache.pop_front()
@@ -301,6 +311,7 @@ func _publish_display(job: RefCounted) -> void:
 
 func visible_height(uv: Vector2) -> float:
 	if not shaded_relief or mesh_heights.is_empty(): return 0.0
+	if patches.enabled and chunking_enabled: return patches.sample(uv)*visible_relief
 	return Grid.sample(mesh_heights,mesh_size,uv)*visible_relief
 
 func visible_bounds() -> Vector2:
@@ -330,12 +341,39 @@ func set_texturing(settings: Dictionary, world_seed: String, visible: bool, regi
 	material.set_shader_parameter("ground_snow_line",settings.snow_height/100.0)
 	return ""
 
+func surface_grid_size() -> Vector2i:
+	return patches.full_grid_size() if patches.enabled and chunking_enabled else mesh_size
+func set_chunking_enabled(enabled: bool) -> void:
+	chunking_enabled = enabled
+	borders.set_relief_grid(surface_grid_size())
+	if borders.source != null: borders.update(borders.source,map_extent,provinces_visible and shaded_relief)
+	set_relief(relief)
+func update_detail(camera: Camera3D,world_focus: Vector3) -> void:
+	if not patches.enabled or not chunking_enabled: return
+	var center := surface.to_local(world_focus)
+	var viewport := surface.get_viewport().get_visible_rect().size
+	patches.update_view(Vector2(center.x,center.z),camera.size,viewport.y,viewport.x/maxf(1,viewport.y),absf(camera.global_basis.z.y))
+	_bind_patch_materials()
+func _bind_patch_materials() -> void:
+	material.set_shader_parameter("terrain_inverse",surface.global_transform.affine_inverse())
+	patches.bind(material,chunking_enabled)
+	for i in range(_relief_materials.size()-1,-1,-1):
+		var target: ShaderMaterial = _relief_materials[i].get_ref()
+		if target == null: _relief_materials.remove_at(i)
+		else: patches.bind(target,chunking_enabled)
+	for child in borders.root.get_children(): patches.bind(child.material_override,chunking_enabled)
 func bind_relief_material(target: ShaderMaterial) -> void:
+	var found := false
+	for reference in _relief_materials:
+		if reference.get_ref() == target: found = true
+	if not found: _relief_materials.append(weakref(target))
+	patches.bind(target,chunking_enabled)
 	target.set_shader_parameter("relief_vertices",_relief_texture)
 	target.set_shader_parameter("relief_amount",visible_relief)
 	lighting.bind(target)
 
 func update_lighting(sun: DirectionalLight3D, environment: Environment, camera: Camera3D, focus: Vector3) -> void:
+	if camera != null: update_detail(camera,focus)
 	lighting.update(sun,environment,camera,focus)
 	lighting.bind(material)
 

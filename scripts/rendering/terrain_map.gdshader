@@ -4,6 +4,7 @@ render_mode cull_disabled, ambient_light_disabled, specular_disabled, fog_disabl
 #include "res://scripts/rendering/map_relief.gdshaderinc"
 #include "res://scripts/rendering/map_lighting.gdshaderinc"
 #include "res://scripts/rendering/display_normals.gdshaderinc"
+uniform mat4 terrain_inverse = mat4(1.0);
 varying vec3 map_world_position;
 uniform vec2 map_extent = vec2(192.0);
 uniform float coast_width = 4.5;
@@ -126,7 +127,13 @@ vec3 province_tint(float id) {
     return 0.3 + 0.6 * fract(sin(vec3(id,id+17.0,id+43.0))*43758.5453);
 }
 void vertex() {
-    VERTEX.y = relief_height(UV);
+    if (chunked_relief) {
+        vec3 map_position = (terrain_inverse*MODEL_MATRIX*vec4(VERTEX,1.0)).xyz;
+        UV = map_position.xz/map_extent+0.5;
+        VERTEX.y = patch_vertex_height(UV,int(round(COLOR.a*4.0)))*relief_amount;
+    } else {
+        VERTEX.y = relief_height(UV);
+    }
     map_world_position = (MODEL_MATRIX*vec4(VERTEX,1.0)).xyz;
 }
 void fragment() {

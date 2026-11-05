@@ -486,7 +486,7 @@ func ray_surface_hit(ray_origin: Vector3, ray_direction: Vector3) -> Variant:
 	if enter > leave:
 		return null
 	var previous_t: float = enter
-	var steps: int = maxi(32,ceili(Vector2(direction.x,direction.z).length()*(leave-enter)/minf(extent.x/(map_renderer.mesh_size.x-1),extent.y/(map_renderer.mesh_size.y-1))*2.0))
+	var steps: int = maxi(32,ceili(Vector2(direction.x,direction.z).length()*(leave-enter)/minf(extent.x/(map_renderer.surface_grid_size().x-1),extent.y/(map_renderer.surface_grid_size().y-1))*2.0))
 	for step_index in range(steps + 1):
 		var t: float = lerpf(enter, leave, float(step_index) / steps)
 		var point: Vector3 = origin + direction * t

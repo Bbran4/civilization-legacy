@@ -217,7 +217,7 @@ func _process(_delta: float) -> void:
 	var extent: Vector2 = editor._terrain.display_size()
 	for j in range(49):
 		var uv: Vector2 = (point + Vector2(cos(j * TAU / 48), sin(j * TAU / 48)) * r) / Vector2(dimensions - Vector2i.ONE)
-		var points := PackedVector2Array([uv]) if previous == Vector2.INF else Grid.split_surface_segment(previous,uv,editor._terrain.map_renderer.mesh_size)
+		var points := PackedVector2Array([uv]) if previous == Vector2.INF else Grid.split_surface_segment(previous,uv,editor._terrain.map_renderer.surface_grid_size())
 		for at in points:
 			var edge := (at-Vector2.ONE*0.5)*extent
 			mesh.surface_add_vertex(Vector3(edge.x,editor._terrain.visible_surface_height(at)+0.08,edge.y))
@@ -294,7 +294,7 @@ func _draw_split() -> void:
 	mesh.surface_begin(Mesh.PRIMITIVE_LINE_STRIP)
 	var previous := Vector2.INF
 	var extent: Vector2 = editor._terrain.display_size()
-	var mesh_size: Vector2i = editor._terrain.map_renderer.mesh_size
+	var mesh_size: Vector2i = editor._terrain.map_renderer.surface_grid_size()
 	for pixel in split_points:
 		var local: Vector2 = (pixel / Vector2(dimensions - Vector2i.ONE) - Vector2.ONE * 0.5) * extent
 		var start := local if previous == Vector2.INF else previous

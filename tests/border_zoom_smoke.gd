@@ -44,6 +44,8 @@ func _run() -> void:
 				record.nation_id = 0
 			layer.ocean_generated = true
 			layer._index_regions()
+			# The current water palette must contrast with ink; raw grayscale sea is dark.
+			renderer.set_texturing(preload("res://scripts/domain/terrain_texturing.gd").DEFAULTS,"border-width",true)
 			heights.fill(0.1)
 			renderer.set_heightfield(heights,layer.size,Vector2(128,128),0,1,2)
 			renderer.set_provinces(layer,true)
@@ -67,6 +69,7 @@ func _run() -> void:
 				failures += 1
 				push_error("Solid lines must remain continuous and bounded: "+str([ocean,zoom_size,narrowest,widest]))
 			print("Solid border pixels: ocean=",ocean," camera=",zoom_size," min/max=",narrowest,"/",widest)
+	renderer.set_texturing(preload("res://scripts/domain/terrain_texturing.gd").DEFAULTS,"border-width",false)
 	for record in layer.records:
 		record.kind = "land"
 		record.nation_id = record.id

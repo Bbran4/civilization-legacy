@@ -16,6 +16,11 @@ void vertex() {
 	vec2 normal = COLOR.rg*2.0-1.0;
 	vec3 center = vec3(VERTEX.x,relief_height(UV2),VERTEX.z);
 	vec2 cell_world = map_extent/vec2(textureSize(relief_vertices,0)-1);
+	if (chunked_relief) {
+		ivec2 patch = clamp(ivec2(floor(UV2*vec2(relief_patch_count))),ivec2(0),relief_patch_count-1);
+		float level = round(texelFetch(relief_patch_lods,patch,0).r*255.0);
+		cell_world = map_extent/(vec2(relief_patch_count)*8.0*exp2(level));
+	}
 	float probe = max(min(cell_world.x,cell_world.y)*0.25,0.0001);
 	vec2 direction = normal*(UV.y < 0.0 ? -1.0 : 1.0);
 	vec3 neighbor = center+vec3(direction.x,0.0,direction.y)*probe;

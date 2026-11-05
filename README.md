@@ -127,8 +127,10 @@ updates prepare the combined ground/water display in a worker; the editor remain
 responsive and shows **Updating terrain view…** until the result is ready. Picking
 pauses during replacement and resumes against the actual displayed triangles.
 Fine world-scaled normals remain visible at full relief. Zoom reuses prepared
-fields. The mesh is still capped at 512 cells; chunked terrain and separate water
-surfaces are later work. Source heights and saved hydrology remain unchanged.
+fields. Large sources now use camera-dependent patches, reaching approximately 2048 cells
+along a 2050-pixel source near the camera. Smooth detail transitions share the same
+surface with picking, borders and tree roots. See [chunked terrain](docs/chunked-terrain.md).
+Separate water surfaces remain later work. Source heights and saved hydrology stay unchanged.
 
 ## Lighting and atmosphere
 

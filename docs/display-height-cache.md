@@ -37,9 +37,9 @@ Tests/callers that need displayed geometry can await `terrain.wait_for_presentat
 
 CPU picking deliberately samples the **displayed mesh triangles**, not arbitrary
 full-resolution heights between their vertices. Tree roots and draped borders still
-use the same grid and diagonal. Source-resolution displacement/chunked geometry is
-a later step; using that field as an unrelated picking surface now would disagree
-with the visible mesh. Overview remains a cheap plane and raw height export stays
+use the same grid and diagonal. Large fields now use [camera-dependent patches](chunked-terrain.md), with matching
+CPU/GPU triangle sampling. Picking the full-resolution texture independently would
+still disagree with the visible mesh between its vertices. Overview remains a cheap plane and raw height export stays
 unchanged.
 
 ## Fine normals
@@ -51,10 +51,10 @@ footprint to reduce distant shimmer. These normals remain active at full relief;
 the previous coarse-normal replacement has been removed. Existing lighting,
 political overlays and terrain material placement remain shared with Play map.
 
-Normals can show detail finer than the mesh; they do not add silhouette or river
-channel geometry. The 512-cell mesh cap, coarse hydraulic limitations and colored
-water overlay remain. Chunked LOD and separate water surfaces are not part of this
-change.
+Normals can show detail finer than the mesh; they do not add geometry themselves.
+The subsequent [chunked terrain stage](chunked-terrain.md) removes the single-grid
+512-cell cap for large sources. Colored water overlays and source-resolution limits
+remain; separate water geometry is later work.
 
 ## Measurements and remaining costs
 
@@ -65,6 +65,7 @@ measured the old `set_heightfield` + water path at **1788 ms blocking**, versus
 while waiting. This was one headless comparison, not an FPS or universal speed claim;
 concurrent work and renderer state affect times.
 
+These timings describe the display-cache stage before chunked geometry.
 The independent cache test observed approximately 172 ms submission, 351 ms worker
 preparation and 25 ms publication in another run. Preparation has moved off the
 main thread for large requests, not disappeared. Height normalization still scans

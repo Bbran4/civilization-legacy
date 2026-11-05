@@ -29,6 +29,8 @@ func build() -> void:
 		if wet and (mask[i*4] > 0 or mask[i*4+1] > 0) and levels[i] >= 0:
 			h = maxf(h,levels[i])
 		heights[i] = (offset+(h-datum)*elevation)*scale
+		bounds.x = minf(bounds.x,maxf(sea_height,heights[i]))
+		bounds.y = maxf(bounds.y,maxf(sea_height,heights[i]))
 	mesh_size = Grid.sample_size_for(extent,mini(MAX_RELIEF_CELLS,maxi(size.x,size.y)-1))
 	mesh_heights.resize(mesh_size.x*mesh_size.y)
 	for y in range(mesh_size.y):

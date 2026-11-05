@@ -1,7 +1,9 @@
 # Zoom-driven terrain relief
 
-The existing map renderer now owns two cached meshes: a four-vertex overview plane
-and a relief grid bounded to 512 cells on its longest axis. A source/surface/water
+The renderer retains a four-vertex overview plane and a bounded relief-grid fallback.
+Large sources now use [camera-dependent patches](chunked-terrain.md) with source-scale
+close detail and matching CPU/GPU triangle sampling. The original fallback grid
+remains bounded to 512 cells on its longest axis. A source/surface/water
 change prepares the relief heights; camera movement and zoom only update uniforms
 and select an existing mesh. No saved generation field is modified.
 
@@ -25,7 +27,7 @@ Lighting now uses full-resolution display-height normals in world units at every
 relief amount. The coarse grid still defines silhouettes, picking and draped lines;
 fine normals improve shading without adding geometry. Dynamic cast shadows are
 supported by the shared lighting path. Thin hydraulic geometry can still soften;
-chunked distance LOD and separate water geometry remain later work.
+chunked distance LOD is implemented; separate water geometry remains later work.
 
 Display preparation now batches source changes, caches two surface/water variants,
 and prepares large fields in a worker. See [display-height caching](display-height-cache.md)
