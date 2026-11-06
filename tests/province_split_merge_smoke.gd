@@ -287,6 +287,32 @@ func _run() -> void:
 	terrain.install_province_layer(replaced)
 	brush.merge_selected()
 	check(terrain.province_layer == replaced, "A replaced model rejects an obsolete merge selection.")
+	var manager = load(ProjectSettings.get_setting("application/run/main_scene")).instantiate()
+	root.add_child(manager)
+	manager._maps()
+	var map_path := "user://maps/standalone-smoke-%d.world.json" % Time.get_ticks_usec()
+	check(editor.save_world(map_path).is_empty(), "Editor saves a selectable world manifest.")
+	manager._maps()
+	var map_index: int = -1
+	for i in range(manager.files.item_count):
+		if manager.files.get_item_metadata(i) == map_path: map_index = i
+	check(map_index >= 0, "Play lists the saved world.")
+	if map_index >= 0:
+		manager.files.select(map_index)
+		manager._play_selected()
+		var standalone = manager.session
+		check(standalone != null and standalone.menu_session, "Main menu launches an independent game.")
+		if standalone != null:
+			check(standalone.get_node("Terrain").province_layer.ids == terrain.province_layer.ids, "Standalone game loads the selected map borders.")
+			standalone._pick_province(target)
+			standalone._found_settlement()
+			check(standalone._settlement == target and standalone._unit == target, "Player founds a tribe and scout in standalone play.")
+			standalone._request_return()
+			check(manager.session == null and manager.get_node("Menu").visible, "Leaving play returns to the main menu.")
+	if map_index >= 0:
+		DirAccess.remove_absolute(editor._terrain_path)
+		DirAccess.remove_absolute(map_path)
+	manager.queue_free()
 	world.queue_free()
 	await process_frame
 	print("Province split and merge: %s" % ("PASS" if failures == 0 else "FAIL (%d)" % failures))
